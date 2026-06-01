@@ -692,6 +692,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   </nav>
 
   <section class="hero">
+    <canvas id="candle-rain" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
     <div class="hero-bg">
       <svg class="candle-bg" viewBox="0 0 1440 400" fill="none" preserveAspectRatio="none">
         <g stroke="#C9A84C">
@@ -2441,6 +2442,163 @@ window.onload=async function(){
     if(event==='SIGNED_OUT'){showPage('page-landing');}
   });
 };
+</script>
+<script>
+// ═══════════════════════════════════
+// CANDLE RAIN ANIMATION — TAGDA VERSION
+// ═══════════════════════════════════
+(function initCandleRain(){
+  const canvas = document.getElementById('candle-rain');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resize(){
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Candle factory
+  function newCandle(spreadY){
+    const bull = Math.random() > 0.44;
+    const bH = 18 + Math.random() * 52;
+    const bW = 6 + Math.random() * 7;
+    return {
+      x: Math.random() * canvas.width,
+      y: spreadY ? Math.random() * canvas.height : -100 - Math.random() * 400,
+      speed: 0.6 + Math.random() * 1.4,
+      bH, bW,
+      wickT: 6 + Math.random() * 22,
+      wickB: 6 + Math.random() * 16,
+      bull,
+      alpha: 0.08 + Math.random() * 0.38,
+      drift: (Math.random() - 0.5) * 0.25,
+      rot: (Math.random() - 0.5) * 0.22,
+      rotSpeed: (Math.random() - 0.5) * 0.0012,
+      scale: 0.55 + Math.random() * 1.0,
+      // Glow pulse
+      pulse: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.02 + Math.random() * 0.03,
+    };
+  }
+
+  const COUNT = 55;
+  const candles = [];
+  for(let i = 0; i < COUNT; i++) candles.push(newCandle(true));
+
+  function drawCandle(c){
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.rot);
+    ctx.scale(c.scale, c.scale);
+
+    // Pulsing glow effect
+    const glowPulse = 0.7 + 0.3 * Math.sin(c.pulse);
+    ctx.globalAlpha = c.alpha * glowPulse;
+
+    const col = c.bull ? '#4CAF7D' : '#E05252';
+    const glowCol = c.bull ? 'rgba(76,175,125,0.15)' : 'rgba(224,82,82,0.15)';
+    const hw = c.bW / 2;
+
+    // Outer glow
+    const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, c.bW * 2.5);
+    grd.addColorStop(0, glowCol);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(-c.bW * 2.5, -c.bH / 2 - c.wickT, c.bW * 5, c.bH + c.wickT + c.wickB);
+
+    // Wick
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, -c.bH / 2 - c.wickT);
+    ctx.lineTo(0, c.bH / 2 + c.wickB);
+    ctx.stroke();
+
+    // Candle body
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    if(ctx.roundRect){
+      ctx.roundRect(-hw, -c.bH / 2, c.bW, c.bH, 2);
+    } else {
+      ctx.rect(-hw, -c.bH / 2, c.bW, c.bH);
+    }
+    ctx.fill();
+
+    // Shine on body
+    const shine = ctx.createLinearGradient(-hw, -c.bH/2, hw, c.bH/2);
+    shine.addColorStop(0, 'rgba(255,255,255,0.18)');
+    shine.addColorStop(0.4, 'rgba(255,255,255,0.06)');
+    shine.addColorStop(1, 'rgba(0,0,0,0.1)');
+    ctx.fillStyle = shine;
+    ctx.beginPath();
+    if(ctx.roundRect){
+      ctx.roundRect(-hw, -c.bH / 2, c.bW, c.bH, 2);
+    } else {
+      ctx.rect(-hw, -c.bH / 2, c.bW, c.bH);
+    }
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  let animId;
+  let lastTime = 0;
+
+  function animate(timestamp){
+    const delta = Math.min((timestamp - lastTime) / 16, 3);
+    lastTime = timestamp;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    candles.forEach(c => {
+      c.y += c.speed * delta;
+      c.x += c.drift * delta;
+      c.rot += c.rotSpeed * delta;
+      c.pulse += c.pulseSpeed * delta;
+
+      // Reset when off screen
+      if(c.y > canvas.height + 120){
+        Object.assign(c, newCandle(false));
+      }
+      // Keep x in bounds loosely
+      if(c.x < -60) c.drift = Math.abs(c.drift);
+      if(c.x > canvas.width + 60) c.drift = -Math.abs(c.drift);
+
+      drawCandle(c);
+    });
+
+    animId = requestAnimationFrame(animate);
+  }
+
+  animId = requestAnimationFrame(animate);
+
+  // Pause when tab hidden — save battery
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden){
+      cancelAnimationFrame(animId);
+    } else {
+      lastTime = 0;
+      animId = requestAnimationFrame(animate);
+    }
+  });
+
+  // Pause when scrolled past hero
+  const heroSection = document.querySelector('.hero');
+  if(heroSection){
+    const obs = new IntersectionObserver(entries => {
+      if(entries[0].isIntersecting){
+        lastTime = 0;
+        animId = requestAnimationFrame(animate);
+      } else {
+        cancelAnimationFrame(animId);
+      }
+    }, {threshold: 0.01});
+    obs.observe(heroSection);
+  }
+})();
 </script>
 </body>
 </html>
