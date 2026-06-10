@@ -1,0 +1,64 @@
+/* ══════════════════════════════════════════════════
+   EdgeTrade — CSS Variables & Global Styles
+   variables.css
+══════════════════════════════════════════════════ */
+
+:root {
+  --bg:    #0A0A0F;
+  --bg2:   #0F0F18;
+  --bg3:   #13131E;
+  --bg4:   #17172A;
+  --card:  rgba(19,19,30,0.9);
+  --gold:       #C9A84C;
+  --gold-dim:   rgba(201,168,76,0.10);
+  --gold-glow:  rgba(201,168,76,0.20);
+  --blue:       #2A6496;
+  --blue-dim:   rgba(42,100,150,0.12);
+  --white:  #F5F0E8;
+  --muted:  #6B7280;
+  --border:  rgba(201,168,76,0.10);
+  --border2: rgba(255,255,255,0.06);
+  --green:     #4CAF7D;
+  --green-dim: rgba(76,175,125,0.10);
+  --red:       #E05252;
+  --red-dim:   rgba(224,82,82,0.10);
+  --sidebar: 220px;
+}
+
+/* ── RESET ── */
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(201,168,76,0.15); border-radius:2px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(201,168,76,0.3); }
+
+/* ── UTILITY ── */
+.gold-sep {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,168,76,0.15), transparent);
+  margin: 20px 0;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(16px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(20px); }
+  to   { opacity:1; transform:translateY(0); }
+}
