@@ -564,9 +564,9 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* ════════════════════════════════
    BROKER POPUP (D)
 ════════════════════════════════ */
-.popup-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;}
+.popup-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;overflow:hidden;}
 .popup-overlay.open{display:flex;}
-.popup-panel{background:var(--bg2);border:1px solid var(--border);border-radius:18px;width:480px;max-width:95vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;}
+.popup-panel{background:var(--bg2);border:1px solid var(--border);border-radius:18px;width:480px;max-width:95vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;overscroll-behavior:contain;}
 .popup-hdr{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .popup-title{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:500;}
 .popup-close{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
@@ -582,7 +582,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .conn-type{font-size:10px;color:var(--muted);}
 .conn-status{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);}
 .conn-status-m{background:var(--gold);box-shadow:0 0 5px var(--gold);}
-.add-broker-sec{padding:14px 22px;flex:1;overflow-y:auto;}
+.add-broker-sec{padding:14px 22px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .add-broker-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .broker-search-w{position:relative;margin-bottom:10px;}
 .broker-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:9px 12px 9px 34px;color:var(--white);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;}
@@ -1586,20 +1586,36 @@ async function loadProfile(){
     const name=data.full_name||state.user.email||'Trader';
     const initials=name.charAt(0).toUpperCase();
     document.getElementById('sidebar-name').textContent=name;
-    document.getElementById('sidebar-av').textContent=initials;
-    document.getElementById('topbar-av').textContent=initials;
     document.getElementById('profile-name-display').textContent=name;
-    const avEl=document.getElementById('profile-av-big');
+    document.getElementById('profile-email-display').textContent=state.user.email||'';
     const savedDp=localStorage.getItem('et-dp');
+    // Profile big avatar
+    const avEl=document.getElementById('profile-av-big');
+    // Sidebar avatar
+    const sideAv=document.getElementById('sidebar-av');
+    // Topbar avatar
+    const topAv=document.getElementById('topbar-av');
     if(savedDp){
+      // Profile big
       avEl.style.backgroundImage=`url(${savedDp})`;
       avEl.style.backgroundSize='cover';
       avEl.style.backgroundPosition='center';
       avEl.textContent='';
+      // Sidebar
+      sideAv.style.backgroundImage=`url(${savedDp})`;
+      sideAv.style.backgroundSize='cover';
+      sideAv.style.backgroundPosition='center';
+      sideAv.textContent='';
+      // Topbar
+      topAv.style.backgroundImage=`url(${savedDp})`;
+      topAv.style.backgroundSize='cover';
+      topAv.style.backgroundPosition='center';
+      topAv.textContent='';
     } else {
       avEl.textContent=initials;
+      sideAv.textContent=initials;
+      topAv.textContent=initials;
     }
-    document.getElementById('profile-email-display').textContent=state.user.email||'';
   }
 }
 
@@ -2360,7 +2376,6 @@ async function editName(){
 }
 
 function changeDP(){
-  // Create hidden file input
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'image/*';
@@ -2371,13 +2386,15 @@ function changeDP(){
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
-      // Show in avatar
-      const av = document.getElementById('profile-av-big');
-      av.style.backgroundImage = `url(${dataUrl})`;
-      av.style.backgroundSize = 'cover';
-      av.style.backgroundPosition = 'center';
-      av.textContent = '';
-      // Save to localStorage (no Supabase storage needed)
+      const applyDp = (el) => {
+        el.style.backgroundImage=`url(${dataUrl})`;
+        el.style.backgroundSize='cover';
+        el.style.backgroundPosition='center';
+        el.textContent='';
+      };
+      applyDp(document.getElementById('profile-av-big'));
+      applyDp(document.getElementById('sidebar-av'));
+      applyDp(document.getElementById('topbar-av'));
       localStorage.setItem('et-dp', dataUrl);
       showToast('Profile photo updated!','success');
     };
