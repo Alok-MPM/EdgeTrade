@@ -582,7 +582,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .conn-type{font-size:10px;color:var(--muted);}
 .conn-status{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);}
 .conn-status-m{background:var(--gold);box-shadow:0 0 5px var(--gold);}
-.add-broker-sec{padding:14px 22px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.add-broker-sec{padding:14px 22px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .add-broker-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .broker-search-w{position:relative;margin-bottom:10px;}
 .broker-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:9px 12px 9px 34px;color:var(--white);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;}
@@ -1278,7 +1278,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   <div class="popup-panel" style="max-height:90vh;">
 
     <!-- MAIN VIEW -->
-    <div id="broker-main-view">
+    <div id="broker-main-view" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
       <div class="popup-hdr">
         <h3 class="popup-title">Brokers & Exchanges</h3>
         <button class="popup-close" onclick="closeBrokerPopup()">✕</button>
@@ -1986,7 +1986,7 @@ function closeBrokerOutside(e){if(e.target===document.getElementById('broker-pop
 })();
 
 function showBrokerMain(){
-  document.getElementById('broker-main-view').style.display='block';
+  document.getElementById('broker-main-view').style.display='flex';
   document.getElementById('broker-connect-view').style.display='none';
   document.getElementById('broker-manual-view').style.display='none';
 }
