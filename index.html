@@ -264,7 +264,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .tb-btn:hover{border-color:var(--gold);color:var(--gold);}
 .notif-dot{width:7px;height:7px;border-radius:50%;background:var(--red);position:absolute;top:5px;right:5px;}
 
-.content-area{flex:1;padding:24px;}
+.content-area{flex:1;padding:24px;padding-bottom:48px;}
 .content-section{display:none;}.content-section.active{display:block;}
 
 /* ════════════════════════════════
@@ -1002,8 +1002,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           <div class="entry-sec entry-sec-full">
             <div class="entry-sec-title">💰 Your Balance</div>
             <div class="fg fg2">
-              <div class="field"><label>Initial Capital</label><div class="prefix-wrap"><span class="pfx" id="pfx-init">₹</span><input type="number" id="e-init" placeholder="Initial capital"></div></div>
-              <div class="field"><label>Updated Capital</label><div class="prefix-wrap"><span class="pfx" id="pfx-upd">₹</span><input type="number" id="e-upd" placeholder="Updated capital"></div></div>
+              <div class="field"><label>Initial Capital <button type="button" id="cur-change-btn" onclick="openCurrencyPicker()" style="background:var(--gold-dim);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:10px;color:var(--gold);cursor:pointer;margin-left:6px;font-family:'Outfit',sans-serif;">Change Currency</button></label><div class="prefix-wrap"><span class="pfx" id="pfx-init">$</span><input type="number" id="e-init" placeholder="Initial capital"></div></div>
+              <div class="field"><label>Updated Capital</label><div class="prefix-wrap"><span class="pfx" id="pfx-upd">$</span><input type="number" id="e-upd" placeholder="Updated capital"></div></div>
             </div>
           </div>
 
@@ -1029,12 +1029,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
               </div>
             </div>
             <div class="fg fg2">
-              <div class="field"><label>Lot Size</label><div class="lot-wrap"><input type="number" id="e-lot" placeholder="0.01"><select class="lot-sel" id="e-lot-unit"><option value="lot">Lot</option><option value="usd">USD</option><option value="asset" id="lot-asset-opt">Asset</option></select></div></div>
+              <div class="field"><label>Lot Size</label><div class="lot-wrap"><input type="number" id="e-lot" placeholder="0.01" oninput="updateLotDisplay()"><select class="lot-sel" id="e-lot-unit" onchange="updateLotDisplay()"><option value="lot">Lot</option><option value="usd">USD</option><option value="inr">INR</option><option value="asset" id="lot-asset-opt">Asset</option></select></div><div id="lot-display" style="margin-top:4px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;min-height:16px;"></div></div>
               <div class="field"><label>Entry Time</label><input type="time" id="e-time"></div>
               <div class="field"><label>Leverage</label><input type="text" id="e-leverage" placeholder="1X"></div>
               <div class="field"><label>Session</label><select id="e-session"><option value="" disabled selected>Select Session</option><option>London</option><option>New York</option><option>Asian</option><option>London-NY Overlap</option><option>Pre-Market</option><option>Post-Market</option></select></div>
               <div class="field"><label>Entry Price</label><div class="prefix-wrap"><span class="pfx" id="pfx-entry">$</span><input type="number" id="e-entry" placeholder="Entry price"></div></div>
-              <div class="field"><label>Fees (Optional)</label><div class="prefix-wrap"><span class="pfx" id="pfx-fees">₹</span><input type="number" id="e-fees" placeholder="0"></div></div>
+              <div class="field"><label>Fees (Optional)</label><div class="prefix-wrap"><span class="pfx" id="pfx-fees">$</span><input type="number" id="e-fees" placeholder="0"></div></div>
             </div>
             <div class="field" style="margin-top:4px;"><label>Direction</label>
               <div class="dir-group">
@@ -1456,7 +1456,8 @@ let state = {
   selectedChart: null,
   statsFilter: 'month',
   calMonth: new Date().getMonth(),
-  calYear: new Date().getFullYear()
+  calYear: new Date().getFullYear(),
+  currentCurrency: '$'
 };
 
 // ══════════════════════════════════════
@@ -1808,7 +1809,7 @@ function fillForm(t){
     'e-init':t.initial_capital,'e-upd':t.updated_capital,
     'e-chart':t.chart_name,'e-lot':t.lot_size,
     'e-time':t.entry_time,'e-leverage':t.leverage,
-    'e-session':t.session,'e-entry':t.entry_price,
+    'e-entry':t.entry_price,
     'e-fees':t.fees,'e-tp':t.take_profit,
     'e-ttp':t.trailing_profit,'e-sl':t.stop_loss,
     'e-tsl':t.trailing_sl,'e-exit':t.exit_price,
@@ -1817,15 +1818,33 @@ function fillForm(t){
     'e-learn':t.learning,'e-diff':t.different_approach
   };
   Object.entries(fields).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.value=val||'';});
-  if(t.lot_unit)document.getElementById('e-lot-unit').value=t.lot_unit;
+  // Session - needs separate handling
+  const sessionEl=document.getElementById('e-session');
+  if(sessionEl) sessionEl.value=t.session||'';
+  // Lot unit
+  if(t.lot_unit) document.getElementById('e-lot-unit').value=t.lot_unit;
+  // Currency symbol restore
+  if(t.currency_symbol) setCurrencySymbol(t.currency_symbol);
+  else { const autoSym=getBrokerCurrencySymbol(); setCurrencySymbol(autoSym); }
+  // Restore asset name in lot dropdown if chart known
+  if(t.chart_name){
+    const ch=CHARTS.find(c=>c.sym===t.chart_name);
+    if(ch) document.getElementById('lot-asset-opt').textContent=ch.sym.split('/')[0]||ch.sym;
+  }
   selDir(t.direction||'long');
   selConc(t.conclusion||'target');
+  updateLotDisplay();
 }
 
 function clearForm(){
   ['e-init','e-upd','e-chart','e-lot','e-time','e-leverage','e-entry','e-fees','e-tp','e-ttp','e-sl','e-tsl','e-exit','e-rrr','e-strategy','e-pov','e-psych','e-learn','e-diff'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('e-session').value='';
   document.getElementById('e-lot-unit').value='lot';
+  // Auto-set currency from current broker
+  const autoSym=getBrokerCurrencySymbol();
+  setCurrencySymbol(autoSym);
+  const disp=document.getElementById('lot-display');
+  if(disp) disp.textContent='';
   selDir('long');selConc('target');state.selectedChart=null;
 }
 
@@ -1859,6 +1878,7 @@ async function saveTrade(){
     conclusion:state.conclusion,
     initial_capital:parseFloat(document.getElementById('e-init').value)||null,
     updated_capital:parseFloat(document.getElementById('e-upd').value)||null,
+    currency_symbol:state.currentCurrency||'$',
     trade_number:state.currentTradeIdx+1
   };
   let err;
@@ -1961,9 +1981,89 @@ function selectChart(c){
   document.getElementById('chart-dd').classList.remove('open');
   chartDDOpen=false;
   const isIndian=c.cat==='indian';
+  const isForex=c.cat==='forex';
   const isCrypto=c.cat==='crypto';
-  document.getElementById('pfx-entry').textContent=isIndian?'₹':'$';
-  document.getElementById('lot-asset-opt').textContent=c.sym.split('/')[0];
+  const isCommodity=c.cat==='commodity';
+  // Auto set currency based on chart category
+  let sym='$';
+  if(isIndian) sym='₹';
+  else if(isForex||isCrypto||isCommodity) sym='$';
+  // Update all currency prefix symbols
+  setCurrencySymbol(sym);
+  // Update lot asset option
+  document.getElementById('lot-asset-opt').textContent=isIndian?c.sym.split('/')[0]||c.sym:c.sym.split('/')[0]||c.sym;
+  updateLotDisplay();
+}
+
+// CURRENCY SYSTEM
+const CURRENCIES=[
+  {sym:'$',name:'USD — US Dollar'},{sym:'₹',name:'INR — Indian Rupee'},
+  {sym:'€',name:'EUR — Euro'},{sym:'£',name:'GBP — Pound'},
+  {sym:'¥',name:'JPY — Yen'},{sym:'₿',name:'BTC — Bitcoin'},
+  {sym:'₩',name:'KRW — Korean Won'},{sym:'A$',name:'AUD — Aussie Dollar'},
+  {sym:'C$',name:'CAD — Canadian Dollar'},{sym:'CHF',name:'CHF — Swiss Franc'},
+  {sym:'S$',name:'SGD — Singapore Dollar'},{sym:'AED',name:'AED — Dirham'},
+];
+
+// Map broker type → currency symbol
+function getBrokerCurrencySymbol(){
+  if(!state.activeBroker) return '$';
+  const b=state.brokers.find(b=>b.id===state.activeBroker);
+  if(!b) return '$';
+  const type=(b.type||'').toLowerCase();
+  const name=(b.name||b.account_label||'').toLowerCase();
+  if(type.includes('indian')||name.includes('zerodha')||name.includes('groww')||name.includes('upstox')||name.includes('angel')||name.includes('dhan')) return '₹';
+  if(type.includes('crypto')||name.includes('binance')||name.includes('bybit')||name.includes('okx')||name.includes('delta')) return '$';
+  if(type.includes('forex')) return '$';
+  return '$';
+}
+
+function setCurrencySymbol(sym){
+  state.currentCurrency=sym;
+  ['pfx-init','pfx-upd','pfx-fees','pfx-entry'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=sym;
+  });
+}
+
+function openCurrencyPicker(){
+  const list=document.getElementById('currency-picker-list');
+  list.innerHTML='';
+  CURRENCIES.forEach(c=>{
+    const btn=document.createElement('button');
+    btn.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;color:var(--white);font-family:Outfit,sans-serif;font-size:12px;text-align:left;transition:all 0.2s;';
+    btn.innerHTML=`<span style="font-size:16px;font-family:JetBrains Mono,monospace;color:var(--gold);">${c.sym}</span><br><span style="color:var(--muted);font-size:10px;">${c.name}</span>`;
+    btn.onmouseover=()=>{btn.style.borderColor='var(--gold)';};
+    btn.onmouseout=()=>{btn.style.borderColor='var(--border)';};
+    btn.onclick=()=>{ setCurrencySymbol(c.sym); updateLotDisplay(); closeCurrencyPickerModal(); };
+    list.appendChild(btn);
+  });
+  document.getElementById('currency-picker-overlay').style.display='flex';
+}
+
+function closeCurrencyPickerModal(){
+  document.getElementById('currency-picker-overlay').style.display='none';
+}
+function closeCurrencyPicker(e){
+  if(e.target===document.getElementById('currency-picker-overlay')) closeCurrencyPickerModal();
+}
+
+// LOT DISPLAY - shows amount summary below lot size
+function updateLotDisplay(){
+  const val=parseFloat(document.getElementById('e-lot').value);
+  const unit=document.getElementById('e-lot-unit').value;
+  const disp=document.getElementById('lot-display');
+  if(!disp) return;
+  if(!val||isNaN(val)){disp.textContent='';return;}
+  let txt='';
+  if(unit==='lot') txt=`▸ ${val} Lot${val!==1?'s':''}`;
+  else if(unit==='usd') txt=`▸ $${val.toLocaleString()} USD`;
+  else if(unit==='inr') txt=`▸ ₹${val.toLocaleString()} INR`;
+  else if(unit==='asset'){
+    const assetName=document.getElementById('lot-asset-opt').textContent||'Units';
+    txt=`▸ ${val} ${assetName}`;
+  }
+  disp.textContent=txt;
 }
 document.addEventListener('click',e=>{
   const w=document.querySelector('.chart-wrap');
@@ -2201,6 +2301,9 @@ function selectBroker(b){
   state.activeBroker = b.id;
   const name = b.account_label || b.name;
   document.getElementById('active-broker-nm').textContent = name;
+  // Auto-set currency based on broker type (only if user hasn't manually changed)
+  const autoSym = getBrokerCurrencySymbol();
+  setCurrencySymbol(autoSym);
   closeBrokerPopup();
   showToast(name+' selected!','success');
 }
@@ -2752,5 +2855,16 @@ window.onload=async function(){
   }
 })();
 </script>
+
+<!-- CURRENCY PICKER MODAL -->
+<div id="currency-picker-overlay" onclick="closeCurrencyPicker(event)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;width:320px;max-width:95vw;" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--gold);">Select Currency</div>
+      <button onclick="closeCurrencyPickerModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="currency-picker-list"></div>
+  </div>
+</div>
 </body>
 </html>
