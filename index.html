@@ -388,11 +388,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .entry-sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,168,76,0.15),transparent);}
 .fg{display:grid;gap:12px;}.fg2{grid-template-columns:1fr 1fr;}.fg3{grid-template-columns:1fr 1fr 1fr;}
 
-.lot-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden;position:relative;}
-.lot-wrap input{flex:1;background:transparent;border:none;outline:none;padding:11px 12px;color:var(--white);font-size:14px;font-family:'Outfit',sans-serif;}
-.lot-wrap input::placeholder{color:var(--muted);}
-.lot-divider{width:1px;background:var(--border2);height:20px;flex-shrink:0;}
-.lot-sel{background:transparent;border:none;outline:none;padding:11px 10px 11px 8px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;cursor:pointer;appearance:auto;min-width:70px;}
+.lot-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden;}
+.lot-wrap input{flex:1;background:transparent;border:none;outline:none;padding:12px 14px;color:var(--white);font-size:14px;font-family:'Outfit',sans-serif;}
+.lot-wrap input::placeholder{color:var(--muted);font-size:13px;}
+.lot-divider{width:1px;background:var(--border2);height:22px;flex-shrink:0;}
+.lot-sel{background:transparent;border:none;outline:none;padding:12px 14px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;appearance:none;-webkit-appearance:none;}
 
 /* Chart search */
 .chart-wrap{position:relative;}
@@ -1031,7 +1031,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
               </div>
             </div>
             <div class="fg fg2">
-              <div class="field"><label>Lot Size</label><div class="lot-wrap"><input type="number" id="e-lot" placeholder="Enter Quantity"><div class="lot-divider"></div><select class="lot-sel" id="e-lot-unit"><option value="lot">Lot</option><option value="usd">USD</option><option value="inr">INR</option><option value="asset" id="lot-asset-opt">Asset</option></select></div></div>
+              <div class="field"><label>Lot Size</label><div class="lot-wrap"><input type="number" id="e-lot" placeholder="Enter Quantity"><div class="lot-divider"></div><select class="lot-sel" id="e-lot-unit"><option value="lot">Lot</option><option value="usd">USD</option><option value="inr">INR</option><option value="asset" id="lot-asset-opt">Asset</option></select><span style="color:var(--gold);font-size:10px;padding-right:12px;pointer-events:none;">▼</span></div></div>
               <div class="field"><label>Entry Time</label><input type="time" id="e-time"></div>
               <div class="field">
                 <label>Leverage <span id="lev-val-badge" style="margin-left:8px;background:var(--gold-dim);border:1px solid var(--border);border-radius:4px;padding:1px 8px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:700;">1X</span></label>
