@@ -264,7 +264,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .tb-btn:hover{border-color:var(--gold);color:var(--gold);}
 .notif-dot{width:7px;height:7px;border-radius:50%;background:var(--red);position:absolute;top:5px;right:5px;}
 
-.content-area{flex:1;padding:24px;padding-bottom:60px;overflow-y:auto;}
+.content-area{flex:1;padding:24px;padding-bottom:120px;overflow-y:auto;}
 .content-section{display:none;}.content-section.active{display:block;}
 
 /* ════════════════════════════════
@@ -388,9 +388,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .entry-sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,168,76,0.15),transparent);}
 .fg{display:grid;gap:12px;}.fg2{grid-template-columns:1fr 1fr;}.fg3{grid-template-columns:1fr 1fr 1fr;}
 
-.lot-wrap{display:flex;gap:0;}
-.lot-wrap input{border-radius:8px 0 0 8px;flex:1;}
-.lot-sel{background:var(--bg3);border:1px solid var(--border2);border-left:none;border-radius:0 8px 8px 0;padding:11px 8px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;outline:none;min-width:68px;}
+.lot-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden;position:relative;}
+.lot-wrap input{flex:1;background:transparent;border:none;outline:none;padding:11px 12px;color:var(--white);font-size:14px;font-family:'Outfit',sans-serif;}
+.lot-wrap input::placeholder{color:var(--muted);}
+.lot-divider{width:1px;background:var(--border2);height:20px;flex-shrink:0;}
+.lot-sel{background:transparent;border:none;outline:none;padding:11px 10px 11px 8px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;cursor:pointer;appearance:auto;min-width:70px;}
 
 /* Chart search */
 .chart-wrap{position:relative;}
@@ -626,7 +628,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .stats-big-grid{grid-template-columns:1fr 1fr;}
   .stats-grid2{grid-template-columns:1fr;}
   .mobile-nav{display:block;}
-  .content-area{padding:16px 16px 100px;overflow-y:auto;}
+  .content-area{padding:16px 16px 140px;overflow-y:auto;}
   .nav{padding:12px 16px;}
   .nav-links{display:none;}
   .nav-cta{gap:8px;}
@@ -1029,29 +1031,21 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
               </div>
             </div>
             <div class="fg fg2">
-              <div class="field"><label>Lot Size</label>
-                <div class="lot-wrap" style="position:relative;">
-                  <input type="number" id="e-lot" placeholder="0.01" oninput="updateLotDisplay()" style="border-radius:8px 0 0 8px;flex:1;padding-right:4px;">
-                  <div id="lot-display" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--gold);font-family:'JetBrains Mono',monospace;pointer-events:none;opacity:0.85;"></div>
-                  <select class="lot-sel" id="e-lot-unit" onchange="updateLotDisplay()">
-                    <option value="lot">Lot</option>
-                    <option value="usd">USD</option>
-                    <option value="inr">INR</option>
-                    <option value="asset" id="lot-asset-opt">Asset</option>
-                  </select>
-                </div>
-              </div>
+              <div class="field"><label>Lot Size</label><div class="lot-wrap"><input type="number" id="e-lot" placeholder="Enter Quantity"><div class="lot-divider"></div><select class="lot-sel" id="e-lot-unit"><option value="lot">Lot</option><option value="usd">USD</option><option value="inr">INR</option><option value="asset" id="lot-asset-opt">Asset</option></select></div></div>
               <div class="field"><label>Entry Time</label><input type="time" id="e-time"></div>
-              <div class="field"><label>Leverage <span id="lev-val-badge" style="margin-left:8px;background:var(--gold-dim);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;">1X</span></label>
-                <input type="text" id="e-leverage" placeholder="e.g. 100X" oninput="syncLevInput(this.value)" style="margin-bottom:6px;">
-                <input type="range" id="e-lev-slider" min="1" max="500" value="1" step="1" oninput="syncLevSlider(this.value)" style="width:100%;accent-color:var(--gold);cursor:pointer;margin-bottom:2px;">
-                <div style="display:flex;justify-content:space-between;padding:0 2px;margin-bottom:0;">
-                  <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(1)">1X</span>
-                  <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(100)">100X</span>
-                  <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(200)">200X</span>
-                  <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(300)">300X</span>
-                  <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(400)">400X</span>
-                  <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(500)">500X</span>
+              <div class="field">
+                <label>Leverage <span id="lev-val-badge" style="margin-left:8px;background:var(--gold-dim);border:1px solid var(--border);border-radius:4px;padding:1px 8px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:700;">1X</span></label>
+                <input type="text" id="e-leverage" placeholder="e.g. 100X" oninput="syncLevInput(this.value)">
+                <div style="padding:6px 0 0;">
+                  <input type="range" id="e-lev-slider" min="1" max="500" value="1" step="1" oninput="syncLevSlider(this.value)" style="width:100%;accent-color:var(--gold);cursor:pointer;display:block;">
+                  <div style="display:flex;justify-content:space-between;margin-top:3px;">
+                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(1)">1X</span>
+                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(100)">100X</span>
+                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(200)">200X</span>
+                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(300)">300X</span>
+                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(400)">400X</span>
+                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(500)">500X</span>
+                  </div>
                 </div>
               </div>
               <div class="field"><label>Session</label><select id="e-session"><option value="" disabled selected>Select Session</option><option>London</option><option>New York</option><option>Asian</option><option>London-NY Overlap</option><option>Pre-Market</option><option>Post-Market</option></select></div>
@@ -1840,26 +1834,22 @@ function fillForm(t){
   };
   Object.entries(fields).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.value=val||'';});
   if(t.lot_unit)document.getElementById('e-lot-unit').value=t.lot_unit;
-  // Leverage slider sync
   if(t.leverage){
-    const levNum=parseInt(t.leverage)||1;
+    const lv=parseInt(t.leverage)||1;
     document.getElementById('e-leverage').value=t.leverage;
-    document.getElementById('e-lev-slider').value=Math.min(500,levNum);
-    document.getElementById('lev-val-badge').textContent=levNum+'X';
+    const sl=document.getElementById('e-lev-slider');if(sl)sl.value=Math.min(500,lv);
+    const badge=document.getElementById('lev-val-badge');if(badge)badge.textContent=lv+'X';
   }
   selDir(t.direction||'long');
   selConc(t.conclusion||'target');
-  updateLotDisplay();
 }
 
 function clearForm(){
   ['e-init','e-upd','e-chart','e-lot','e-time','e-leverage','e-entry','e-fees','e-tp','e-ttp','e-sl','e-tsl','e-exit','e-rrr','e-strategy','e-pov','e-psych','e-learn','e-diff'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('e-session').value='';
   document.getElementById('e-lot-unit').value='lot';
-  document.getElementById('e-lev-slider').value=1;
-  document.getElementById('lev-val-badge').textContent='1X';
-  const disp=document.getElementById('lot-display');if(disp)disp.textContent='';
-  const lotInp=document.getElementById('e-lot');if(lotInp){lotInp.style.color='var(--white)';lotInp.style.caretColor='var(--white)';}
+  const sl=document.getElementById('e-lev-slider');if(sl)sl.value=1;
+  const badge=document.getElementById('lev-val-badge');if(badge)badge.textContent='1X';
   selDir('long');selConc('target');state.selectedChart=null;
 }
 
@@ -1913,7 +1903,6 @@ async function saveTrade(){
 }
 
 // ══════════════════════════════════════
-// FORM HELPERS
 function syncLevSlider(val){
   const v=parseInt(val)||1;
   document.getElementById('e-leverage').value=v+'X';
@@ -1922,37 +1911,15 @@ function syncLevSlider(val){
 function syncLevInput(val){
   const num=parseInt(val)||1;
   const clamped=Math.min(500,Math.max(1,num));
-  document.getElementById('e-lev-slider').value=clamped;
+  const sl=document.getElementById('e-lev-slider');if(sl)sl.value=clamped;
   document.getElementById('lev-val-badge').textContent=clamped+'X';
 }
 function setLev(v){
   document.getElementById('e-leverage').value=v+'X';
-  document.getElementById('e-lev-slider').value=v;
+  const sl=document.getElementById('e-lev-slider');if(sl)sl.value=v;
   document.getElementById('lev-val-badge').textContent=v+'X';
 }
-function updateLotDisplay(){
-  const inp=document.getElementById('e-lot');
-  const val=parseFloat(inp.value);
-  const unit=document.getElementById('e-lot-unit').value;
-  const disp=document.getElementById('lot-display');
-  if(!disp) return;
-  if(!val||isNaN(val)){
-    disp.textContent='';
-    inp.style.color='var(--white)';
-    inp.style.opacity='1';
-    return;
-  }
-  let unitLabel='';
-  if(unit==='lot') unitLabel=`Lot${val!==1?'s':''}`;
-  else if(unit==='usd') unitLabel='USD';
-  else if(unit==='inr') unitLabel='INR';
-  else if(unit==='asset') unitLabel=document.getElementById('lot-asset-opt').textContent||'Units';
-  // Show formatted value inside the input via overlay
-  // Make number input text transparent so overlay shows instead
-  inp.style.color='transparent';
-  inp.style.caretColor='var(--white)';
-  disp.textContent=`${val} ${unitLabel}`;
-}
+// FORM HELPERS
 // ══════════════════════════════════════
 function selDir(d){
   state.direction=d;
