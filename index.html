@@ -393,6 +393,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .lot-wrap input::placeholder{color:var(--muted);font-size:13px;}
 .lot-divider{width:1px;background:var(--border2);height:22px;flex-shrink:0;}
 .lot-sel{background:transparent;border:none;outline:none;padding:12px 14px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;appearance:none;-webkit-appearance:none;}
+.lot-dd-item{padding:10px 16px;font-size:13px;color:var(--white);cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background 0.15s;}
+.lot-dd-item:hover{background:rgba(201,168,76,0.12);color:var(--gold);}
 
 /* Chart search */
 .chart-wrap{position:relative;}
@@ -1031,41 +1033,70 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
               </div>
             </div>
             <div class="fg fg2">
-              <div class="field"><label>Lot Size</label>
-                <div style="display:flex;align-items:center;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;overflow:hidden;transition:border-color 0.2s;" id="lot-box" onfocusin="document.getElementById('lot-box').style.borderColor='rgba(201,168,76,0.4)'" onfocusout="document.getElementById('lot-box').style.borderColor='rgba(255,255,255,0.06)'">
-                  <button type="button" onclick="stepLot(-1)" style="width:38px;height:44px;background:rgba(255,255,255,0.05);border:none;border-right:1px solid var(--border2);color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)';this.style.color='var(--gold)'" onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='var(--muted)'">−</button>
-                  <input type="number" id="e-lot" placeholder="0" min="0" step="1" style="flex:1;background:transparent;border:none;outline:none;padding:12px 10px;color:var(--white);font-size:15px;font-family:'JetBrains Mono',monospace;font-weight:500;text-align:center;width:0;">
-                  <button type="button" onclick="stepLot(1)" style="width:38px;height:44px;background:rgba(255,255,255,0.05);border:none;border-left:1px solid var(--border2);color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)';this.style.color='var(--gold)'" onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='var(--muted)'">+</button>
-                  <div style="width:1px;background:var(--border2);height:24px;flex-shrink:0;"></div>
+              <!-- LOT SIZE — Delta Exchange style: [Lot ▼]  [  Enter Quantity  ] -->
+              <div class="field"><label>Lot Size
+                <span id="lot-sync-badge" style="display:none;margin-left:8px;background:rgba(76,175,125,0.15);border:1px solid rgba(76,175,125,0.3);border-radius:4px;padding:1px 7px;font-size:10px;color:var(--green);letter-spacing:1px;">● LIVE</span>
+              </label>
+                <div style="display:flex;align-items:center;gap:0;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;overflow:visible;transition:border-color 0.2s;" id="lot-box">
+                  <!-- LEFT: unit pill -->
                   <div style="position:relative;flex-shrink:0;">
-                    <button type="button" id="lot-unit-btn" onclick="toggleLotDD()" style="display:flex;align-items:center;gap:5px;background:transparent;border:none;padding:12px 14px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
-                      <span id="lot-unit-label">Lot</span><span style="font-size:9px;opacity:0.7;">▼</span>
+                    <button type="button" id="lot-unit-btn" onclick="toggleLotDD(event)" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:none;border-right:1px solid var(--border2);border-radius:8px 0 0 8px;padding:0 14px;height:46px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                      <span id="lot-unit-label">Lot</span><span style="font-size:9px;opacity:0.7;margin-left:2px;">▼</span>
                     </button>
-                    <div id="lot-unit-dd" style="display:none;position:absolute;top:calc(100%+4px);right:0;background:#13131E;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.6);min-width:110px;z-index:99;">
-                      <div onclick="selectLotUnit('lot','Lot')" style="padding:10px 16px;font-size:13px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)';this.style.color='var(--gold)'" onmouseout="this.style.background='transparent';this.style.color=''">Lot</div>
-                      <div onclick="selectLotUnit('usd','USD')" style="padding:10px 16px;font-size:13px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)';this.style.color='var(--gold)'" onmouseout="this.style.background='transparent';this.style.color=''">USD</div>
-                      <div onclick="selectLotUnit('inr','INR')" style="padding:10px 16px;font-size:13px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)';this.style.color='var(--gold)'" onmouseout="this.style.background='transparent';this.style.color=''">INR</div>
-                      <div onclick="selectLotUnit('asset','Asset')" id="lot-asset-opt" style="padding:10px 16px;font-size:13px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)';this.style.color='var(--gold)'" onmouseout="this.style.background='transparent';this.style.color=''">Asset</div>
+                    <div id="lot-unit-dd" style="display:none;position:absolute;top:calc(100%+6px);left:0;background:#13131E;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.7);min-width:120px;z-index:999;">
+                      <div onclick="selectLotUnit('lot','Lot')" class="lot-dd-item">Lot</div>
+                      <div onclick="selectLotUnit('usd','USD')" class="lot-dd-item">USD ($)</div>
+                      <div onclick="selectLotUnit('inr','INR')" class="lot-dd-item">INR (₹)</div>
+                      <div onclick="selectLotUnit('asset','Asset')" id="lot-asset-opt" class="lot-dd-item">Asset</div>
                     </div>
                   </div>
+                  <!-- RIGHT: big quantity input -->
+                  <input type="number" id="e-lot" placeholder="Enter Quantity" min="0" step="any"
+                    style="flex:1;background:transparent;border:none;outline:none;padding:12px 16px;color:var(--white);font-size:15px;font-family:'JetBrains Mono',monospace;font-weight:500;width:0;min-width:0;"
+                    onfocus="document.getElementById('lot-box').style.borderColor='rgba(201,168,76,0.4)'"
+                    onblur="document.getElementById('lot-box').style.borderColor='rgba(255,255,255,0.06)'">
                 </div>
                 <input type="hidden" id="e-lot-unit" value="lot">
               </div>
+
               <div class="field"><label>Entry Time</label><input type="time" id="e-time"></div>
+
+              <!-- LEVERAGE — same Delta style: [200X ▼]  [slider fills rest] -->
               <div class="field">
-                <label>Leverage <span id="lev-val-badge" style="margin-left:8px;background:var(--gold-dim);border:1px solid var(--border);border-radius:4px;padding:1px 8px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:700;">1X</span></label>
-                <input type="text" id="e-leverage" placeholder="e.g. 100X" oninput="syncLevInput(this.value)">
-                <div style="padding:6px 0 2px;">
-                  <input type="range" id="e-lev-slider" min="1" max="500" value="1" step="1" oninput="syncLevSlider(this.value)" style="width:100%;accent-color:var(--gold);cursor:pointer;display:block;">
-                  <div style="display:flex;justify-content:space-between;margin-top:3px;margin-bottom:0;">
-                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(1)">1X</span>
-                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(100)">100X</span>
-                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(200)">200X</span>
-                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(300)">300X</span>
-                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(400)">400X</span>
-                    <span style="font-size:10px;color:var(--muted);cursor:pointer;" onclick="setLev(500)">500X</span>
+                <label>Leverage</label>
+                <div style="display:flex;align-items:center;gap:0;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;overflow:visible;transition:border-color 0.2s;" id="lev-box">
+                  <!-- LEFT: current value pill -->
+                  <div style="position:relative;flex-shrink:0;">
+                    <button type="button" id="lev-unit-btn" onclick="toggleLevDD(event)" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:none;border-right:1px solid var(--border2);border-radius:8px 0 0 8px;padding:0 14px;height:46px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;min-width:80px;transition:background 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                      <span id="lev-val-badge">1X</span><span style="font-size:9px;opacity:0.7;margin-left:2px;">▼</span>
+                    </button>
+                    <div id="lev-unit-dd" style="display:none;position:absolute;top:calc(100%+6px);left:0;background:#13131E;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.7);min-width:110px;z-index:999;">
+                      <div onclick="setLev(1)" class="lot-dd-item">1X</div>
+                      <div onclick="setLev(10)" class="lot-dd-item">10X</div>
+                      <div onclick="setLev(25)" class="lot-dd-item">25X</div>
+                      <div onclick="setLev(50)" class="lot-dd-item">50X</div>
+                      <div onclick="setLev(100)" class="lot-dd-item">100X</div>
+                      <div onclick="setLev(200)" class="lot-dd-item">200X</div>
+                      <div onclick="setLev(500)" class="lot-dd-item">500X</div>
+                    </div>
+                  </div>
+                  <!-- RIGHT: slider fills remaining space -->
+                  <div style="flex:1;padding:0 14px;display:flex;flex-direction:column;justify-content:center;gap:2px;"
+                    onfocus="document.getElementById('lev-box').style.borderColor='rgba(201,168,76,0.4)'"
+                    onblur="document.getElementById('lev-box').style.borderColor='rgba(255,255,255,0.06)'">
+                    <input type="range" id="e-lev-slider" min="1" max="500" value="1" step="1"
+                      oninput="syncLevSlider(this.value)"
+                      style="width:100%;accent-color:var(--gold);cursor:pointer;display:block;height:4px;">
+                    <div style="display:flex;justify-content:space-between;">
+                      <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(1)">1X</span>
+                      <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(100)">100X</span>
+                      <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(200)">200X</span>
+                      <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(300)">300X</span>
+                      <span style="font-size:9px;color:var(--muted);cursor:pointer;" onclick="setLev(500)">500X</span>
+                    </div>
                   </div>
                 </div>
+                <input type="hidden" id="e-leverage" value="1X">
               </div>
               <div class="field"><label>Session</label><select id="e-session"><option value="" disabled selected>Select Session</option><option>London</option><option>New York</option><option>Asian</option><option>London-NY Overlap</option><option>Pre-Market</option><option>Post-Market</option></select></div>
               <div class="field"><label>Entry Price</label><div class="prefix-wrap"><span class="pfx" id="pfx-entry">$</span><input type="number" id="e-entry" placeholder="Entry price"></div></div>
@@ -1931,7 +1962,7 @@ async function saveTrade(){
 function syncLevSlider(val){
   const v=parseInt(val)||1;
   document.getElementById('e-leverage').value=v+'X';
-  document.getElementById('lev-val-badge').textContent=v+'X';
+  const badge=document.getElementById('lev-val-badge');if(badge)badge.textContent=v+'X';
 }
 function syncLevInput(val){
   const num=parseInt(val)||1;
@@ -1943,6 +1974,7 @@ function setLev(v){
   document.getElementById('e-leverage').value=v+'X';
   const sl=document.getElementById('e-lev-slider');if(sl)sl.value=v;
   document.getElementById('lev-val-badge').textContent=v+'X';
+  const dd=document.getElementById('lev-unit-dd');if(dd)dd.style.display='none';
 }
 // LOT STEPPER & DROPDOWN
 function stepLot(dir){
@@ -1951,8 +1983,14 @@ function stepLot(dir){
   const next=Math.max(0,parseFloat((cur+dir).toFixed(6)));
   inp.value=next;
 }
-function toggleLotDD(){
+function toggleLotDD(e){
+  if(e)e.stopPropagation();
   const dd=document.getElementById('lot-unit-dd');
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+function toggleLevDD(e){
+  if(e)e.stopPropagation();
+  const dd=document.getElementById('lev-unit-dd');
   dd.style.display=dd.style.display==='none'?'block':'none';
 }
 function selectLotUnit(val,label){
@@ -1960,10 +1998,36 @@ function selectLotUnit(val,label){
   document.getElementById('lot-unit-label').textContent=label;
   document.getElementById('lot-unit-dd').style.display='none';
 }
+// Close all dropdowns on outside click
 document.addEventListener('click',function(e){
-  const btn=document.getElementById('lot-unit-btn');
-  const dd=document.getElementById('lot-unit-dd');
-  if(dd&&btn&&!btn.contains(e.target)&&!dd.contains(e.target)){dd.style.display='none';}
+  ['lot-unit-btn','lot-unit-dd','lev-unit-btn','lev-unit-dd'].forEach(function(id,i){
+    if(i%2===0){
+      const btn=document.getElementById(id);
+      const dd=document.getElementById(['lot-unit-dd','lot-unit-dd','lev-unit-dd','lev-unit-dd'][i]);
+      if(dd&&btn&&!btn.contains(e.target)&&!dd.contains(e.target)){dd.style.display='none';}
+    }
+  });
+});
+
+// Broker lot sync — called when broker sends trade data via postMessage or websocket
+function syncBrokerLot(lotValue, unit){
+  const inp=document.getElementById('e-lot');
+  if(inp&&lotValue!=null){
+    inp.value=lotValue;
+    inp.style.color='var(--green)';
+    setTimeout(function(){inp.style.color='var(--white)';},1200);
+  }
+  if(unit){selectLotUnit(unit,unit.charAt(0).toUpperCase()+unit.slice(1));}
+  const badge=document.getElementById('lot-sync-badge');
+  if(badge){badge.style.display='inline';}
+}
+// Listen for broker postMessage (works with Binance/Delta bridge extensions)
+window.addEventListener('message',function(ev){
+  if(ev.data&&ev.data.type==='BROKER_TRADE'){
+    const d=ev.data;
+    if(d.lot!=null)syncBrokerLot(d.lot, d.lotUnit||'lot');
+    if(d.leverage!=null)setLev(parseInt(d.leverage));
+  }
 });
 // FORM HELPERS
 // ══════════════════════════════════════
