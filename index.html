@@ -673,29 +673,53 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 /* ════════ STRATEGY AUTOCOMPLETE ════════ */
 .strategy-wrap{position:relative;}
-.strategy-dd{
-  position:absolute;bottom:calc(100%+6px);left:0;right:0;z-index:999;
-  background:#13131E;border:1px solid var(--border);border-radius:12px;
-  overflow:hidden;box-shadow:0 -8px 32px rgba(0,0,0,0.6);
-  display:none;max-height:220px;overflow-y:auto;
+/* Strategy Modal — broker popup style */
+.strategy-modal-overlay{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
+  display:none;align-items:flex-end;justify-content:center;
 }
-.strategy-dd.open{display:block;animation:fadeUp 0.18s ease;}
-.strategy-dd-header{
-  padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--gold);border-bottom:1px solid var(--border);background:var(--gold-dim);
-  display:flex;align-items:center;gap:6px;
+.strategy-modal-overlay.open{display:flex;animation:fadeIn 0.2s ease;}
+.strategy-modal-panel{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:20px 20px 0 0;
+  width:100%;max-width:640px;
+  max-height:65vh;display:flex;flex-direction:column;
+  box-shadow:0 -16px 48px rgba(0,0,0,0.7);
+  animation:slideUp 0.25s ease;
 }
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.strategy-modal-handle{
+  width:40px;height:4px;background:rgba(255,255,255,0.15);
+  border-radius:2px;margin:12px auto 0;flex-shrink:0;
+}
+.strategy-modal-header{
+  padding:14px 18px 12px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.strategy-modal-title{
+  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--gold);display:flex;align-items:center;gap:6px;
+}
+.strategy-modal-close{
+  width:28px;height:28px;border-radius:7px;border:1px solid var(--border);
+  background:none;color:var(--muted);cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;
+}
+.strategy-modal-close:hover{border-color:var(--red);color:var(--red);}
+.strategy-modal-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .strategy-item{
-  padding:10px 14px;font-size:13px;cursor:pointer;
+  padding:13px 18px;font-size:14px;cursor:pointer;
   display:flex;align-items:center;justify-content:space-between;
   transition:background 0.15s;border-bottom:1px solid var(--border2);
 }
 .strategy-item:last-child{border-bottom:none;}
+.strategy-item:active{background:var(--gold-dim);}
 .strategy-item:hover{background:var(--gold-dim);color:var(--gold);}
-.strategy-item-name{flex:1;}
-.strategy-item-count{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:2px 8px;border:1px solid var(--border2);border-radius:20px;}
+.strategy-item-name{flex:1;font-weight:500;}
+.strategy-item-count{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:3px 10px;border:1px solid var(--border2);border-radius:20px;}
 .strategy-item:hover .strategy-item-count{border-color:var(--gold);color:var(--gold);}
-.strategy-dd-empty{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
+.strategy-dd-empty{padding:20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6;}
 
 /* ════════ STRATEGY STATS CARD ════════ */
 .strat-filter-wrap{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
@@ -1188,7 +1212,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             </div>
           </div>
 
-          <div class="entry-sec"><div class="entry-sec-title">📋 Strategy & Setups</div><div class="field"><div class="strategy-wrap"><textarea id="e-strategy" placeholder="What's your strategy? BOS on 15m, FVG fill, London sweep..." style="min-height:100px;" onfocus="openStrategyDD()" oninput="filterStrategyDD(this.value)"></textarea><div class="strategy-dd" id="strategy-dd"><div class="strategy-dd-header">⚡ Your Saved Strategies</div><div id="strategy-dd-list"></div></div></div></div></div>
+          <div class="entry-sec"><div class="entry-sec-title">📋 Strategy & Setups</div><div class="field"><textarea id="e-strategy" placeholder="What's your strategy? BOS on 15m, FVG fill, London sweep..." style="min-height:100px;" onfocus="openStrategyDD()" oninput="filterStrategyDD(this.value)"></textarea></div></div>
           <div class="entry-sec"><div class="entry-sec-title">👁️ Market Bias & Point of View</div><div class="field"><textarea id="e-pov" placeholder="Your market view, bias, confluences..." style="min-height:100px;"></textarea></div></div>
           <div class="entry-sec"><div class="entry-sec-title">🧠 Psychology & Mindset</div><div class="field"><textarea id="e-psych" placeholder="Emotional state, confidence level, FOMO, revenge trade?" style="min-height:85px;"></textarea></div></div>
 
@@ -2858,16 +2882,20 @@ function openStrategyDD(){
   } else {
     renderStrategyDD(document.getElementById('e-strategy').value||'');
   }
-  const dd = document.getElementById('strategy-dd');
-  if(dd) dd.classList.add('open');
+  const overlay = document.getElementById('strategy-modal-overlay');
+  if(overlay) overlay.classList.add('open');
+  document.body.style.overflow='hidden';
   _stratDDOpen = true;
 }
 
 function filterStrategyDD(val){
   renderStrategyDD(val);
-  const dd = document.getElementById('strategy-dd');
-  if(!dd) return;
-  if(_strategyCache.length>0){ dd.classList.add('open'); _stratDDOpen=true; }
+  if(_strategyCache.length>0 && !_stratDDOpen){
+    const overlay = document.getElementById('strategy-modal-overlay');
+    if(overlay) overlay.classList.add('open');
+    document.body.style.overflow='hidden';
+    _stratDDOpen = true;
+  }
 }
 
 function renderStrategyDD(query){
@@ -2876,7 +2904,7 @@ function renderStrategyDD(query){
   const q=(query||'').toLowerCase().trim();
   const filtered = q ? _strategyCache.filter(s=>s.strategy.toLowerCase().includes(q)) : _strategyCache;
   if(!filtered.length){
-    list.innerHTML='<div class="strategy-dd-empty">No saved strategies yet. Type and save your first trade!</div>';
+    list.innerHTML='<div class="strategy-dd-empty">No saved strategies yet.<br>Type a strategy name and save your trade — it will appear here next time!</div>';
     return;
   }
   list.innerHTML = filtered.map(s=>{
@@ -2887,21 +2915,26 @@ function renderStrategyDD(query){
 
 function selectStrategy(name){
   const ta = document.getElementById('e-strategy');
-  if(ta) ta.value = name;
+  if(ta){ ta.value = name; }
   closeStrategyDD();
 }
 
-function closeStrategyDD(){
-  const dd = document.getElementById('strategy-dd');
-  if(dd) dd.classList.remove('open');
+function closeStrategyDD(e){
+  // Called from X button (no event) or overlay background click
+  if(e && e.type==='click' && e.target !== document.getElementById('strategy-modal-overlay')) return;
+  const overlay = document.getElementById('strategy-modal-overlay');
+  if(overlay) overlay.classList.remove('open');
+  document.body.style.overflow='';
   _stratDDOpen = false;
 }
 
-document.addEventListener('click', function(e){
-  if(!_stratDDOpen) return;
-  const wrap = document.querySelector('.strategy-wrap');
-  if(wrap && !wrap.contains(e.target)) closeStrategyDD();
-});
+function closeStrategyDDBtn(){
+  const overlay = document.getElementById('strategy-modal-overlay');
+  if(overlay) overlay.classList.remove('open');
+  document.body.style.overflow='';
+  _stratDDOpen = false;
+}
+
 
 // Hook into initApp to load strategies
 const _origInitApp = window.initApp;
@@ -3156,5 +3189,18 @@ function toggleStratDetail(id){
   }
 })();
 </script>
+
+<!-- STRATEGY MODAL -->
+<div class="strategy-modal-overlay" id="strategy-modal-overlay" onclick="closeStrategyDD(event)">
+  <div class="strategy-modal-panel" id="strategy-modal-panel">
+    <div class="strategy-modal-handle"></div>
+    <div class="strategy-modal-header">
+      <div class="strategy-modal-title">⚡ Your Saved Strategies</div>
+      <button class="strategy-modal-close" onclick="closeStrategyDDBtn()">✕</button>
+    </div>
+    <div class="strategy-modal-list" id="strategy-dd-list"></div>
+  </div>
+</div>
+
 </body>
 </html>
