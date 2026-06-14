@@ -675,23 +675,25 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .strategy-wrap{position:relative;}
 /* Strategy Modal — broker popup style */
 .strategy-modal-overlay{
-  position:fixed;inset:0;z-index:300;
-  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);
   display:none;align-items:flex-end;justify-content:center;
+  overscroll-behavior:contain;
 }
 .strategy-modal-overlay.open{display:flex;animation:fadeIn 0.2s ease;}
 .strategy-modal-panel{
   background:var(--bg2);border:1px solid var(--border);
+  border-top:1px solid rgba(201,168,76,0.15);
   border-radius:20px 20px 0 0;
-  width:100%;max-width:640px;
-  max-height:65vh;display:flex;flex-direction:column;
-  box-shadow:0 -16px 48px rgba(0,0,0,0.7);
-  animation:slideUp 0.25s ease;
+  width:100%;max-width:100%;
+  height:75vh;display:flex;flex-direction:column;
+  box-shadow:0 -20px 60px rgba(0,0,0,0.8);
+  animation:slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
 }
 @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 .strategy-modal-handle{
-  width:40px;height:4px;background:rgba(255,255,255,0.15);
-  border-radius:2px;margin:12px auto 0;flex-shrink:0;
+  width:44px;height:5px;background:rgba(255,255,255,0.18);
+  border-radius:3px;margin:10px auto 0;flex-shrink:0;cursor:grab;
 }
 .strategy-modal-header{
   padding:14px 18px 12px;border-bottom:1px solid var(--border);
@@ -2886,6 +2888,11 @@ function openStrategyDD(){
   if(overlay) overlay.classList.add('open');
   document.body.style.overflow='hidden';
   _stratDDOpen = true;
+  // Clear search and focus
+  setTimeout(()=>{
+    const si = document.getElementById('strategy-search-inp');
+    if(si){ si.value=''; si.focus(); }
+  }, 100);
 }
 
 function filterStrategyDD(val){
@@ -3193,10 +3200,16 @@ function toggleStratDetail(id){
 <!-- STRATEGY MODAL -->
 <div class="strategy-modal-overlay" id="strategy-modal-overlay" onclick="closeStrategyDD(event)">
   <div class="strategy-modal-panel" id="strategy-modal-panel">
-    <div class="strategy-modal-handle"></div>
+    <div class="strategy-modal-handle" onclick="closeStrategyDDBtn()"></div>
     <div class="strategy-modal-header">
       <div class="strategy-modal-title">⚡ Your Saved Strategies</div>
       <button class="strategy-modal-close" onclick="closeStrategyDDBtn()">✕</button>
+    </div>
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <input type="text" id="strategy-search-inp"
+        placeholder="Search strategy..."
+        oninput="filterStrategyDD(this.value)"
+        style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--white);font-family:'Outfit',sans-serif;font-size:14px;outline:none;">
     </div>
     <div class="strategy-modal-list" id="strategy-dd-list"></div>
   </div>
