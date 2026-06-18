@@ -3272,6 +3272,8 @@ function toggleStratDetail(id){
 // CALCULATOR + AI
 // ══════════════════════════════════════
 let calcImg = null;
+const GEMINI_KEY = 'AQ.Ab8RN6L0qpGK0KC7HR8x8jrBcKqAo1o8Ew2RPGmsQ3Enc2FN_w';
+let calcChatHistory = [];
 
 function initCalcBrokers(){
   const row = document.getElementById('calc-broker-row');
@@ -3349,7 +3351,7 @@ async function sendCalcMsg(){
   const text = inp.value.trim();
   if(!text && !calcImg) return;
 
-  // User message
+  // User message UI
   const userDiv = document.createElement('div');
   userDiv.className = 'calc-msg-user';
   if(calcImg){
@@ -3363,62 +3365,64 @@ async function sendCalcMsg(){
   // Loading
   const loadDiv = document.createElement('div');
   loadDiv.className = 'calc-msg-loading';
-  loadDiv.textContent = 'AI is thinking...';
+  loadDiv.textContent = '⏳ AI is thinking...';
   msgs.appendChild(loadDiv);
   msgs.scrollTop = msgs.scrollHeight;
 
-  // Gather context
+  // Context
   const capital = document.getElementById('calc-capital').value;
   const entry = document.getElementById('calc-entry').value;
   const sl = document.getElementById('calc-sl').value;
   const tp = document.getElementById('calc-tp').value;
   const risk = document.getElementById('calc-risk-slider').value;
   const activeBroker = state.brokers?.find(b => b.id === state.activeBroker);
-  const brokerName = activeBroker?.name || 'Unknown Broker';
+  const brokerName = activeBroker?.name || activeBroker?.account_label || 'Unknown Broker';
 
-  const systemPrompt = `You are an expert trading calculator AI assistant for EdgeTrade, a professional trading journal app.
-User's context:
+  const systemPrompt = `You are an expert trading calculator AI for EdgeTrade app.
+User context:
 - Broker: ${brokerName}
-- Capital/Balance: ${capital || 'Not provided'}
+- Capital: ${capital || 'Not set'}
 - Risk %: ${risk}%
-- Entry Price: ${entry || 'Not provided'}
-- Stop Loss: ${sl || 'Not provided'}
-- Target: ${tp || 'Not provided'}
+- Entry: ${entry || 'Not set'}
+- Stop Loss: ${sl || 'Not set'}
+- Target: ${tp || 'Not set'}
+Help calculate position size, risk amount, R:R ratio, drawdown. Be concise, max 150 words. Use clear formatting with line breaks.`;
 
-Help the user calculate position size, risk amount in currency, R:R ratio, and potential drawdown scenarios.
-Be concise but thorough. Format numbers clearly. If chart image is provided, analyze it and give trade setup suggestions.
-Always calculate in the user's broker currency context. Keep responses under 200 words and use clear formatting.`;
+  // Build parts
+  const parts = [];
+  if(calcImg){
+    const base64 = calcImg.split(',')[1];
+    const mtype = calcImg.split(';')[0].split(':')[1];
+    parts.push({inline_data:{mime_type:mtype,data:base64}});
+  }
+  parts.push({text: text || 'Analyze this chart.'});
+
+  // Add to history
+  calcChatHistory.push({role:'user', parts});
 
   try {
-    const contentArr = [];
-    if(calcImg){
-      const base64 = calcImg.split(',')[1];
-      const mtype = calcImg.split(';')[0].split(':')[1];
-      contentArr.push({type:'image',source:{type:'base64',media_type:mtype,data:base64}});
-    }
-    contentArr.push({type:'text',text: text || 'Analyze this chart and suggest trade parameters.'});
-
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1000,
-        system: systemPrompt,
-        messages:[{role:'user',content:contentArr}]
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        system_instruction: {parts:[{text: systemPrompt}]},
+        contents: calcChatHistory
       })
     });
     const data = await res.json();
-    const reply = data.content?.map(c=>c.text||'').join('') || 'Sorry, could not get a response.';
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not get response.';
+
+    // Add AI reply to history
+    calcChatHistory.push({role:'model', parts:[{text: reply}]});
 
     loadDiv.remove();
     const aiDiv = document.createElement('div');
     aiDiv.className = 'calc-msg-ai';
-    aiDiv.innerHTML = reply.replace(/\n/g,'<br>');
+    aiDiv.innerHTML = reply.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
     msgs.appendChild(aiDiv);
     clearCalcImg();
   } catch(e) {
-    loadDiv.textContent = 'Error: Could not connect to AI. Please try again.';
+    loadDiv.textContent = '❌ Error: ' + e.message;
   }
   msgs.scrollTop = msgs.scrollHeight;
 }
