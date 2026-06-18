@@ -1380,10 +1380,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
           <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
             <span style="font-size:18px;">🤖</span>
-            <div>
+            <div style="flex:1;">
               <div style="font-size:14px;font-weight:500;">AI Trading Assistant</div>
               <div style="font-size:11px;color:var(--muted);">Describe your trade setup or upload a chart screenshot</div>
             </div>
+            <button id="gemini-key-btn" onclick="setGeminiKey()" style="padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;transition:all 0.2s;">🔑 Set API Key</button>
           </div>
           <!-- Chat Messages -->
           <div id="calc-chat-msgs" style="min-height:200px;max-height:360px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -1727,7 +1728,12 @@ function showSection(key){
   if(key==='home') refreshHome();
   if(key==='trade-list') refreshTradeList();
   if(key==='stats') renderStats();
-  if(key==='calculator') initCalcBrokers();
+  if(key==='calculator') {
+    initCalcBrokers();
+    // Update API key button state if key already set
+    const btn = document.getElementById("gemini-key-btn");
+    if (btn && GEMINI_KEY) { btn.textContent = "🔑 Key Set ✓"; btn.style.borderColor = "var(--green)"; btn.style.color = "var(--green)"; }
+  }
 }
 
 function setSideNav(id){
@@ -3273,10 +3279,17 @@ function toggleStratDetail(id){
 // ══════════════════════════════════════
 
 // ── Gemini API Key (session only — GitHub safe) ──
-let GEMINI_KEY = sessionStorage.getItem("GEMINI_API_KEY");
-if (!GEMINI_KEY) {
-  GEMINI_KEY = prompt("EdgeTrade AI Testing — Apni Gemini API Key paste karo (session mein rahegi, GitHub push nahi hogi):");
-  if (GEMINI_KEY) sessionStorage.setItem("GEMINI_API_KEY", GEMINI_KEY);
+let GEMINI_KEY = sessionStorage.getItem("GEMINI_API_KEY") || null;
+
+function setGeminiKey() {
+  const key = prompt("Apni Gemini API Key paste karo (session mein rahegi, GitHub push nahi hogi):");
+  if (key && key.trim()) {
+    GEMINI_KEY = key.trim();
+    sessionStorage.setItem("GEMINI_API_KEY", GEMINI_KEY);
+    showToast("API Key set! AI ready hai", "success");
+    const btn = document.getElementById("gemini-key-btn");
+    if (btn) { btn.textContent = "Key Set"; btn.style.borderColor = "var(--green)"; btn.style.color = "var(--green)"; }
+  }
 }
 
 let calcImg = null;
@@ -3399,7 +3412,7 @@ Always calculate in the user's broker currency context. Keep responses under 200
 
   try {
     if (!GEMINI_KEY) {
-      loadDiv.textContent = 'API Key missing! Page refresh karo aur key daalo.';
+      loadDiv.innerHTML = 'API Key set nahi hai. Upar &#x1F511; <b>Set API Key</b> button click karo.';
       return;
     }
 
