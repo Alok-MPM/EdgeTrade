@@ -3425,7 +3425,7 @@ Always calculate in the user's broker currency context. Keep responses under 200
       parts.push({ inline_data: { mime_type: mtype, data: base64 } });
     }
 
-   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_KEY}`; 
+   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`; 
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
