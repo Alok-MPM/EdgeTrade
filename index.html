@@ -1584,7 +1584,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
         <!-- Instructions -->
         <div style="background:var(--gold-dim);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
-          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;font-weight:600;">How to get API Key</div>
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;font-weight:600;" id="connect-instructions-title">How to get API Key</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.6;" id="connect-instructions">Instructions will appear here.</div>
         </div>
 
@@ -1613,6 +1613,27 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <div class="field" id="field-passphrase" style="margin-bottom:14px;display:none;">
           <label>Passphrase</label>
           <input type="password" id="conn-passphrase" placeholder="API Passphrase" autocomplete="off">
+        </div>
+
+        <!-- MT4/MT5 Server -->
+        <div class="field" id="field-mt-server" style="margin-bottom:14px;display:none;">
+          <label>Server</label>
+          <input type="text" id="conn-mt-server" placeholder="e.g. Exness-MT5Real32" autocomplete="off">
+        </div>
+
+        <!-- MT4/MT5 Login -->
+        <div class="field" id="field-mt-login" style="margin-bottom:14px;display:none;">
+          <label>Login (Account Number)</label>
+          <input type="text" id="conn-mt-login" placeholder="e.g. 250075250" autocomplete="off" inputmode="numeric">
+        </div>
+
+        <!-- MT4/MT5 Investor Password -->
+        <div class="field" id="field-mt-password" style="margin-bottom:14px;display:none;">
+          <label>Investor Password (read-only)</label>
+          <div style="position:relative;">
+            <input type="password" id="conn-mt-password" placeholder="Your MT4/MT5 investor password" autocomplete="off" style="padding-right:40px;">
+            <button onclick="toggleEye('conn-mt-password',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">👁</button>
+          </div>
         </div>
 
         <!-- Warning -->
@@ -2369,6 +2390,7 @@ function showConnectForm(config){
   document.getElementById('connect-broker-name').textContent = config.name;
   document.getElementById('connect-broker-type').textContent = config.type;
   document.getElementById('connect-instructions').textContent = config.instructions || 'Get API key from broker website.';
+  document.getElementById('connect-instructions-title').textContent = config.requires_mt_login ? 'How to Connect' : 'How to get API Key';
 
   const link = document.getElementById('connect-broker-link');
   if(config.website_url){ link.href=config.website_url; link.style.display='block'; }
@@ -2378,12 +2400,18 @@ function showConnectForm(config){
   document.getElementById('field-api-key').style.display = config.requires_api_key ? 'flex' : 'none';
   document.getElementById('field-api-secret').style.display = config.requires_secret ? 'flex' : 'none';
   document.getElementById('field-passphrase').style.display = config.requires_passphrase ? 'flex' : 'none';
+  document.getElementById('field-mt-server').style.display = config.requires_mt_login ? 'flex' : 'none';
+  document.getElementById('field-mt-login').style.display = config.requires_mt_login ? 'flex' : 'none';
+  document.getElementById('field-mt-password').style.display = config.requires_mt_login ? 'flex' : 'none';
 
   // Clear fields
   document.getElementById('conn-label').value = config.name + ' Account';
   document.getElementById('conn-api-key').value = '';
   document.getElementById('conn-api-secret').value = '';
   document.getElementById('conn-passphrase').value = '';
+  document.getElementById('conn-mt-server').value = '';
+  document.getElementById('conn-mt-login').value = '';
+  document.getElementById('conn-mt-password').value = '';
   document.getElementById('conn-error').style.display = 'none';
 }
 
@@ -2459,12 +2487,18 @@ async function submitBrokerConnection(){
   const apiKey = document.getElementById('conn-api-key').value.trim();
   const apiSecret = document.getElementById('conn-api-secret').value.trim();
   const passphrase = document.getElementById('conn-passphrase').value.trim();
+  const mtServer = document.getElementById('conn-mt-server').value.trim();
+  const mtLogin = document.getElementById('conn-mt-login').value.trim();
+  const mtPassword = document.getElementById('conn-mt-password').value.trim();
   const errEl = document.getElementById('conn-error');
 
   if(!label){ errEl.textContent='Please enter an account label.'; errEl.style.display='block'; return; }
   if(selectedBrokerConfig.requires_api_key && !apiKey){ errEl.textContent='API Key is required.'; errEl.style.display='block'; return; }
   if(selectedBrokerConfig.requires_secret && !apiSecret){ errEl.textContent='API Secret is required.'; errEl.style.display='block'; return; }
   if(selectedBrokerConfig.requires_passphrase && !passphrase){ errEl.textContent='Passphrase is required.'; errEl.style.display='block'; return; }
+  if(selectedBrokerConfig.requires_mt_login && !mtServer){ errEl.textContent='Server is required.'; errEl.style.display='block'; return; }
+  if(selectedBrokerConfig.requires_mt_login && !mtLogin){ errEl.textContent='Login (Account Number) is required.'; errEl.style.display='block'; return; }
+  if(selectedBrokerConfig.requires_mt_login && !mtPassword){ errEl.textContent='Investor Password is required.'; errEl.style.display='block'; return; }
 
   errEl.style.display='none';
   const btn = document.getElementById('conn-submit-btn');
@@ -2477,6 +2511,9 @@ async function submitBrokerConnection(){
     api_key_encrypted: apiKey || null,
     api_secret_encrypted: apiSecret || null,
     api_passphrase_encrypted: passphrase || null,
+    mt_server: mtServer || null,
+    mt_login: mtLogin || null,
+    mt_investor_password_encrypted: mtPassword || null,
     sync_status: 'pending',
     is_active: true
   }]).select().single();
@@ -3425,7 +3462,7 @@ Always calculate in the user's broker currency context. Keep responses under 200
       parts.push({ inline_data: { mime_type: mtype, data: base64 } });
     }
 
-   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`; 
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
