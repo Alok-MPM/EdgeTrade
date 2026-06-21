@@ -243,7 +243,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .nav-item:hover{background:var(--gold-dim);color:var(--white);}
 .nav-item.active{background:var(--gold-dim);border-color:var(--border);color:var(--gold);font-weight:500;}
 .nav-icon{font-size:16px;flex-shrink:0;}
-.nav-icon-img{width:18px;height:18px;object-fit:contain;}
+.nav-icon-img{width:22px;height:22px;object-fit:cover;border-radius:50%;}
 .sidebar-bottom{padding:14px 10px;border-top:1px solid var(--border);}
 .sidebar-user{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background 0.2s;}
 .sidebar-user:hover{background:var(--gold-dim);}
@@ -1008,13 +1008,13 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
     <nav class="sidebar-nav">
       <div class="nav-sec-lbl">Main</div>
       <button class="nav-item active" id="snav-home" onclick="showSection('home');setSideNav('snav-home')"><img src="icons/journal-icon.png" class="nav-icon-img">Journal</button>
-      <button class="nav-item" id="snav-stats" onclick="showSection('stats');setSideNav('snav-stats')"><span class="nav-icon">📊</span>Statistics</button>
-      <button class="nav-item" id="snav-bot" onclick="showSection('bot');setSideNav('snav-bot')"><span class="nav-icon">🤖</span>Assistant</button>
-      <button class="nav-item" id="snav-calc" onclick="showSection('calculator');setSideNav('snav-calc')"><span class="nav-icon">🧮</span>Calculator</button>
+      <button class="nav-item" id="snav-stats" onclick="showSection('stats');setSideNav('snav-stats')"><img src="icons/stats-icon.png" class="nav-icon-img">Statistics</button>
+      <button class="nav-item" id="snav-bot" onclick="showSection('bot');setSideNav('snav-bot')"><img src="icons/assistant-icon.png" class="nav-icon-img">Assistant</button>
+      <button class="nav-item" id="snav-calc" onclick="showSection('calculator');setSideNav('snav-calc')"><img src="icons/calculator-icon.png" class="nav-icon-img">Calculator</button>
       <div class="nav-sec-lbl">Account</div>
       <button class="nav-item" onclick="openBrokerPopup()"><img src="icons/broker-icon.png" class="nav-icon-img">Brokers</button>
-      <button class="nav-item" id="snav-profile" onclick="showSection('profile');setSideNav('snav-profile')"><span class="nav-icon">👤</span>Profile</button>
-      <button class="nav-item" id="snav-settings" onclick="showSection('settings');setSideNav('snav-settings')"><span class="nav-icon">⚙️</span>Settings</button>
+      <button class="nav-item" id="snav-profile" onclick="showSection('profile');setSideNav('snav-profile')"><img src="icons/profile-icon.png" class="nav-icon-img">Profile</button>
+      <button class="nav-item" id="snav-settings" onclick="showSection('settings');setSideNav('snav-settings')"><img src="icons/settings-icon.png" class="nav-icon-img">Settings</button>
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-user" onclick="showSection('profile')">
@@ -1527,10 +1527,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 <div class="mobile-nav" id="mobile-nav" style="display:none;">
   <div class="mn-items">
     <button class="mn-item active" id="mn-home" onclick="showSection('home');setMobNav('mn-home')"><img src="icons/journal-icon.png" class="nav-icon-img">Journal</button>
-    <button class="mn-item" id="mn-stats" onclick="showSection('stats');setMobNav('mn-stats')"><span class="mni">📊</span>Stats</button>
+    <button class="mn-item" id="mn-stats" onclick="showSection('stats');setMobNav('mn-stats')"><img src="icons/stats-icon.png" class="nav-icon-img">Stats</button>
     <button class="mn-item" onclick="openNewTrade()"><div class="mn-center-btn">+</div><span>Add</span></button>
-    <button class="mn-item" id="mn-bot" onclick="showSection('bot');setMobNav('mn-bot')"><span class="mni">🤖</span>Bot</button>
-    <button class="mn-item" id="mn-profile" onclick="showSection('profile');setMobNav('mn-profile')"><span class="mni">👤</span>Profile</button>
+    <button class="mn-item" id="mn-bot" onclick="showSection('bot');setMobNav('mn-bot')"><img src="icons/assistant-icon.png" class="nav-icon-img">Bot</button>
+    <button class="mn-item" id="mn-profile" onclick="showSection('profile');setMobNav('mn-profile')"><img src="icons/profile-icon.png" class="nav-icon-img">Profile</button>
   </div>
 </div>
 
