@@ -239,11 +239,23 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .sidebar-logo-text span{color:var(--gold);}
 .sidebar-nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;}
 .nav-sec-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:10px 8px 5px;}
-.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all 0.2s;color:var(--muted);font-size:14px;border:1px solid transparent;background:none;width:100%;font-family:'Outfit',sans-serif;}
-.nav-item:hover{background:var(--gold-dim);color:var(--white);}
-.nav-item.active{background:var(--gold-dim);border-color:var(--border);color:var(--gold);font-weight:500;}
-.nav-icon{font-size:16px;flex-shrink:0;}
-.nav-icon-img{width:22px;height:22px;object-fit:cover;border-radius:50%;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all 0.18s;color:var(--muted);font-size:15px;border:1px solid transparent;background:none;width:100%;font-family:'Outfit',sans-serif;position:relative;overflow:visible;}
+  .nav-item:hover{background:var(--gold-dim);color:var(--white);}
+  .nav-item.active{background:var(--gold-dim);border-color:var(--border);color:var(--gold);font-weight:600;}
+  .nav-icon{font-size:20px;flex-shrink:0;}
+  .nav-icon-img{width:34px;height:34px;object-fit:contain;border-radius:8px;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;filter:drop-shadow(0 0 6px var(--gold-glow));transition:transform 0.18s,filter 0.18s;}
+
+  /* Make sure content sits above animated border layers */
+  .nav-item > *{position:relative;z-index:3;}
+
+  /* Soft glow on hover for icons */
+  .nav-item:hover .nav-icon-img{transform:scale(1.06);filter:drop-shadow(0 0 8px var(--gold-glow));}
+
+  /* Animated rotating glow border for active nav-item */
+  .nav-item.active::before{content:'';position:absolute;top:-6px;left:-6px;right:-6px;bottom:-6px;border-radius:12px;background:conic-gradient(from 0deg,var(--gold) 0deg,var(--gold) 40deg,transparent 60deg,transparent 360deg);filter:blur(6px);animation:navGlowRotate 4s linear infinite;opacity:0.9;z-index:1;pointer-events:none;}
+  .nav-item.active::after{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;border-radius:10px;background:var(--bg2);z-index:2;pointer-events:none;}
+
+  @keyframes navGlowRotate{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .sidebar-bottom{padding:14px 10px;border-top:1px solid var(--border);}
 .sidebar-user{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background 0.2s;}
 .sidebar-user:hover{background:var(--gold-dim);}
