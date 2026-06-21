@@ -2332,21 +2332,25 @@ let selectedBrokerConfig = null;
 
 // Premium 3D-style broker logos (custom designed, brand-color matched — not official trademarked logos)
 const BROKER_LOGOS = {
-  'binance': {bg:'linear-gradient(145deg,#F3BA2F,#C9911A)', svg:'<path d="M12 2L14.5 4.5L9 10L12 13L15 10L17.5 12.5L12 18L6.5 12.5L9 10M12 2L9.5 4.5L12 7L14.5 4.5M12 18L9.5 20.5L12 23L14.5 20.5M4.5 9.5L2 12L4.5 14.5L7 12M19.5 9.5L17 12L19.5 14.5L22 12" fill="#fff"/>'},
-  'bybit': {bg:'linear-gradient(145deg,#FFA826,#E8870E)', svg:'<circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><path d="M9 9c0-1.5 1.2-2.5 3-2.5s3 1 3 2.2c0 1.5-1.3 2-3 2.3-2 .3-3 1.2-3 2.5 0 1.4 1.3 2.5 3 2.5s3-1 3-2.3" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>'},
-  'bitget': {bg:'linear-gradient(145deg,#5B6CFF,#3344CC)', svg:'<path d="M4 12L12 4L20 12L12 20Z" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.4" fill="#fff"/>'},
-  'coinbase': {bg:'linear-gradient(145deg,#3B82F6,#1E4FBE)', svg:'<circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#fff"/>'},
-  'coinswitch': {bg:'linear-gradient(145deg,#22C55E,#0E9447)', svg:'<path d="M6 16l4-8 2 4 2-7 4 11" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'},
-  'delta': {bg:'linear-gradient(145deg,#38BDF8,#0B7FB8)', svg:'<path d="M12 3 L20 8 V16 L12 21 L4 16 V8 Z" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 8v8M8 10v4M16 10v4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>'},
-  'kucoin': {bg:'linear-gradient(145deg,#34D399,#0E9F71)', svg:'<circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><path d="M9 7v10M9 12l5-5M9 12l5 5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'},
-  'okx': {bg:'linear-gradient(145deg,#2B2B2B,#000)', svg:'<circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><path d="M9 9l6 6M15 9l-6 6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>'},
-  'exness': {bg:'linear-gradient(145deg,#E5E7EB,#9CA3AF)', svg:'<path d="M4 18l4-9 4 6 4-11 4 14" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'},
-  'hotforex': {bg:'linear-gradient(145deg,#EF4444,#B91C1C)', svg:'<path d="M12 3c4 2 6 4 6 8s-3 8-6 9c-3-1-6-5-6-9s2-6 6-8z" fill="#fff"/>'},
-  'ic markets': {bg:'linear-gradient(145deg,#60A5FA,#2563EB)', svg:'<path d="M4 17l5-6 4 4 7-9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'},
-  'pepperstone': {bg:'linear-gradient(145deg,#F472B6,#BE185D)', svg:'<path d="M5 6l7 6-7 6M12 6l7 6-7 6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'},
-  'xm': {bg:'linear-gradient(145deg,#1F2937,#000)', svg:'<path d="M5 5l14 14M19 5L5 19" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>'},
-  'metatrader 4': {bg:'linear-gradient(145deg,#8B5CF6,#5B21B6)', svg:'<path d="M4 18V6l4 6 4-6 4 6 4-6v12" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'},
-  'metatrader 5': {bg:'linear-gradient(145deg,#A78BFA,#7C3AED)', svg:'<path d="M3 16l5-7 3 3 4-8 6 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'}
+  'binance': {bg:'#0B0B0B', svg:'<path d="M12 5.5L14.2 7.7L12 9.9L9.8 7.7Z" fill="#F0B90B"/><path d="M7 9.5L9.2 11.7L7 13.9L4.8 11.7Z" fill="#F0B90B"/><path d="M17 9.5L19.2 11.7L17 13.9L14.8 11.7Z" fill="#F0B90B"/><path d="M12 10.5L14.2 12.7L12 14.9L9.8 12.7Z" fill="#F0B90B"/><path d="M12 15.5L14.2 17.7L12 19.9L9.8 17.7Z" fill="#F0B90B"/>', scale:1.55},
+  'bybit': {bg:'#000', svg:'<text x="0" y="22" font-family="Arial,sans-serif" font-weight="800" font-size="22" fill="#fff" letter-spacing="-1">BY</text><rect x="40" y="4" width="4" height="20" fill="#F7A600"/><text x="48" y="22" font-family="Arial,sans-serif" font-weight="800" font-size="22" fill="#fff" letter-spacing="-1">T</text>', viewBox:'0 0 92 30', scale:1.3},
+  'bitget': {bg:'#fff', svg:'<path d="M17 6L9 6L9 11L17 11" stroke="#1DA8B3" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 18L15 18L15 13L7 13" stroke="#1DA8B3" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'},
+  'coinbase': {bg:'#0052FF', svg:'<circle cx="12" cy="12" r="8" fill="#fff"/><rect x="9" y="9" width="6" height="6" rx="1.2" fill="#0052FF"/>'},
+  'coinswitch': {bg:'#fff', svg:'<path d="M12 4 A8 8 0 0 0 12 20 Z" fill="#1B4332"/><path d="M12 4 A8 8 0 0 1 12 20 Z" fill="#2DD4A8"/>'},
+  'delta': {bg:'#0B0B0B', svg:'<path d="M4 8L13 8L7 16L4 16Z" fill="#F47920"/><path d="M9 8L18 8L12 16L9 16Z" fill="#3EA64A"/>'},
+  'kucoin': {bg:'#fff', svg:'<path d="M7 4L7 20" stroke="#24AE8F" stroke-width="2.4" stroke-linecap="round"/><path d="M7 12L13 5M7 12L13 19" stroke="#24AE8F" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="6" r="2.2" fill="#24AE8F"/>'},
+  'okx': {bg:'#fff', svg:'<rect x="4" y="4" width="5" height="5" fill="#000"/><rect x="15" y="4" width="5" height="5" fill="#000"/><rect x="9.5" y="9.5" width="5" height="5" fill="#000"/><rect x="4" y="15" width="5" height="5" fill="#000"/><rect x="15" y="15" width="5" height="5" fill="#000"/>'},
+  'exness': {bg:'#0B0B0B', svg:'<ellipse cx="12" cy="12" rx="7" ry="7" fill="none" stroke="#FFC727" stroke-width="2"/><path d="M6.5 17.5L17.5 6.5" stroke="#FFC727" stroke-width="2" stroke-linecap="round"/>'},
+  'hotforex': {bg:'#0B0B0B', svg:'<text x="0" y="22" font-family="Arial,sans-serif" font-weight="900" font-size="24" fill="#fff">HF</text><text x="36" y="22" font-family="Arial,sans-serif" font-weight="900" font-size="24" fill="#D62B2B">M</text>', viewBox:'0 0 60 30', scale:1.3},
+  'ic markets': {bg:'#0B0B0B', svg:'<rect x="4" y="14" width="3" height="6" fill="#fff"/><rect x="8.5" y="10" width="3" height="10" fill="#fff"/><rect x="13" y="6" width="3" height="14" fill="#fff"/><text x="18" y="18" font-family="Arial,sans-serif" font-weight="900" font-size="13" fill="#3CB54A">IC</text>'},
+  'pepperstone': {bg:'#fff', svg:'<path d="M12 3 L19 6 V11 C19 16 16 19.5 12 21 C8 19.5 5 16 5 11 V6 Z" fill="#1A73E8"/><text x="7.7" y="14.5" font-family="Arial,sans-serif" font-weight="900" font-size="11" fill="#fff">P</text>'},
+  'xm': {bg:'#0B0B0B', svg:'<path d="M2 4 L10 18 L2 32" fill="#D9242A"/><text x="14" y="26" font-family="Arial,sans-serif" font-weight="900" font-size="24" fill="#fff">XM</text>', viewBox:'0 0 60 36', scale:1.35},
+  'metatrader 4': {bg:'linear-gradient(160deg,#4A9FE8,#2E7BC4)', svg:'<circle cx="12" cy="9" r="3.4" fill="#3CB54A"/><circle cx="8" cy="14" r="3" fill="#F2B632"/><circle cx="16" cy="14" r="3" fill="#3D8FD6"/><circle cx="12" cy="13.5" r="3.4" fill="#fff"/><text x="9.7" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="7" fill="#E8821E">4</text>'},
+  'metatrader 5': {bg:'linear-gradient(160deg,#4A9FE8,#2E7BC4)', svg:'<circle cx="12" cy="9" r="3.4" fill="#3CB54A"/><circle cx="8" cy="14" r="3" fill="#F2B632"/><circle cx="16" cy="14" r="3" fill="#3D8FD6"/><circle cx="12" cy="13.5" r="3.4" fill="#fff"/><text x="9.7" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="7" fill="#E8821E">5</text>'},
+  'zerodha': {bg:'#fff', svg:'<path d="M20 5L11 12L20 19L15 19L6 12L15 5Z" fill="#E2492B"/>'},
+  'upstox': {bg:'#5A1F6B', svg:'<path d="M5 13c2 0 3-2 3-5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/><rect x="11.5" y="6" width="2.4" height="12" fill="#fff"/><path d="M14.5 12a3.5 3.5 0 1 0 0 0.01" stroke="#fff" stroke-width="2.2" fill="none"/>'},
+  'angel one': {bg:'#fff', svg:'<path d="M12 4L19 18H5Z" fill="#1A56DB"/><path d="M12 4L8 12H16Z" fill="#F47920"/>'},
+  'groww': {bg:'linear-gradient(160deg,#5B8DEF,#34D399)', svg:'<path d="M5 16l4-5 3 3 6-9" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>', round:true}
 };
 
 function getBrokerLogoHTML(name, size){
@@ -2356,7 +2360,11 @@ function getBrokerLogoHTML(name, size){
   const fullKey = name.toLowerCase().trim();
   const entry = BROKER_LOGOS[fullKey] || BROKER_LOGOS[key];
   if(!entry) return null;
-  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.3)}px;background:${entry.bg};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);flex-shrink:0;"><svg width="${Math.round(size*0.6)}" height="${Math.round(size*0.6)}" viewBox="0 0 24 24">${entry.svg}</svg></div>`;
+  const radius = entry.round ? '50%' : Math.round(size*0.3)+'px';
+  const vb = entry.viewBox || '0 0 24 24';
+  const scale = entry.scale || 1;
+  const svgSize = Math.round(size*0.6*scale);
+  return `<div style="width:${size}px;height:${size}px;border-radius:${radius};background:${entry.bg};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);flex-shrink:0;overflow:hidden;"><svg width="${svgSize}" height="${Math.round(svgSize*0.6)}" viewBox="${vb}">${entry.svg}</svg></div>`;
 }
 
 async function openBrokerPopup(){
