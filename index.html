@@ -504,7 +504,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .sf-btn{padding:8px 16px;border-radius:30px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;}
 .sf-btn:hover,.sf-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim);}
 
-.stats-big-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.stats-big-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
 .stat-big{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;}
 .stat-big-val{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;margin-bottom:4px;}
 .stat-big-lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
@@ -1323,6 +1323,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <div class="stats-big-grid" id="stats-big-grid">
           <div class="stat-big"><div class="stat-big-val sbv-g" id="st-winrate">0%</div><div class="stat-big-lbl">Win Rate</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-c" id="st-total">0</div><div class="stat-big-lbl">Total Trades</div></div>
+          <div class="stat-big"><div class="stat-big-val sbv-g" id="st-wins">0</div><div class="stat-big-lbl">Win Trades</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-o" id="st-rrr">0.00</div><div class="stat-big-lbl">Avg R:R</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-r" id="st-losses">0</div><div class="stat-big-lbl">Total Losses</div></div>
         </div>
@@ -1767,7 +1768,7 @@ let state = {
   user: null,
   profile: null,
   brokers: [],
-  days: [],
+
   activeBroker: null,
   currentDayId: null,
   currentTradeIdx: null,
@@ -2743,6 +2744,7 @@ function renderStats(){
   const winRate=total>0?Math.round((profits/total)*100):0;
   document.getElementById('st-winrate').textContent=winRate+'%';
   document.getElementById('st-total').textContent=total;
+  document.getElementById('st-wins').textContent=profits;
   document.getElementById('st-losses').textContent=losses;
   const rrrs=trades.filter(t=>t.rrr).map(t=>{
     const parts=t.rrr.split(':');
