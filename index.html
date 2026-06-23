@@ -508,6 +508,13 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .stat-big{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;}
 .stat-big-val{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;margin-bottom:4px;}
 .stat-big-lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.capital-growth-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+.capital-growth-empty{color:var(--muted);font-size:13px;}
+.capital-growth-meta{display:flex;gap:24px;margin-top:14px;flex-wrap:wrap;}
+.cg-meta-item{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.cg-meta-val{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;display:block;margin-top:2px;}
+.cg-meta-val.cg-up{color:var(--green);}
+.cg-meta-val.cg-down{color:var(--red);}
 .sbv-g{color:var(--green);}
 .sbv-r{color:var(--red);}
 .sbv-o{color:var(--gold);}
@@ -1327,6 +1334,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           <div class="stat-big"><div class="stat-big-val sbv-o" id="st-rrr">0.00</div><div class="stat-big-lbl">Avg R:R</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-r" id="st-losses">0</div><div class="stat-big-lbl">Total Losses</div></div>
         </div>
+        <div class="capital-growth-card" id="capital-growth-card">
+          <div class="stats-card-title">📈 Capital Growth</div>
+          <div id="capital-growth-chart-wrap"></div>
+        </div>
         <div class="stats-grid2">
           <!-- Session Analysis -->
           <div class="stats-card">
@@ -1808,7 +1819,7 @@ function showSection(key){
   closeSidebar();
   if(key==='home') refreshHome();
   if(key==='trade-list') refreshTradeList();
-  if(key==='stats') renderStats();
+  if(key==='stats') {renderStats();renderCapitalGrowth();}
   if(key==='calculator') {
     initCalcBrokers();
     // Update API key button state if key already set
@@ -2685,7 +2696,7 @@ function selectBroker(b){
 
 async function syncBroker(connectionId, brokerId){
   showToast('Syncing trades...','success');
-  try {
+  
     const { data, error } = await db.functions.invoke('sync-'+brokerId, {
       body: { connection_id: connectionId }
     });
@@ -2721,6 +2732,7 @@ function setStatsFilter(f,btn){
   document.querySelectorAll('.sf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderStats();
+  renderCapitalGrowth();
 }
 
 function getFilteredTrades(){
@@ -2816,6 +2828,53 @@ function renderStats(){
 
   // Calendar
   renderCalendar();
+}
+
+function renderCapitalGrowth(){
+  const wrap=document.getElementById('capital-growth-chart-wrap');
+  const card=document.getElementById('capital-growth-card');
+  if(!wrap||!card)return;
+  const trades=getFilteredTrades();
+  const points=trades
+    .filter(t=>t.updated_capital!=null && t.updated_capital!=='' && !isNaN(parseFloat(t.updated_capital)))
+    .map(t=>({date:t.date,val:parseFloat(t.updated_capital)}))
+    .sort((a,b)=>new Date(a.date+'T00:00:00')-new Date(b.date+'T00:00:00'));
+  if(points.length<2){
+    wrap.innerHTML='<div class="capital-growth-empty">Not enough capital data yet for this period. Fill "Updated Capital" in your trade entries to see growth here.</div>';
+    return;
+  }
+  const vals=points.map(p=>p.val);
+  const minV=Math.min(...vals), maxV=Math.max(...vals);
+  const range=(maxV-minV)||1;
+  const w=900,h=220,pad=10;
+  const stepX=(w-pad*2)/(points.length-1);
+  const coords=points.map((p,i)=>{
+    const x=pad+i*stepX;
+    const y=pad+(h-pad*2)*(1-((p.val-minV)/range));
+    return [x,y];
+  });
+  const pathD=coords.map((c,i)=>(i===0?'M':'L')+c[0].toFixed(2)+','+c[1].toFixed(2)).join(' ');
+  const areaD=pathD+' L'+coords[coords.length-1][0].toFixed(2)+','+(h-pad)+' L'+coords[0][0].toFixed(2)+','+(h-pad)+' Z';
+  const first=vals[0], last=vals[vals.length-1];
+  const change=last-first;
+  const changePct=first!==0?((change/first)*100):0;
+  const isUp=change>=0;
+  wrap.innerHTML=`
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:220px;display:block;">
+      <defs>
+        <linearGradient id="cgGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#cgGrad)" stroke="none"/>
+      <path d="${pathD}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <div class="capital-growth-meta">
+      <div class="cg-meta-item">Start<span class="cg-meta-val">₹${first.toLocaleString('en-IN')}</span></div>
+      <div class="cg-meta-item">Current<span class="cg-meta-val">₹${last.toLocaleString('en-IN')}</span></div>
+      <div class="cg-meta-item">Change<span class="cg-meta-val ${isUp?'cg-up':'cg-down'}">${isUp?'+':''}₹${change.toLocaleString('en-IN')} (${isUp?'+':''}${changePct.toFixed(1)}%)</span></div>
+    </div>`;
 }
 
 function changeCalMonth(dir){
