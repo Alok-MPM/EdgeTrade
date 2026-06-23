@@ -2811,12 +2811,72 @@ function renderStats(){
     const wr=dt.length>0?Math.round(dw/dt.length*100):null;
     if(wr!==null&&wr<40&&dt.length>=3)wps.push(`Your <strong>${dn}</strong> win rate is only ${wr}% — consider avoiding trades on ${dn}.`);
   });
+  let worstLossDay=null, worstLossDayCount=-1;
+  days.forEach((dn,di)=>{
+    const dt=trades.filter(t=>new Date(t.date+'T00:00:00').getDay()===di);
+    const dl=dt.filter(t=>t.conclusion==='loss').length;
+    if(dl>worstLossDayCount){worstLossDayCount=dl;worstLossDay=dn;}
+  });
+  if(worstLossDayCount>=2)wps.push(`<strong>${worstLossDay}</strong> has your highest number of losses (${worstLossDayCount} loss${worstLossDayCount>1?'es':''}) across the selected period.`);
   sessions.forEach(s=>{
     const st=trades.filter(t=>t.session===s);
     const sw=st.filter(t=>t.conclusion==='target').length;
     const wr=st.length>0?Math.round(sw/st.length*100):null;
     if(wr!==null&&wr<40&&st.length>=3)wps.push(`Your <strong>${s}</strong> session win rate is ${wr}% — consider reducing ${s} trades.`);
   });
+  const stratMap={};
+  trades.forEach(t=>{
+    const s=(t.strategy||'').trim();
+    if(!s)return;
+    if(!stratMap[s])stratMap[s]={total:0,wins:0};
+    stratMap[s].total++;
+    if(t.conclusion==='target')stratMap[s].wins++;
+  });
+  let worstStrat=null, worstStratWr=101;
+  Object.keys(stratMap).forEach(s=>{
+    const m=stratMap[s];
+    if(m.total>=3){
+      const wr=Math.round(m.wins/m.total*100);
+      if(wr<worstStratWr){worstStratWr=wr;worstStrat=s;}
+    }
+  });
+  if(worstStrat&&worstStratWr<50)wps.push(`Your strategy "<strong>${worstStrat.substring(0,40)}${worstStrat.length>40?'...':''}</strong>" has only a ${worstStratWr}% win rate (${stratMap[worstStrat].wins}W / ${stratMap[worstStrat].total-stratMap[worstStrat].wins}L of ${stratMap[worstStrat].total} trades).`);
+
+  const symMap={};
+  trades.forEach(t=>{
+    const sym=(t.chart_name||'').trim();
+    if(!sym)return;
+    if(!symMap[sym])symMap[sym]={total:0,wins:0};
+    symMap[sym].total++;
+    if(t.conclusion==='target')symMap[sym].wins++;
+  });
+  let worstSym=null, worstSymWr=101;
+  Object.keys(symMap).forEach(sym=>{
+    const m=symMap[sym];
+    if(m.total>=3){
+      const wr=Math.round(m.wins/m.total*100);
+      if(wr<worstSymWr){worstSymWr=wr;worstSym=sym;}
+    }
+  });
+  if(worstSym&&worstSymWr<50)wps.push(`You perform worst on <strong>${worstSym}</strong> — only ${worstSymWr}% win rate (${symMap[worstSym].wins}W / ${symMap[worstSym].total-symMap[worstSym].wins}L of ${symMap[worstSym].total} trades).`);
+
+  const PSYCH_KEYWORDS=['fomo','revenge','fear','greed','overconfiden','impulsive','anxious','panic','hesitat'];
+  const psychCounts={};
+  trades.forEach(t=>{
+    const p=(t.psychology||'').toLowerCase();
+    if(!p)return;
+    PSYCH_KEYWORDS.forEach(kw=>{
+      if(p.includes(kw)){
+        psychCounts[kw]=(psychCounts[kw]||0)+1;
+      }
+    });
+  });
+  let topPsych=null, topPsychCount=0;
+  Object.keys(psychCounts).forEach(kw=>{
+    if(psychCounts[kw]>topPsychCount){topPsychCount=psychCounts[kw];topPsych=kw;}
+  });
+  if(topPsych&&topPsychCount>=2)wps.push(`You mentioned "<strong>${topPsych}</strong>" in your psychology notes on ${topPsychCount} trades — this pattern may be affecting your results.`);
+
   if(losses>profits&&total>=5)wps.push(`More <strong>Loss</strong> trades than Profit. Focus on risk management and trade quality over quantity.`);
   const wpEl=document.getElementById('weak-points');
   if(wps.length===0){wpEl.innerHTML='<div style="color:var(--muted);font-size:13px;">'+( total<5?'Trade more to unlock personalized weak point analysis.':'No significant weak points found. Keep going!')+'</div>';return;}
