@@ -1030,7 +1030,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <!-- LOGIN -->
         <div id="form-login">
           <div class="field"><label>Email Address</label><input type="email" id="l-email" placeholder="your@email.com" autocomplete="email"></div>
-          <div class="field"><label>Password</label><div class="field-pass"><input type="password" id="l-pass" placeholder="Your password" autocomplete="current-password"><button class="eye-btn" onclick="toggleEye('l-pass',this)">👁</button></div></div>
+          <div class="field"><label>Password</label><div class="field-pass"><input type="password" id="l-pass" placeholder="Your password" autocomplete="current-password" maxlength="64"><button class="eye-btn" onclick="toggleEye('l-pass',this)">👁</button></div></div>
           <div class="forgot-link"><a href="#" onclick="switchTab('forgot');return false;">Forgot password?</a></div>
           <button class="btn-submit" id="btn-login" onclick="handleLogin()">Sign In to EdgeTrade</button>
           <p class="auth-switch">No account? <a href="#" onclick="switchTab('signup');return false;">Create free account</a></p>
@@ -1040,7 +1040,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <div id="form-signup" style="display:none;">
           <div class="field"><label>Full Name</label><input type="text" id="s-name" placeholder="Your full name" autocomplete="name"></div>
           <div class="field"><label>Email Address</label><input type="email" id="s-email" placeholder="your@email.com" autocomplete="email"></div>
-          <div class="field"><label>Password</label><div class="field-pass"><input type="password" id="s-pass" placeholder="Min 6 characters" autocomplete="new-password"><button class="eye-btn" onclick="toggleEye('s-pass',this)">👁</button></div></div>
+          <div class="field"><label>Password</label><div class="field-pass"><input type="password" id="s-pass" placeholder="Min 6 characters" autocomplete="new-password" maxlength="64"><button class="eye-btn" onclick="toggleEye('s-pass',this)">👁</button></div></div>
           <div class="field"><label>Country</label>
             <div class="country-wrap">
               <div class="country-display" id="country-display" onclick="toggleCountry()" tabindex="0">
@@ -1532,8 +1532,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             <div class="pass-card-sub">Enter your new password below</div>
             <div class="msg msg-success" id="pass-msg-s">✓ Password updated successfully!</div>
             <div class="msg msg-error" id="pass-msg-e">Something went wrong. Try again.</div>
-            <div class="field"><label>New Password</label><div class="field-pass"><input type="password" id="g-newpass" placeholder="Min 6 characters"><button class="eye-btn" onclick="toggleEye('g-newpass',this)">👁</button></div></div>
-            <div class="field"><label>Confirm New Password</label><div class="field-pass"><input type="password" id="g-confpass" placeholder="Confirm password"><button class="eye-btn" onclick="toggleEye('g-confpass',this)">👁</button></div></div>
+            <div class="field"><label>New Password</label><div class="field-pass"><input type="password" id="g-newpass" placeholder="Min 6 characters" maxlength="64"><button class="eye-btn" onclick="toggleEye('g-newpass',this)">👁</button></div></div>
+            <div class="field"><label>Confirm New Password</label><div class="field-pass"><input type="password" id="g-confpass" placeholder="Confirm password" maxlength="64"><button class="eye-btn" onclick="toggleEye('g-confpass',this)">👁</button></div></div>
             <div class="pass-actions">
               <button class="btn-cancel" onclick="showSection('profile')">Cancel</button>
               <button class="btn-reset" onclick="handlePasswordChange()">Reset Password</button>
