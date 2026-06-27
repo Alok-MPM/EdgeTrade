@@ -1973,7 +1973,7 @@ async function loadProfile(){
     document.getElementById('sidebar-name').textContent=name;
     document.getElementById('profile-name-display').textContent=name;
     document.getElementById('profile-email-display').textContent=state.user.email||'';
-    const savedDp=localStorage.getItem('et-dp');
+    const savedDp=data.avatar_url;
     // Profile big avatar
     const avEl=document.getElementById('profile-av-big');
     // Sidebar avatar
@@ -2481,6 +2481,23 @@ const BROKER_LOGOS = {
   'zerodha': {bg:'#fff', svg:'<path d="M20 5L11 12L20 19L15 19L6 12L15 5Z" fill="#E2492B"/>'},
   'upstox': {bg:'#5A1F6B', svg:'<path d="M5 13c2 0 3-2 3-5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/><rect x="11.5" y="6" width="2.4" height="12" fill="#fff"/><path d="M14.5 12a3.5 3.5 0 1 0 0 0.01" stroke="#fff" stroke-width="2.2" fill="none"/>'},
   'angel one': {bg:'#fff', svg:'<rect x="4" y="14" width="2.6" height="2.6" fill="#F47920"/><rect x="7.2" y="14" width="2.6" height="2.6" fill="#F47920"/><rect x="10.4" y="14" width="2.6" height="2.6" fill="#F47920"/><rect x="5.6" y="11" width="2.6" height="2.6" fill="#F47920"/><rect x="8.8" y="11" width="2.6" height="2.6" fill="#F47920"/><rect x="7.2" y="8" width="2.6" height="2.6" fill="#F47920"/><path d="M11 17L16 6L21 17Z" fill="#1A56DB"/>'},
+  'fyers': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="12" fill="#F6C040" text-anchor="middle">FY</text>'},
+  'dhan': {bg:'#0F2557', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="12" fill="#fff" text-anchor="middle">DH</text>'},
+  'finvasia (shoonya)': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">FV</text>'},
+  'alice blue': {bg:'#0E3CCB', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">AB</text>'},
+  'pocketful': {bg:'#1A1A1A', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">PF</text>'},
+  'samco': {bg:'#1A1F71', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">SM</text>'},
+  'kotak neo': {bg:'#C22E1A', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">KN</text>'},
+  'gate.io': {bg:'#000', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">GT</text>'},
+  'kraken': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">KR</text>'},
+  'mexc': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">MX</text>'},
+  'bingx': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">BX</text>'},
+  'bitfinex': {bg:'#062C41', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">BF</text>'},
+  'htx (huobi)': {bg:'#141414', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">HT</text>'},
+  'crypto.com': {bg:'#1B1B1B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">C</text>'},
+  'deriv': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">DV</text>'},
+  'coindcx': {bg:'#0B0B0B', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">DC</text>'},
+  'wazirx': {bg:'#EB7A00', svg:'<text x="12" y="16" font-family="Arial,sans-serif" font-weight="800" font-size="10" fill="#fff" text-anchor="middle">WX</text>'},
   'groww': {bg:'linear-gradient(160deg,#5B8DEF,#34D399)', svg:'<path d="M5 16l4-5 3 3 6-9" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>', round:true}
 };
 
@@ -3166,11 +3183,19 @@ function changeDP(){
     const file = e.target.files[0];
     if(!file) return;
     if(file.size > 2*1024*1024){ showToast('Image too large. Max 2MB.','error'); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
+    showToast('Uploading photo...','info');
+    try{
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const filePath = `${state.user.id}/avatar.${ext}`;
+      const { error: uploadError } = await db.storage.from('avatars').upload(filePath, file, { upsert: true });
+      if(uploadError){ alert('UPLOAD ERROR: '+JSON.stringify(uploadError)); return; }
+      const { data: urlData } = db.storage.from('avatars').getPublicUrl(filePath);
+      const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+      const { error: updateError } = await db.from('profiles').update({ avatar_url: publicUrl }).eq('id', state.user.id);
+      if(updateError){ alert('DB UPDATE ERROR: '+JSON.stringify(updateError)); return; }
       const applyDp = (el) => {
-        el.style.backgroundImage=`url(${dataUrl})`;
+        if(!el) return;
+        el.style.backgroundImage=`url(${publicUrl})`;
         el.style.backgroundSize='cover';
         el.style.backgroundPosition='center';
         el.textContent='';
@@ -3178,10 +3203,11 @@ function changeDP(){
       applyDp(document.getElementById('profile-av-big'));
       applyDp(document.getElementById('sidebar-av'));
       applyDp(document.getElementById('topbar-av'));
-      localStorage.setItem('et-dp', dataUrl);
+      if(state.profile) state.profile.avatar_url = publicUrl;
       showToast('Profile photo updated!','success');
-    };
-    reader.readAsDataURL(file);
+    }catch(err){
+      alert('CATCH ERROR: '+err.message);
+    }
   };
   inp.click();
 }
