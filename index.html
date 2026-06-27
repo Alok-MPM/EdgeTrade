@@ -838,6 +838,22 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 .calc-broker-chip{padding:8px 16px;border-radius:30px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;}
 .calc-broker-chip.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim);}
+/* === BROKER DEMO FEATURE STYLES === */
+.conn-filter-row{display:flex;gap:8px;padding:10px 14px 4px;}
+.conn-filter-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;transition:all 0.2s;}
+.conn-filter-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim);}
+.atype-row{padding:0 0 12px;}
+.atype-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block;}
+.atype-btns{display:flex;gap:8px;}
+.atype-btn{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--muted);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer;transition:all 0.2s;text-align:center;}
+.atype-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim);font-weight:600;}
+.atype-btn.disabled-btn{opacity:0.35;cursor:not-allowed;pointer-events:none;}
+.atype-note{font-size:11px;margin-top:8px;padding:7px 10px;border-radius:6px;display:none;}
+.atype-note.demo-note{color:var(--green);background:var(--green-dim);border:1px solid rgba(76,175,125,0.2);}
+.atype-note.real-note{color:var(--muted);background:rgba(255,255,255,0.03);border:1px solid var(--border2);}
+.acct-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:10px;font-weight:600;flex-shrink:0;}
+.acct-badge.real{color:var(--gold);background:var(--gold-dim);border:1px solid rgba(201,168,76,0.25);}
+.acct-badge.demo{color:var(--green);background:var(--green-dim);border:1px solid rgba(76,175,125,0.25);} 
 .calc-msg-user{background:var(--gold-dim);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;align-self:flex-end;max-width:85%;}
 .calc-msg-ai{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--white);max-width:90%;line-height:1.6;}
 .calc-msg-loading{color:var(--muted);font-size:13px;font-style:italic;}
@@ -1637,6 +1653,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           <div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;">Loading...</div>
         </div>
       </div>
+      <div class="conn-filter-row">
+        <button class="conn-filter-btn active" id="cf-all" onclick="filterConnected('all')">All</button>
+        <button class="conn-filter-btn" id="cf-real" onclick="filterConnected('real')">🔴 Real</button>
+        <button class="conn-filter-btn" id="cf-demo" onclick="filterConnected('demo')">🟢 Demo</button>
+      </div>
       <div class="add-broker-sec">
         <div class="add-broker-lbl">Available Brokers</div>
         <div class="broker-search-w">
@@ -1680,6 +1701,16 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <div class="field" style="margin-bottom:14px;">
           <label>Account Label</label>
           <input type="text" id="conn-label" placeholder="e.g. My Binance Account, Futures Account">
+        </div>
+
+        <!-- Account Type Selector -->
+        <div class="atype-row" id="atype-row">
+          <span class="atype-label">Account Type</span>
+          <div class="atype-btns">
+            <button class="atype-btn active" id="atype-real" onclick="selectAcctType('real')">🔴 Real Account</button>
+            <button class="atype-btn" id="atype-demo" onclick="selectAcctType('demo')">🟢 Demo Account</button>
+          </div>
+          <div class="atype-note" id="atype-note"></div>
         </div>
 
         <!-- API Key -->
@@ -2460,6 +2491,51 @@ document.addEventListener('click',e=>{
 // ══════════════════════════════════════
 let allBrokerConfigs = [];
 let selectedBrokerConfig = null;
+let selectedAcctType = 'real';
+let connectedFilter = 'all';
+
+// Brokers that support Demo/Testnet API connection
+const DEMO_SUPPORTED_BROKERS = [
+  'binance','bybit','okx','delta exchange','kucoin','bitget',
+  'gate.io','bingx','kraken','coinbase advanced','htx (huobi)',
+  'bitfinex','crypto.com','mexc','exness','ic markets',
+  'pepperstone','xm','deriv','metatrader 4','metatrader 5','hotforex'
+];
+
+function brokerSupportsDemo(name){
+  if(!name) return false;
+  const n = name.toLowerCase();
+  return DEMO_SUPPORTED_BROKERS.some(b => n.includes(b) || b.includes(n));
+}
+
+function selectAcctType(type){
+  selectedAcctType = type;
+  document.getElementById('atype-real').classList.toggle('active', type==='real');
+  document.getElementById('atype-demo').classList.toggle('active', type==='demo');
+  const note = document.getElementById('atype-note');
+  const lbl = document.getElementById('conn-label');
+  const bName = selectedBrokerConfig ? selectedBrokerConfig.name : '';
+  if(type==='demo'){
+    note.style.display='block';
+    note.className='atype-note demo-note';
+    note.textContent='✅ Demo/Testnet — Simulated funds. No real money at risk.';
+    if(lbl && !lbl.value.toLowerCase().includes('demo')) lbl.value = bName + ' Demo Account';
+  } else {
+    note.style.display='block';
+    note.className='atype-note real-note';
+    note.textContent='⚠️ Real Account — Actual funds. Use Read-Only API keys only.';
+    if(lbl && lbl.value.toLowerCase().includes('demo')) lbl.value = bName + ' Account';
+  }
+}
+
+function filterConnected(type){
+  connectedFilter = type;
+  ['all','real','demo'].forEach(t=>{
+    const btn = document.getElementById('cf-'+t);
+    if(btn) btn.classList.toggle('active', t===type);
+  });
+  renderConnected();
+}
 
 // Official broker logos — pulled live from each broker's own website favicon (their own brand asset, used purely for account identification).
 const BROKER_DOMAINS = {
@@ -2604,6 +2680,24 @@ function showConnectForm(config){
   document.getElementById('conn-mt-login').value = '';
   document.getElementById('conn-mt-password').value = '';
   document.getElementById('conn-error').style.display = 'none';
+  // Reset account type to Real
+  selectedAcctType = 'real';
+  const atReal = document.getElementById('atype-real');
+  const atDemo = document.getElementById('atype-demo');
+  const atNote = document.getElementById('atype-note');
+  if(atReal) atReal.classList.add('active');
+  if(atDemo) atDemo.classList.remove('active');
+  if(atNote){ atNote.style.display='none'; atNote.textContent=''; }
+  // Enable or disable Demo button based on broker support
+  if(atDemo){
+    if(brokerSupportsDemo(config.name)){
+      atDemo.classList.remove('disabled-btn');
+      atDemo.title='';
+    } else {
+      atDemo.classList.add('disabled-btn');
+      atDemo.title='This broker does not support Demo API connection';
+    }
+  }
 }
 
 async function loadBrokerConfigs(){
@@ -2621,7 +2715,12 @@ function renderConnected(){
     list.innerHTML='<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;">No accounts connected yet. Add one below.</div>';
     return;
   }
-  state.brokers.forEach(b=>{
+  const filteredForDisplay = connectedFilter==='all' ? state.brokers : state.brokers.filter(b=>(b.account_type||'real')===connectedFilter);
+  if(!filteredForDisplay.length){
+    list.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;">No ${connectedFilter} accounts connected.</div>`;
+    return;
+  }
+  filteredForDisplay.forEach(b=>{
     const config = allBrokerConfigs.find(c=>c.id===b.broker_id) || {};
     const isSelected = state.activeBroker === b.id;
     const lastSync = b.last_sync ? new Date(b.last_sync).toLocaleDateString() : 'Never';
@@ -2634,7 +2733,7 @@ function renderConnected(){
     d.innerHTML = `
       ${logoHTML}
       <div class="conn-info">
-        <div class="conn-name">${b.account_label||b.name}</div>
+        <div class="conn-name" style="display:flex;align-items:center;gap:6px;">${b.account_label||b.name}<span class="acct-badge ${b.account_type||'real'}">${(b.account_type||'real').toUpperCase()}</span></div>
         <div class="conn-type">${config.type||b.type||'Manual'} · Synced: ${lastSync}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -2655,8 +2754,7 @@ function renderAvailable(list){
     const d = document.createElement('div');
     d.className = 'avail-broker';
     const isConnected = connectedIds.includes(b.id);
-    d.style.opacity = isConnected ? '0.5' : '1';
-    d.onclick = ()=>{ if(!isConnected) showConnectForm(b); else showToast(b.name+' already connected','error'); };
+    d.onclick = ()=>showConnectForm(b);
     const logoHTML = getBrokerLogoHTML(b.name, 40) || `<span class="avail-emoji">${b.emoji||'🏦'}</span>`;
     d.innerHTML = `
       ${logoHTML}
@@ -2702,6 +2800,7 @@ async function submitBrokerConnection(){
     user_id: state.user.id,
     broker_id: selectedBrokerConfig.id,
     account_label: label,
+    account_type: selectedAcctType,
     api_key_encrypted: apiKey || null,
     api_secret_encrypted: apiSecret || null,
     api_passphrase_encrypted: passphrase || null,
