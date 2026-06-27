@@ -45,10 +45,11 @@ async function callGemini(apiKey: string, fullPrompt: string, imageBase64?: stri
   if (imageBase64) {
     parts.push({ inline_data: { mime_type: mimeType || "image/jpeg", data: imageBase64 } });
   }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    
     body: JSON.stringify({ contents: [{ parts }] }),
   });
   const data = await res.json();
