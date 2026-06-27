@@ -1428,6 +1428,26 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             <div class="strong-list" id="strong-points"><div style="color:var(--muted);font-size:13px;">Trade more to unlock personalized strength analysis.</div></div>
           </div>
         </div>
+
+        <!-- AI STATISTICS CHAT -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:14px;">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">📊</span>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:500;">AI Statistics Analyst</div>
+              <div style="font-size:11px;color:var(--muted);">Apne trading patterns, weak points aur performance ke baare mein poochho</div>
+            </div>
+          </div>
+          <div id="stats-chat-msgs" style="min-height:200px;max-height:360px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div class="calc-msg-ai">
+              📊 Main hoon EdgeTrade Statistics Analyst — aapke trading data ka deep dive expert. Kya samajhna chahte ho?
+            </div>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">
+            <textarea id="stats-chat-inp" placeholder="Apne stats ke baare mein kuch poochho..." style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Outfit',sans-serif;font-size:14px;outline:none;resize:none;min-height:44px;max-height:120px;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendStatsMsg();}"></textarea>
+            <button onclick="sendStatsMsg()" style="padding:10px 18px;background:var(--gold);color:#0A0A0F;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;flex-shrink:0;">Send</button>
+          </div>
+        </div>
       </div>
 
       <!-- BOT -->
@@ -3935,6 +3955,118 @@ async function sendCalcMsg(){
     loadDiv.textContent = 'Error: ' + e.message;
   }
   msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ══════════════════════════════════════
+// STATISTICS AI
+// ══════════════════════════════════════
+let statsHistory = [];
+
+async function sendStatsMsg(){
+  const inp = document.getElementById('stats-chat-inp');
+  const msgs = document.getElementById('stats-chat-msgs');
+  const text = inp.value.trim();
+  if(!text) return;
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'calc-msg-user';
+  userDiv.textContent = text;
+  msgs.appendChild(userDiv);
+  inp.value = '';
+
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'calc-msg-loading';
+  loadDiv.textContent = 'AI is thinking...';
+  msgs.appendChild(loadDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const trades = getFilteredTrades();
+  const total = trades.length;
+  const profits = trades.filter(t=>t.conclusion==='target').length;
+  const losses = trades.filter(t=>t.conclusion==='loss').length;
+  const bes = trades.filter(t=>t.conclusion==='breakeven').length;
+  const winRate = total>0?Math.round((profits/total)*100):0;
+
+  const rrrs = trades.filter(t=>t.rrr).map(t=>{
+    const parts=t.rrr.split(':');
+    return parts.length===2?parseFloat(parts[1])/parseFloat(parts[0]):0;
+  }).filter(r=>r>0);
+  const avgRR = rrrs.length>0?(rrrs.reduce((a,b)=>a+b,0)/rrrs.length).toFixed(2):null;
+
+  const sessions=['London','New York','Asian','London-NY Overlap'];
+  const sessionPerformance={};
+  sessions.forEach(s=>{
+    const st=trades.filter(t=>t.session===s);
+    const sw=st.filter(t=>t.conclusion==='target').length;
+    sessionPerformance[s]={trades:st.length,wins:sw,winRate:st.length>0?Math.round(sw/st.length*100):null};
+  });
+
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayOfWeekPerformance={};
+  days.forEach((dn,di)=>{
+    const dt=trades.filter(t=>new Date(t.date+'T00:00:00').getDay()===di);
+    const dw=dt.filter(t=>t.conclusion==='target').length;
+    dayOfWeekPerformance[dn]={trades:dt.length,wins:dw,winRate:dt.length>0?Math.round(dw/dt.length*100):null};
+  });
+
+  const stratMap={};
+  trades.forEach(t=>{
+    const s=(t.strategy||'').trim();
+    if(!s)return;
+    if(!stratMap[s])stratMap[s]={total:0,wins:0};
+    stratMap[s].total++;
+    if(t.conclusion==='target')stratMap[s].wins++;
+  });
+  const strategyPerformance=Object.keys(stratMap).map(s=>({
+    name:s,total:stratMap[s].total,wins:stratMap[s].wins,
+    winRate:Math.round(stratMap[s].wins/stratMap[s].total*100)
+  }));
+
+  const capitalPoints=trades
+    .filter(t=>t.updated_capital!=null&&t.updated_capital!==''&&!isNaN(parseFloat(t.updated_capital)))
+    .map(t=>({date:t.date,val:parseFloat(t.updated_capital)}))
+    .sort((a,b)=>new Date(a.date+'T00:00:00')-new Date(b.date+'T00:00:00'));
+  const capitalGrowth=capitalPoints.length>=2?{
+    start:capitalPoints[0].val,
+    current:capitalPoints[capitalPoints.length-1].val,
+    change:capitalPoints[capitalPoints.length-1].val-capitalPoints[0].val,
+    changePct:((capitalPoints[capitalPoints.length-1].val-capitalPoints[0].val)/capitalPoints[0].val*100).toFixed(1)
+  }:null;
+
+  const statsContext={
+    filter:state.statsFilter,
+    totalTrades:total,wins:profits,losses:losses,breakevens:bes,
+    winRate:winRate,avgRR:avgRR,
+    sessionPerformance:sessionPerformance,
+    dayOfWeekPerformance:dayOfWeekPerformance,
+    strategyPerformance:strategyPerformance,
+    capitalGrowth:capitalGrowth,
+    weakPoints:document.getElementById('weak-points')?.innerText||'',
+    strongPoints:document.getElementById('strong-points')?.innerText||''
+  };
+
+  statsHistory.push({role:'user',content:text});
+
+  try {
+    const {data,error}=await db.functions.invoke('ai-statistics',{
+      body:{messages:statsHistory,statsContext:statsContext}
+    });
+
+    if(error) throw error;
+    if(data?.error) throw new Error(data.error);
+
+    const reply=data?.reply||'No response from AI.';
+    statsHistory.push({role:'assistant',content:reply});
+
+    loadDiv.remove();
+    const aiDiv=document.createElement('div');
+    aiDiv.className='calc-msg-ai';
+    aiDiv.innerHTML=reply.replace(/\n/g,'<br>');
+    msgs.appendChild(aiDiv);
+  } catch(e){
+    loadDiv.textContent='Error: '+e.message;
+  }
+  msgs.scrollTop=msgs.scrollHeight;
 }
 </script>
 
