@@ -1488,7 +1488,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
               <div style="font-size:14px;font-weight:500;">AI Trading Assistant</div>
               <div style="font-size:11px;color:var(--muted);">Describe your trade setup or upload a chart screenshot</div>
             </div>
-            <button id="gemini-key-btn" onclick="setGeminiKey()" style="padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;transition:all 0.2s;">🔑 Set API Key</button>
           </div>
           <!-- Chat Messages -->
           <div id="calc-chat-msgs" style="min-height:200px;max-height:360px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -1870,9 +1869,6 @@ function showSection(key){
   if(key==='stats') {renderStats();renderCapitalGrowth();}
   if(key==='calculator') {
     initCalcBrokers();
-    // Update API key button state if key already set
-    const btn = document.getElementById("gemini-key-btn");
-    if (btn && GEMINI_KEY) { btn.textContent = "🔑 Key Set ✓"; btn.style.borderColor = "var(--green)"; btn.style.color = "var(--green)"; }
   }
 }
 
@@ -3798,20 +3794,6 @@ function toggleStratDetail(id){
 // CALCULATOR + AI
 // ══════════════════════════════════════
 
-// ── Gemini API Key (session only — GitHub safe) ──
-let GEMINI_KEY = sessionStorage.getItem("GEMINI_API_KEY") || null;
-
-function setGeminiKey() {
-  const key = prompt("Apni Gemini API Key paste karo (session mein rahegi, GitHub push nahi hogi):");
-  if (key && key.trim()) {
-    GEMINI_KEY = key.trim();
-    sessionStorage.setItem("GEMINI_API_KEY", GEMINI_KEY);
-    showToast("API Key set! AI ready hai", "success");
-    const btn = document.getElementById("gemini-key-btn");
-    if (btn) { btn.textContent = "Key Set"; btn.style.borderColor = "var(--green)"; btn.style.color = "var(--green)"; }
-  }
-}
-
 let calcImg = null;
 
 function initCalcBrokers(){
@@ -3890,7 +3872,6 @@ async function sendCalcMsg(){
   const text = inp.value.trim();
   if(!text && !calcImg) return;
 
-  // User message
   const userDiv = document.createElement('div');
   userDiv.className = 'calc-msg-user';
   if(calcImg){
@@ -3901,14 +3882,12 @@ async function sendCalcMsg(){
   msgs.appendChild(userDiv);
   inp.value = '';
 
-  // Loading
   const loadDiv = document.createElement('div');
   loadDiv.className = 'calc-msg-loading';
   loadDiv.textContent = 'AI is thinking...';
   msgs.appendChild(loadDiv);
   msgs.scrollTop = msgs.scrollHeight;
 
-  // Gather context
   const capital = document.getElementById('calc-capital').value;
   const entry = document.getElementById('calc-entry').value;
   const sl = document.getElementById('calc-sl').value;
@@ -3917,48 +3896,34 @@ async function sendCalcMsg(){
   const activeBroker = state.brokers?.find(b => b.id === state.activeBroker);
   const brokerName = activeBroker?.name || 'Unknown Broker';
 
-  const systemPrompt = `You are an expert trading calculator AI assistant for EdgeTrade, a professional trading journal app.
-User's context:
-- Broker: ${brokerName}
-- Capital/Balance: ${capital || 'Not provided'}
-- Risk %: ${risk}%
-- Entry Price: ${entry || 'Not provided'}
-- Stop Loss: ${sl || 'Not provided'}
-- Target: ${tp || 'Not provided'}
-
-Help the user calculate position size, risk amount in currency, R:R ratio, and potential drawdown scenarios.
-Be concise but thorough. Format numbers clearly. If chart image is provided, analyze it and give trade setup suggestions.
-Always calculate in the user's broker currency context. Keep responses under 200 words and use clear formatting.`;
+  let imageBase64 = null;
+  let imageMimeType = null;
+  if (calcImg) {
+    imageBase64 = calcImg.split(',')[1];
+    imageMimeType = calcImg.split(';')[0].split(':')[1];
+  }
 
   try {
-    if (!GEMINI_KEY) {
-      loadDiv.innerHTML = 'API Key set nahi hai. Upar &#x1F511; <b>Set API Key</b> button click karo.';
-      return;
-    }
-
-    // Build Gemini content parts
-    const parts = [];
-    parts.push({ text: systemPrompt + '\n\nUser: ' + (text || 'Analyze this chart and suggest trade parameters.') });
-    if (calcImg) {
-      const base64 = calcImg.split(',')[1];
-      const mtype = calcImg.split(';')[0].split(':')[1];
-      parts.push({ inline_data: { mime_type: mtype, data: base64 } });
-    }
-
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }] })
+    const { data, error } = await db.functions.invoke('ai-calculator', {
+      body: {
+        message: text,
+        image_base64: imageBase64,
+        image_mime_type: imageMimeType,
+        context: {
+          broker: brokerName,
+          capital: capital,
+          risk_pct: risk,
+          entry: entry,
+          stop_loss: sl,
+          target: tp
+        }
+      }
     });
-    const data = await res.json();
 
-    if (data.error) {
-      loadDiv.textContent = 'API Error: ' + data.error.message;
-      return;
-    }
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from AI.';
+    const reply = data?.reply || 'No response from AI.';
 
     loadDiv.remove();
     const aiDiv = document.createElement('div');
@@ -3967,7 +3932,7 @@ Always calculate in the user's broker currency context. Keep responses under 200
     msgs.appendChild(aiDiv);
     clearCalcImg();
   } catch(e) {
-    loadDiv.textContent = 'Network Error: ' + e.message;
+    loadDiv.textContent = 'Error: ' + e.message;
   }
   msgs.scrollTop = msgs.scrollHeight;
 }
