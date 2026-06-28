@@ -62,7 +62,7 @@ export async function syncMt5Account(conn: Record<string, unknown>, supabase: un
   if (!deployed) throw new Error("MetaAPI account not ready. Please retry in a minute.");
 
   // Fetch trade history
-  const startTime = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const startTime = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
   const endTime = new Date().toISOString();
   const history = await metaApiFetch(
     `/users/current/accounts/${accountId}/history-deals/time/${encodeURIComponent(startTime)}/${encodeURIComponent(endTime)}`,
