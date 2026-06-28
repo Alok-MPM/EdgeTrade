@@ -31,7 +31,7 @@ export function getSupabaseAdmin(): SupabaseClient {
 export async function getConnection(supabase: SupabaseClient, connectionId: string) {
   const { data, error } = await supabase
     .from("user_broker_connections")
-    .select("*")
+    .select("id, user_id, broker_id, account_label, account_type, api_key_encrypted, api_secret_encrypted, api_passphrase_encrypted, mt_server, mt_login, mt_investor_password_encrypted, sync_status, last_sync, is_active, extra_data")
     .eq("id", connectionId)
     .single();
   if (error || !data) throw new Error("Connection not found: " + (error?.message || "no data"));
