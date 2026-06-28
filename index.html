@@ -663,6 +663,13 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .conn-type{font-size:10px;color:var(--muted);}
 .conn-status{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);}
 .conn-status-m{background:var(--gold);box-shadow:0 0 5px var(--gold);}
+.acct-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+.acct-dot.real{background:var(--red);box-shadow:0 0 5px rgba(224,82,82,0.6);}
+.acct-dot.demo{background:var(--green);box-shadow:0 0 5px rgba(76,175,125,0.6);}
+.icon-btn-del{background:transparent;border:1px solid var(--border2);border-radius:7px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:all 0.2s;}
+.icon-btn-del img{width:14px;height:14px;opacity:0.55;transition:opacity 0.2s;}
+.icon-btn-del:hover{border-color:rgba(224,82,82,0.4);background:var(--red-dim);}
+.icon-btn-del:hover img{opacity:1;}
 .add-broker-sec{padding:14px 22px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .add-broker-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .broker-search-w{position:relative;margin-bottom:10px;}
@@ -1674,8 +1681,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
       </div>
       <div class="conn-filter-row">
         <button class="conn-filter-btn active" id="cf-all" onclick="filterConnected('all')">All</button>
-        <button class="conn-filter-btn" id="cf-real" onclick="filterConnected('real')">🔴 Real</button>
-        <button class="conn-filter-btn" id="cf-demo" onclick="filterConnected('demo')">🟢 Demo</button>
+        <button class="conn-filter-btn" id="cf-real" onclick="filterConnected('real')"><span class="acct-dot real"></span>Real</button>
+        <button class="conn-filter-btn" id="cf-demo" onclick="filterConnected('demo')"><span class="acct-dot demo"></span>Demo</button>
       </div>
       <div class="add-broker-sec">
         <div class="add-broker-lbl">Available Brokers</div>
@@ -1726,8 +1733,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <div class="atype-row" id="atype-row">
           <span class="atype-label">Account Type</span>
           <div class="atype-btns">
-            <button class="atype-btn active" id="atype-real" onclick="selectAcctType('real')">🔴 Real Account</button>
-            <button class="atype-btn" id="atype-demo" onclick="selectAcctType('demo')">🟢 Demo Account</button>
+            <button class="atype-btn active" id="atype-real" onclick="selectAcctType('real')"><span class="acct-dot real"></span>Real Account</button>
+            <button class="atype-btn" id="atype-demo" onclick="selectAcctType('demo')"><span class="acct-dot demo"></span>Demo Account</button>
           </div>
           <div class="atype-note" id="atype-note"></div>
         </div>
@@ -2755,8 +2762,8 @@ function renderConnected(){
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         ${!b.is_manual?`<button onclick="event.stopPropagation();syncBroker('${b.id}','${b.broker_id}')" style="background:var(--gold-dim);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:10px;color:var(--gold);cursor:pointer;">🔄 Sync</button>`:''}
-        <button onclick="event.stopPropagation();deleteBroker('${b.id}','${b.account_label||b.name}')" style="background:var(--red-dim);border:1px solid rgba(224,82,82,0.3);border-radius:6px;padding:4px 8px;font-size:10px;color:var(--red);cursor:pointer;">🗑</button>
-        <div class="conn-status ${b.is_manual?'conn-status-m':''}" style="background:${statusColor};box-shadow:0 0 5px ${statusColor};"></div>
+        <button class="icon-btn-del" onclick="event.stopPropagation();deleteBroker('${b.id}','${b.account_label||b.name}')" title="Delete"><img src="https://unpkg.com/lucide-static@latest/icons/trash-2.svg" alt="Delete"></button>
+        <div class="conn-status ${b.is_manual?'conn-status-m':''}" style="background:${statusColor};border:2px solid var(--bg3);box-shadow:0 0 4px ${statusColor};width:8px;height:8px;"></div>
       </div>
     `;
     list.appendChild(d);
