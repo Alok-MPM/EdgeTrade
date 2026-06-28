@@ -132,6 +132,12 @@ serve(async (req) => {
     }
 
     const body = await req.json();
+    const conn = {
+      id: body.connection_id ?? null,
+      broker_id: body.broker_id ?? null,
+      api_key_encrypted: body.api_key ?? null,
+    };
+    console.log("CONN DATA:", JSON.stringify({ id: conn.id, broker_id: conn.broker_id, has_key: !!conn.api_key_encrypted }));
     const { broker_id, account_label, api_key, api_secret, api_passphrase, access_token } = body;
 
     if (!broker_id || !api_key) {
