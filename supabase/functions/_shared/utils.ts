@@ -5,6 +5,22 @@ export const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function decryptData(ciphertext: string, secret: string): Promise<string> {
+  const decoder = new TextDecoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret.padEnd(32, "0").slice(0, 32)),
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"]
+  );
+  const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const encrypted = combined.slice(12);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, keyMaterial, encrypted);
+  return decoder.decode(decrypted);
+}
+
 export function getSupabaseAdmin(): SupabaseClient {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -19,6 +35,11 @@ export async function getConnection(supabase: SupabaseClient, connectionId: stri
     .eq("id", connectionId)
     .single();
   if (error || !data) throw new Error("Connection not found: " + (error?.message || "no data"));
+  const secret = Deno.env.get("ENCRYPTION_SECRET") ?? "edgetrade-default-secret-key-2024";
+  if (data.api_key_encrypted) data.api_key_encrypted = await decryptData(data.api_key_encrypted, secret);
+  if (data.api_secret_encrypted) data.api_secret_encrypted = await decryptData(data.api_secret_encrypted, secret);
+  if (data.api_passphrase_encrypted) data.api_passphrase_encrypted = await decryptData(data.api_passphrase_encrypted, secret);
+  if (data.mt_investor_password_encrypted) data.mt_investor_password_encrypted = await decryptData(data.mt_investor_password_encrypted, secret);
   return data;
 }
 
