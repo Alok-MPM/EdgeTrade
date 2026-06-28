@@ -10,6 +10,9 @@ serve(async (req) => {
       if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
         try {
                 const { connection_id } = await req.json();
+                    const DAYS_90 = 90 * 24 * 3600 * 1000;
+      const startTime = Date.now() - DAYS_90;
+
                     const supabase = createClient(
                               Deno.env.get("SUPABASE_URL")!,
                                     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
