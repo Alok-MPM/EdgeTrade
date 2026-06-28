@@ -1,0 +1,150 @@
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+export const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+export function getSupabaseAdmin(): SupabaseClient {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+}
+
+export async function getConnection(supabase: SupabaseClient, connectionId: string) {
+  const { data, error } = await supabase
+    .from("user_broker_connections")
+    .select("*")
+    .eq("id", connectionId)
+    .single();
+  if (error || !data) throw new Error("Connection not found: " + (error?.message || "no data"));
+  return data;
+}
+
+export async function getOrCreateTradingDay(
+  supabase: SupabaseClient,
+  userId: string,
+  connectionId: string,
+  date: string
+): Promise<string> {
+  const { data: existing } = await supabase
+    .from("trading_days")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("broker_id", connectionId)
+    .eq("date", date)
+    .maybeSingle();
+
+  if (existing?.id) return existing.id;
+
+  const { data: created, error } = await supabase
+    .from("trading_days")
+    .insert([{ user_id: userId, broker_id: connectionId, date }])
+    .select("id")
+    .single();
+
+  if (error) {
+    // Race condition: try fetching again
+    const { data: retry } = await supabase
+      .from("trading_days")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("broker_id", connectionId)
+      .eq("date", date)
+      .single();
+    if (retry?.id) return retry.id;
+    throw new Error("Failed to create trading day: " + error.message);
+  }
+  return created.id;
+}
+
+export interface NormalizedTrade {
+  external_trade_id: string;
+  symbol: string;
+  direction: "long" | "short";
+  lot_size: number | null;
+  lot_unit: string;
+  entry_price: number | null;
+  exit_price: number | null;
+  entry_time: string | null;
+  fees: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  conclusion: "target" | "loss" | "breakeven";
+  date: string; // YYYY-MM-DD
+}
+
+export async function saveSyncedTrades(
+  supabase: SupabaseClient,
+  userId: string,
+  connectionId: string,
+  trades: NormalizedTrade[]
+): Promise<number> {
+  let count = 0;
+  for (const trade of trades) {
+    if (!trade.external_trade_id || !trade.date) continue;
+
+    const { data: existing } = await supabase
+      .from("trades")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("external_trade_id", trade.external_trade_id)
+      .maybeSingle();
+
+    if (existing?.id) continue; // already synced
+
+    const dayId = await getOrCreateTradingDay(supabase, userId, connectionId, trade.date);
+
+    const { error } = await supabase.from("trades").insert([{
+      day_id: dayId,
+      user_id: userId,
+      connection_id: connectionId,
+      external_trade_id: trade.external_trade_id,
+      chart_name: trade.symbol,
+      direction: trade.direction,
+      lot_size: trade.lot_size,
+      lot_unit: trade.lot_unit || "qty",
+      entry_price: trade.entry_price,
+      exit_price: trade.exit_price,
+      entry_time: trade.entry_time,
+      fees: trade.fees,
+      stop_loss: trade.stop_loss,
+      take_profit: trade.take_profit,
+      conclusion: trade.conclusion,
+    }]);
+
+    if (!error) count++;
+  }
+  return count;
+}
+
+export async function updateSyncStatus(
+  supabase: SupabaseClient,
+  connectionId: string,
+  status: "success" | "error"
+) {
+  await supabase
+    .from("user_broker_connections")
+    .update({ sync_status: status, last_sync: new Date().toISOString() })
+    .eq("id", connectionId);
+}
+
+export function pnlToConclusion(pnl: number | null): "target" | "loss" | "breakeven" {
+  if (pnl === null || pnl === undefined) return "breakeven";
+  if (pnl > 0) return "target";
+  if (pnl < 0) return "loss";
+  return "breakeven";
+}
+
+export function msToDate(ms: number): string {
+  return new Date(ms).toISOString().split("T")[0];
+}
+
+export function isoToDate(iso: string): string {
+  return iso.split("T")[0];
+}
+
+export function msToTime(ms: number): string {
+  return new Date(ms).toTimeString().slice(0, 5);
+}
