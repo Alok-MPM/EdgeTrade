@@ -22,6 +22,7 @@ async function decryptData(ciphertext: string, secret: string): Promise<string> 
 }
 
 export function getSupabaseAdmin(): SupabaseClient {
+  console.log("KEY CHECK:", !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), !!Deno.env.get("SUPABASE_ANON_KEY"));
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
