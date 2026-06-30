@@ -7,19 +7,24 @@ const corsHeaders = {
 };
 
 async function decryptData(ciphertext: string, secret: string) {
-  const decoder = new TextDecoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret.padEnd(32, "0").slice(0, 32)),
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
-  const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
-  const iv = combined.slice(0, 12);
-  const encrypted = combined.slice(12);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, keyMaterial, encrypted);
-  return decoder.decode(decrypted);
+  try {
+    const decoder = new TextDecoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret.padEnd(32, "0").slice(0, 32)),
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"]
+    );
+    const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const encrypted = combined.slice(12);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, keyMaterial, encrypted);
+    return decoder.decode(decrypted);
+  } catch (e) {
+    console.log("DECRYPT DEBUG - secret length:", secret.length, "ciphertext length:", ciphertext.length, "error:", (e as Error).message);
+    throw new Error("Decryption failed: " + (e as Error).message);
+  }
 }
 
 async function hmacSha256Hex(key: string, message: string) {
