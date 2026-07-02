@@ -81,21 +81,38 @@ serve(async (req) => {
     console.log("INCOME RESPONSE:", JSON.stringify(incomeResp).slice(0, 1000));
 
     let symbols: string[] = [];
+    const minTradeIdBySymbol: Record<string, number> = {};
     if (Array.isArray(incomeResp)) {
       symbols = [...new Set(incomeResp.map((i: any) => i.symbol).filter(Boolean))];
+      for (const entry of incomeResp) {
+        if (!entry.symbol || !entry.tradeId) continue;
+        const tid = parseInt(entry.tradeId, 10);
+        if (isNaN(tid)) continue;
+        if (!(entry.symbol in minTradeIdBySymbol) || tid < minTradeIdBySymbol[entry.symbol]) {
+          minTradeIdBySymbol[entry.symbol] = tid;
+        }
+      }
     } else {
       console.log("INCOME ERROR (not array):", JSON.stringify(incomeResp));
     }
     console.log("ACTIVE SYMBOLS FOUND:", JSON.stringify(symbols));
+    console.log("MIN TRADE ID BY SYMBOL:", JSON.stringify(minTradeIdBySymbol));
 
-    // Step 2: Fetch trades for each active symbol
+    // Step 2: Fetch trades for each active symbol using fromId
+    // (userTrades has a strict 7-day startTime/endTime window, so we
+    // anchor on the earliest known tradeId from income history instead,
+    // which has no such restriction)
     let allTrades: any[] = [];
     for (const symbol of symbols) {
-      const tradesResp = await signedFetch("/fapi/v1/userTrades", {
-        symbol,
-        startTime: startTime.toString(),
-        limit: "1000",
-      }, apiKey, apiSecret);
+      const minId = minTradeIdBySymbol[symbol];
+      const params: Record<string, string> = { symbol, limit: "1000" };
+      if (minId) {
+        params.fromId = Math.max(minId - 1, 0).toString();
+      } else {
+        params.startTime = startTime.toString();
+      }
+
+      const tradesResp = await signedFetch("/fapi/v1/userTrades", params, apiKey, apiSecret);
 
       console.log(`TRADES for ${symbol}:`, JSON.stringify(tradesResp).slice(0, 500));
 
