@@ -2820,17 +2820,31 @@ async function submitBrokerConnection(){
   const btn = document.getElementById('conn-submit-btn');
   btn.textContent='Connecting...'; btn.disabled=true;
 
+  const { data: encData, error: encError } = await db.functions.invoke('encrypt-keys', {
+    body: {
+      api_key: apiKey || null,
+      api_secret: apiSecret || null,
+      api_passphrase: passphrase || null,
+      mt_investor_password: mtPassword || null
+    }
+  });
+
+  if(encError){
+    btn.textContent='Connect Account'; btn.disabled=false;
+    errEl.textContent='Encryption error: '+encError.message; errEl.style.display='block'; return;
+  }
+
   const { data, error } = await db.from('user_broker_connections').insert([{
     user_id: state.user.id,
     broker_id: selectedBrokerConfig.id,
     account_label: label,
     account_type: selectedAcctType,
-    api_key_encrypted: apiKey || null,
-    api_secret_encrypted: apiSecret || null,
-    api_passphrase_encrypted: passphrase || null,
+    api_key_encrypted: encData.api_key_encrypted,
+    api_secret_encrypted: encData.api_secret_encrypted,
+    api_passphrase_encrypted: encData.api_passphrase_encrypted,
     mt_server: mtServer || null,
     mt_login: mtLogin || null,
-    mt_investor_password_encrypted: mtPassword || null,
+    mt_investor_password_encrypted: encData.mt_investor_password_encrypted,
     sync_status: 'pending',
     is_active: true
   }]).select().single();
