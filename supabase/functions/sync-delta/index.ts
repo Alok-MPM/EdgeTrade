@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleSyncRequest } from "../_utils/edge-handler.ts";
-import { saveSyncedTrades, pnlToConclusion, msToDate, NormalizedTrade } from "../_utils/utils.ts";
+import { saveSyncedTrades, pnlToConclusion, NormalizedTrade } from "../_utils/utils.ts";
 import { hmacSha256Hex } from "../_utils/crypto.ts";
 
 async function deltaFetch(base: string, path: string, params: Record<string, string | number>, apiKey: string, apiSecret: string) {
@@ -33,9 +33,8 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
   if (Array.isArray(orders)) {
     for (const o of orders) {
       if (o.state !== "closed" || !o.avg_fill_price) continue;
-      const orderMs = new Date(o.updated_at || o.created_at).getTime();
-      if (orderMs < cutoffMs) continue;
       const ts = new Date(o.updated_at || o.created_at);
+      if (ts.getTime() < cutoffMs) continue;
       const pnl = parseFloat(o.pnl || "0");
       trades.push({
         external_trade_id: `delta-${o.id}`,
