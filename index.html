@@ -2087,7 +2087,9 @@ async function loadDays(){
 // ══════════════════════════════════════
 function getActiveBrokerDays(){
   if(!state.activeBroker) return [];
-  return state.days.filter(d=>d.broker_id===state.activeBroker);
+  const activeConn = state.brokers.find(b=>b.id===state.activeBroker);
+  if(!activeConn) return [];
+  return state.days.filter(d=>d.broker_id===activeConn.broker_id);
 }
 
 function refreshHome(){
@@ -2160,10 +2162,11 @@ function updateBalCards(){
 async function addNewDay(){
   if(!state.user){showToast('Please sign in first','error');return;}
   if(!state.activeBroker){showToast('Pehle broker connect ya select karo','error');return;}
+  const activeConn = state.brokers.find(b=>b.id===state.activeBroker);
   const today=new Date().toISOString().split('T')[0];
   const exists=getActiveBrokerDays().find(d=>d.date===today);
   if(exists){openDay(exists.id);return;}
-  const {data,error}=await db.from('trading_days').insert([{user_id:state.user.id,broker_id:state.activeBroker||null,date:today}]).select().single();
+  const {data,error}=await db.from('trading_days').insert([{user_id:state.user.id,broker_id:activeConn?.broker_id||null,date:today}]).select().single();
   if(error){showToast('Error creating day: '+error.message,'error');return;}
   state.days.unshift({...data,trades:[]});
   openDay(data.id);
@@ -2955,13 +2958,25 @@ async function deleteBroker(connectionId, name){
   }
 
   if(deleteTrades){
-    const { data: dayRows } = await db.from('trading_days').select('id').eq('broker_id', connectionId);
-    const dayIds = (dayRows||[]).map(d=>d.id);
-    if(dayIds.length>0){
-      await db.from('trades').delete().in('day_id', dayIds);
-      await db.from('trading_days').delete().in('id', dayIds);
+    // Delete only this connection's own trades (accurate per-account, since trades.connection_id is specific)
+    await db.from('trades').delete().eq('connection_id', connectionId);
+    state.days = state.days.map(d=>({...d, trades:(d.trades||[]).filter(t=>t.connection_id!==connectionId)}));
+
+    // trading_days.broker_id is a shared broker-type catalog id, not the connection id,
+    // so only remove days that are now completely empty (no trades left from any connection)
+    if(broker?.broker_id){
+      const { data: typeDays } = await db.from('trading_days').select('id').eq('broker_id', broker.broker_id);
+      const typeDayIds = (typeDays||[]).map(d=>d.id);
+      if(typeDayIds.length>0){
+        const { data: remainingTrades } = await db.from('trades').select('day_id').in('day_id', typeDayIds);
+        const usedDayIds = new Set((remainingTrades||[]).map(t=>t.day_id));
+        const emptyDayIds = typeDayIds.filter(id=>!usedDayIds.has(id));
+        if(emptyDayIds.length>0){
+          await db.from('trading_days').delete().in('id', emptyDayIds);
+        }
+        state.days = state.days.filter(d=>!emptyDayIds.includes(d.id));
+      }
     }
-    state.days = state.days.filter(d=>d.broker_id!==connectionId);
   }
 
   const { error } = await db.from('user_broker_connections').delete().eq('id', connectionId);
