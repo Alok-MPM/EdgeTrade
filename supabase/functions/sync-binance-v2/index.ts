@@ -149,7 +149,7 @@ serve(async (req) => {
         .from("trading_days")
         .insert([{
           user_id: conn.user_id,
-          broker_id: conn.broker_id || null,
+          broker_id: connection_id,
           date: dateStr,
         }])
         .select()
