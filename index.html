@@ -2085,17 +2085,37 @@ async function loadDays(){
 // ══════════════════════════════════════
 // HOME PAGE
 // ══════════════════════════════════════
+function getActiveBrokerDays(){
+  if(!state.activeBroker) return [];
+  return state.days.filter(d=>d.broker_id===state.activeBroker);
+}
+
 function refreshHome(){
   const now=new Date();
   document.getElementById('month-badge').textContent=now.toLocaleString('default',{month:'long',year:'numeric'});
-  const total=state.days.length;
-  document.getElementById('days-count-lbl').textContent=total+' day'+(total===1?'':'s')+' logged';
+  const activeDays=getActiveBrokerDays();
+  document.getElementById('days-count-lbl').textContent=activeDays.length+' day'+(activeDays.length===1?'':'s')+' logged';
   const grid=document.getElementById('days-grid');
   document.querySelectorAll('.day-card').forEach(c=>c.remove());
   const empty=document.getElementById('empty-state');
-  if(state.days.length===0){empty.style.display='block';updateBalCards();return;}
+  if(!state.brokers.length){
+    empty.style.display='block';
+    empty.querySelector('.empty-icon').textContent='🔗';
+    empty.querySelector('.empty-title').textContent='No broker connected';
+    empty.querySelector('.empty-sub').innerHTML='Connect a broker or create a manual account first.<br>Go to Brokers to get started.';
+    updateBalCards();
+    return;
+  }
+  if(activeDays.length===0){
+    empty.style.display='block';
+    empty.querySelector('.empty-icon').textContent='📋';
+    empty.querySelector('.empty-title').textContent='No trading days yet';
+    empty.querySelector('.empty-sub').innerHTML='Click "Add Trading Day" to start.<br>Or connect a broker to auto-sync.';
+    updateBalCards();
+    return;
+  }
   empty.style.display='none';
-  state.days.forEach((day,i)=>{
+  activeDays.forEach((day,i)=>{
     const card=makeDayCard(day,i);
     grid.appendChild(card);
   });
@@ -2124,7 +2144,7 @@ function makeDayCard(day,i){
 }
 
 function updateBalCards(){
-  const days=state.days;
+  const days=getActiveBrokerDays();
   let pt=0,lt=0;
   days.forEach(d=>(d.trades||[]).forEach(t=>{
     if(t.conclusion==='target')pt++;
@@ -2139,8 +2159,9 @@ function updateBalCards(){
 
 async function addNewDay(){
   if(!state.user){showToast('Please sign in first','error');return;}
+  if(!state.activeBroker){showToast('Pehle broker connect ya select karo','error');return;}
   const today=new Date().toISOString().split('T')[0];
-  const exists=state.days.find(d=>d.date===today);
+  const exists=getActiveBrokerDays().find(d=>d.date===today);
   if(exists){openDay(exists.id);return;}
   const {data,error}=await db.from('trading_days').insert([{user_id:state.user.id,broker_id:state.activeBroker||null,date:today}]).select().single();
   if(error){showToast('Error creating day: '+error.message,'error');return;}
@@ -2900,6 +2921,7 @@ function selectBroker(b){
   const name = b.account_label || b.name;
   document.getElementById('active-broker-nm').textContent = name;
   closeBrokerPopup();
+  refreshHome();
   showToast(name+' selected!','success');
 }
 
@@ -2915,6 +2937,7 @@ async function syncBroker(connectionId, brokerId){
     // Reload data
     await loadDays();
     renderConnected();
+    refreshHome();
   } catch(e) {
     // error suppressed
     showToast('Sync failed. Please try again.','error');
@@ -2922,7 +2945,25 @@ async function syncBroker(connectionId, brokerId){
 }
 
 async function deleteBroker(connectionId, name){
-  if(!confirm('Delete "'+name+'"?\n\nYeh broker aur uske saare sync data hata dega.\nKya aap sure hain?')) return;
+  const broker = state.brokers.find(b=>b.id===connectionId);
+  const isManual = !!broker?.is_manual;
+  if(!confirm('Delete "'+name+'"?\n\nYeh broker hata dega.\nKya aap sure hain?')) return;
+
+  let deleteTrades = true;
+  if(isManual){
+    deleteTrades = confirm('Iske manual trades bhi delete karne hain?\n\nOK = trades bhi delete honge\nCancel = trades safe rakhe jayenge');
+  }
+
+  if(deleteTrades){
+    const { data: dayRows } = await db.from('trading_days').select('id').eq('broker_id', connectionId);
+    const dayIds = (dayRows||[]).map(d=>d.id);
+    if(dayIds.length>0){
+      await db.from('trades').delete().in('day_id', dayIds);
+      await db.from('trading_days').delete().in('id', dayIds);
+    }
+    state.days = state.days.filter(d=>d.broker_id!==connectionId);
+  }
+
   const { error } = await db.from('user_broker_connections').delete().eq('id', connectionId);
   if(error){ showToast('Error: '+error.message,'error'); return; }
   state.brokers = state.brokers.filter(b=>b.id!==connectionId);
@@ -2933,6 +2974,7 @@ async function deleteBroker(connectionId, name){
   }
   renderConnected();
   renderAvailable(allBrokerConfigs);
+  refreshHome();
   showToast(name+' removed.','success');
 }
 // ══════════════════════════════════════
