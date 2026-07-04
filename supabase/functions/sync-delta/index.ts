@@ -27,12 +27,14 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
   const isDemo = conn.account_type === "demo";
   const base = isDemo ? "https://cdn-ind.testnet.deltaex.org" : "https://api.india.delta.exchange";
   const trades: NormalizedTrade[] = [];
-  const startTime = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().split(".")[0] + "Z";
+  const cutoffMs = Date.now() - 90 * 24 * 3600 * 1000;
 
-  const orders = await deltaFetch(base, "/v2/orders/history", { page_size: "200", state: "closed", after: startTime }, apiKey, apiSecret);
+  const orders = await deltaFetch(base, "/v2/orders/history", { page_size: "200", state: "closed" }, apiKey, apiSecret);
   if (Array.isArray(orders)) {
     for (const o of orders) {
       if (o.state !== "closed" || !o.avg_fill_price) continue;
+      const orderMs = new Date(o.updated_at || o.created_at).getTime();
+      if (orderMs < cutoffMs) continue;
       const ts = new Date(o.updated_at || o.created_at);
       const pnl = parseFloat(o.pnl || "0");
       trades.push({
