@@ -29,7 +29,9 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
   const trades: NormalizedTrade[] = [];
   const cutoffMs = Date.now() - 90 * 24 * 3600 * 1000;
 
-  const orders = await deltaFetch(base, "/v2/orders/history", { page_size: "200", state: "closed" }, apiKey, apiSecret);
+  const orders = await deltaFetch(base, "/v2/orders/history", { page_size: "50" }, apiKey, apiSecret);
+  console.log("DELTA RAW COUNT:", Array.isArray(orders) ? orders.length : typeof orders);
+  console.log("DELTA RAW SAMPLE:", JSON.stringify(orders?.slice ? orders.slice(0, 3) : orders));
   if (Array.isArray(orders)) {
     for (const o of orders) {
       if (o.state !== "closed" || !o.avg_fill_price) continue;
