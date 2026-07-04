@@ -133,6 +133,7 @@ serve(async (req) => {
         .from("trading_days")
         .select("id")
         .eq("user_id", conn.user_id)
+        .eq("connection_id", connection_id)
         .eq("date", dateStr)
         .maybeSingle();
 
@@ -149,7 +150,7 @@ serve(async (req) => {
         .from("trading_days")
         .insert([{
           user_id: conn.user_id,
-          broker_id: conn.broker_id,
+          connection_id: connection_id,
           date: dateStr,
         }])
         .select()
