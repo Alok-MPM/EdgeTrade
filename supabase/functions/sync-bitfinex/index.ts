@@ -13,7 +13,10 @@ async function bitfinexFetch(path: string, body: Record<string, unknown>, apiKey
     headers: { "bfx-apikey": apiKey, "bfx-signature": sig, "bfx-nonce": nonce, "Content-Type": "application/json" },
     body: bodyStr,
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`Bitfinex API error [${path}]: ${res.status} ${await res.text()}`);
+    return null;
+  }
   return res.json();
 }
 
@@ -28,9 +31,11 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
     for (const t of tradeData) {
       // BFX trade array: [ID, PAIR, MTS_CREATE, ORDER_ID, EXEC_AMOUNT, EXEC_PRICE, ...]
       const [id, pair, ts, , amount, price, , , fee] = t;
-      const pnl = null; // Bitfinex trade history doesn't include per-trade PnL directly
+      const pnl = null; // Bitfinex trade history doesn't include per-trade realized PnL directly
       trades.push({
         external_trade_id: `bfx-${id}`,
+        // NOTE: verify when live - Bitfinex pair codes are inconsistent (tBTCUSD, tETHUSD, funding
+        // currencies fXXX, etc). This regex handles the common 3-3/3-4 char case but may not cover all.
         symbol: (pair || "").replace("tBTC", "BTC/").replace("tETH", "ETH/")
           .replace(/^t(.{3})(.{3,4})$/, "$1/$2"),
         direction: amount > 0 ? "long" : "short",

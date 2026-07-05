@@ -18,26 +18,35 @@ ${ts}`;
       "KEY": apiKey, "SIGN": sig, "Timestamp": ts
     }
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`Gate.io API error [${path}] pair=${params.currency_pair || "n/a"}: ${res.status} ${await res.text()}`);
+    return null;
+  }
   return res.json();
 }
 
 serve((req) => handleSyncRequest(req, async (conn, supabase) => {
   const apiKey = conn.api_key_encrypted as string;
   const apiSecret = conn.api_secret_encrypted as string;
-  const isDemo = conn.account_type === "demo"; // Gate uses live API for both, demo is simulated
   const trades: NormalizedTrade[] = [];
   const from = Math.floor((Date.now() - 90 * 24 * 3600 * 1000) / 1000).toString();
 
-  // Spot orders
-  const spotOrders = await gateFetch("/api/v4/spot/orders", { status: "finished", from, limit: "500" }, apiKey, apiSecret);
-  if (Array.isArray(spotOrders)) {
+  // NOTE (critical fix): Gate.io's spot orders endpoint only returns the last 24 HOURS of
+  // finished orders when currency_pair is omitted, regardless of the `from` param. The old
+  // code queried without currency_pair, silently limiting spot sync to ~1 day. Looping over
+  // common pairs as a fix, similar to the MEXC/HTX pattern - expand list as needed.
+  const spotPairs = ["BTC_USDT","ETH_USDT","SOL_USDT","XRP_USDT","BNB_USDT","DOGE_USDT","ADA_USDT"];
+  for (const pair of spotPairs) {
+    const spotOrders = await gateFetch("/api/v4/spot/orders", {
+      currency_pair: pair, status: "finished", from, limit: "500"
+    }, apiKey, apiSecret);
+    if (!Array.isArray(spotOrders)) continue;
     for (const o of spotOrders) {
       if (o.status !== "closed") continue;
       const ts = parseFloat(o.update_time || o.create_time) * 1000;
       trades.push({
         external_trade_id: `gate-${o.id}`,
-        symbol: (o.currency_pair || "").replace("_USDT", "/USDT"),
+        symbol: pair.replace("_USDT", "/USDT"),
         direction: o.side === "buy" ? "long" : "short",
         lot_size: parseFloat(o.amount),
         lot_unit: "qty",
@@ -47,13 +56,13 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
         fees: parseFloat(o.fee || "0"),
         stop_loss: null,
         take_profit: null,
-        conclusion: "target",
+        conclusion: "breakeven",
         date: msToDate(ts),
       });
     }
   }
 
-  // Futures closed positions
+  // Futures closed positions (contract param optional here per docs, kept as-is)
   const futContracts = await gateFetch("/api/v4/futures/usdt/orders", { status: "finished", from, limit: "200" }, apiKey, apiSecret);
   if (Array.isArray(futContracts)) {
     for (const o of futContracts) {
@@ -68,6 +77,8 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
         entry_price: parseFloat(o.fill_price || o.price),
         exit_price: null,
         entry_time: msToTime(ts),
+        // NOTE: verify when live - futures order object doesn't expose fee directly;
+        // real fee data may require a separate call to /futures/usdt/my_trades.
         fees: 0,
         stop_loss: null,
         take_profit: null,

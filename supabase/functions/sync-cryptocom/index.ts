@@ -1,3 +1,9 @@
+// IMPORTANT: Crypto.com decommissioned the legacy Spot v2.1 API (api.crypto.com/v2/*) in
+// July 2024. This file has been migrated to the Exchange v1 API (api.crypto.com/exchange/v1/*).
+// Also fixes a real API limitation: private/get-order-history has a MAX 24-HOUR window per
+// call - the old code requested a 90-day range in one call, which would silently return
+// nothing or error. Now loops in 24h windows, capped to avoid Edge Function timeout.
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleSyncRequest } from "../_utils/edge-handler.ts";
 import { saveSyncedTrades, msToDate, msToTime, NormalizedTrade } from "../_utils/utils.ts";
@@ -15,20 +21,31 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
     const preSign = method + id + apiKey + paramStr + nonce;
     const sig = await hmacSha256Hex(apiSecret, preSign);
     const body = JSON.stringify({ id, method, params, api_key: apiKey, sig, nonce: parseInt(nonce) });
-    const res = await fetch("https://api.crypto.com/v2/private/" + method, {
+    const res = await fetch("https://api.crypto.com/exchange/v1/" + method, {
       method: "POST", headers: { "Content-Type": "application/json" }, body,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`Crypto.com API error [${method}]: ${res.status} ${await res.text()}`);
+      return null;
+    }
     const j = await res.json();
     return j?.result?.order_list || j?.result?.trade_list || null;
   }
 
-  const start_ts = Date.now() - 90 * 24 * 3600 * 1000;
-  const orders = await cryptoComFetch("private/get-order-history", {
-    start_ts, count: 200
-  });
+  // 24h max window per docs - loop last 14 days (14 calls) to stay within Edge Function
+  // timeout limits. Increase DAYS_TO_SYNC later if the function has headroom.
+  const DAYS_TO_SYNC = 14;
+  const ONE_DAY = 24 * 3600 * 1000;
+  const now = Date.now();
 
-  if (Array.isArray(orders)) {
+  for (let i = 0; i < DAYS_TO_SYNC; i++) {
+    const end_ts = now - i * ONE_DAY;
+    const start_ts = end_ts - ONE_DAY;
+    const orders = await cryptoComFetch("private/get-order-history", {
+      start_ts, end_ts, limit: 200
+    });
+    if (!Array.isArray(orders)) continue;
+
     for (const o of orders) {
       if (o.status !== "FILLED") continue;
       const ts = parseInt(o.update_time || o.create_time);
@@ -44,7 +61,7 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
         fees: parseFloat(o.cumulative_fee || o.fee || "0"),
         stop_loss: null,
         take_profit: null,
-        conclusion: "target",
+        conclusion: "breakeven",
         date: msToDate(ts),
       });
     }

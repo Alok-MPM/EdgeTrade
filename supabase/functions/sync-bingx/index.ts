@@ -10,7 +10,10 @@ async function bingxFetch(path: string, params: Record<string, string | number>,
   const res = await fetch(`https://open-api.bingx.com${path}?${qstr}&signature=${sig}`, {
     headers: { "X-BX-APIKEY": apiKey }
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`BingX API error [${path}]: ${res.status} ${await res.text()}`);
+    return null;
+  }
   const j = await res.json();
   return j?.data?.orders || j?.data || null;
 }
@@ -49,6 +52,10 @@ serve((req) => handleSyncRequest(req, async (conn, supabase) => {
       });
     }
   }
+
+  // NOTE: coverage gap - this only syncs perpetual futures. BingX also has spot trading
+  // (/openApi/spot/v1/trade/myTrades) which is not synced here. Flagging for a future batch
+  // if the user has spot trades on BingX.
 
   return await saveSyncedTrades(supabase as never, conn.user_id as string, conn.id as string, trades);
 }));
