@@ -36,7 +36,7 @@
 .light-mode{
   --bg:#F3E4C9; --bg2:#FFFDF8; --bg3:#FAF2E2; --bg4:#F3E4C9;
   --white:#0A2947; --muted:#3D5A73;
-  --border:rgba(10,41,71,0.16); --border2:rgba(10,41,71,0.10);
+  --border:rgba(10,41,71,0.22); --border2:rgba(10,41,71,0.14);
   --gold:#0A2947; --gold-dim:rgba(10,41,71,0.08); --gold-glow:rgba(10,41,71,0.20);
   --gold-text:#F3E4C9; --gold-shade:#04182B;
 }
@@ -74,6 +74,83 @@
 .light-mode .auth-left .auth-tagline{color:var(--cream);}
 .light-mode .auth-left .auth-feat-text{color:rgba(243,228,201,0.65);}
 .light-mode .auth-left-name{color:var(--cream);}
+
+/* ═══ LIGHT MODE — Georgia typography + card/button/tab polish ═══ */
+.light-mode .logo-text,
+.light-mode .hero-title,
+.light-mode .sbar-num,
+.light-mode .sec-title,
+.light-mode .feat-title,
+.light-mode .step-n,
+.light-mode .step-title,
+.light-mode .cta-title,
+.light-mode .footer-logo,
+.light-mode .auth-left-name,
+.light-mode .auth-tagline,
+.light-mode .auth-form-title,
+.light-mode .sidebar-logo-text,
+.light-mode .bal-val,
+.light-mode .sec-main-title,
+.light-mode .empty-title,
+.light-mode .dc-count,
+.light-mode .page-hdr-title,
+.light-mode .tc-num,
+.light-mode .entry-sec-title,
+.light-mode .stat-big-val,
+.light-mode .cg-meta-val,
+.light-mode .stats-card-title,
+.light-mode .profile-name,
+.light-mode .settings-card-title,
+.light-mode .pass-card-title,
+.light-mode .popup-title,
+.light-mode .strat-compare-wr{
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.light-mode .btn-gold,
+.light-mode .btn-hp-primary,
+.light-mode .btn-submit,
+.light-mode .btn-primary,
+.light-mode .btn-reset{
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  font-weight:700;
+  box-shadow:none;
+}
+.light-mode .btn-gold:hover,
+.light-mode .btn-hp-primary:hover,
+.light-mode .btn-submit:hover,
+.light-mode .btn-primary:hover,
+.light-mode .btn-reset:hover{
+  filter:none;
+  box-shadow:0 4px 14px rgba(10,41,71,0.25);
+  transform:none;
+}
+
+.light-mode .bal-card,
+.light-mode .stat-big,
+.light-mode .stats-card{
+  box-shadow:0 1px 3px rgba(10,41,71,0.06);
+}
+.light-mode .bal-card:hover{ border-color: rgba(10,41,71,0.25); }
+.light-mode .bal-card::before{ background:linear-gradient(90deg,transparent,var(--navy),transparent); }
+
+.light-mode .sf-btn.active,
+.light-mode .strat-filter-btn.active,
+.light-mode .conn-filter-btn.active{
+  background:var(--navy) !important;
+  border-color:var(--navy) !important;
+  color:var(--cream) !important;
+}
+
+.light-mode .stat-big.accent{
+  background:var(--navy);
+  border-color:var(--navy);
+}
+.light-mode .stat-big.accent .stat-big-val,
+.light-mode .stat-big.accent .stat-big-lbl{
+  color:var(--cream) !important;
+}
 
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
@@ -1407,7 +1484,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           <button class="sf-btn" onclick="setStatsFilter('all',this)">All Time</button>
         </div>
         <div class="stats-big-grid" id="stats-big-grid">
-          <div class="stat-big"><div class="stat-big-val sbv-g" id="st-winrate">0%</div><div class="stat-big-lbl">Win Rate</div></div>
+          <div class="stat-big accent"><div class="stat-big-val sbv-g" id="st-winrate">0%</div><div class="stat-big-lbl">Win Rate</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-c" id="st-total">0</div><div class="stat-big-lbl">Total Trades</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-g" id="st-wins">0</div><div class="stat-big-lbl">Win Trades</div></div>
           <div class="stat-big"><div class="stat-big-val sbv-o" id="st-rrr">0.00</div><div class="stat-big-lbl">Avg R:R</div></div>
