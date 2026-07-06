@@ -382,29 +382,29 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
     border-radius: 999px;
     box-shadow: none;
   }
-  .nav-icon{font-size:20px;flex-shrink:0;}
-  .nav-icon{font-size:20px;flex-shrink:0;}
-  .nav-icon-img{width:40px;height:40px;object-fit:cover;border-radius:50%;display:block;image-rendering:auto;filter:drop-shadow(0 0 6px var(--gold-glow));transition:transform 0.18s,filter 0.18s;}
-  /* Assistant and Calculator artwork should fill the circular frame better */
-  .nav-item#snav-bot .nav-icon-img,
-  .mn-item#mn-bot .nav-icon-img,
-  .mobile-nav .mn-item#mn-bot .nav-icon-img,
-  .nav-item#snav-calc .nav-icon-img{
-    /* zoom artwork slightly without changing container size */
-    transform: scale(1.18);
-  }
-  .nav-item#snav-bot:hover .nav-icon-img,
-  .mn-item#mn-bot:hover .nav-icon-img,
-  .mobile-nav .mn-item#mn-bot:hover .nav-icon-img,
-  .nav-item#snav-calc:hover .nav-icon-img{
-    transform: scale(1.26);
-  }
 
   /* Make sure content sits above animated border layers */
   .nav-item > *{position:relative;z-index:3;}
 
-  /* Soft glow on hover for icons */
-  .nav-item:hover .nav-icon-img{transform:scale(1.06);filter:drop-shadow(0 0 8px var(--gold-glow));}
+  .nav-icon-svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+  
+  .nav-item:hover .nav-icon-svg,
+  .nav-item.active .nav-icon-svg,
+  .mn-item:hover .nav-icon-svg,
+  .mn-item.active .nav-icon-svg {
+    filter: drop-shadow(0 0 6px var(--gold-glow));
+    transform: scale(1.1);
+  }
 
   /* Active nav item: simple highlighted background (no glow) */
   .nav-item.active {
@@ -1248,14 +1248,14 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
     </div>
     <nav class="sidebar-nav">
       <div class="nav-sec-lbl">Main</div>
-      <button class="nav-item active" id="snav-home" onclick="showSection('home');setSideNav('snav-home')"><img src="icons/journal-icon.png" class="nav-icon-img">Journal</button>
-      <button class="nav-item" id="snav-stats" onclick="showSection('stats');setSideNav('snav-stats')"><img src="icons/stats-icon.png" class="nav-icon-img">Statistics</button>
-      <button class="nav-item" id="snav-bot" onclick="showSection('bot');setSideNav('snav-bot')"><img src="icons/assistant-icon.png" class="nav-icon-img">Assistant</button>
-      <button class="nav-item" id="snav-calc" onclick="showSection('calculator');setSideNav('snav-calc')"><img src="icons/calculator-icon.png" class="nav-icon-img">Calculator</button>
+      <button class="nav-item active" id="snav-home" onclick="showSection('home');setSideNav('snav-home')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>Journal</button>
+      <button class="nav-item" id="snav-stats" onclick="showSection('stats');setSideNav('snav-stats')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Statistics</button>
+      <button class="nav-item" id="snav-bot" onclick="showSection('bot');setSideNav('snav-bot')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>Assistant</button>
+      <button class="nav-item" id="snav-calc" onclick="showSection('calculator');setSideNav('snav-calc')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 10v.01M12 10v.01M8 10v.01"/></svg>Calculator</button>
       <div class="nav-sec-lbl">Account</div>
-      <button class="nav-item" onclick="openBrokerPopup()"><img src="icons/broker-icon.png" class="nav-icon-img">Brokers</button>
-      <button class="nav-item" id="snav-profile" onclick="showSection('profile');setSideNav('snav-profile')"><img src="icons/profile-icon.png" class="nav-icon-img">Profile</button>
-      <button class="nav-item" id="snav-settings" onclick="showSection('settings');setSideNav('snav-settings')"><img src="icons/settings-icon.png" class="nav-icon-img">Settings</button>
+      <button class="nav-item" onclick="openBrokerPopup()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Brokers</button>
+      <button class="nav-item" id="snav-profile" onclick="showSection('profile');setSideNav('snav-profile')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
+      <button class="nav-item" id="snav-settings" onclick="showSection('settings');setSideNav('snav-settings')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Settings</button>
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-user" onclick="showSection('profile')">
@@ -1798,11 +1798,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 <!-- MOBILE NAV -->
 <div class="mobile-nav" id="mobile-nav" style="display:none;">
   <div class="mn-items">
-    <button class="mn-item active" id="mn-home" onclick="showSection('home');setMobNav('mn-home')"><img src="icons/journal-icon.png" class="nav-icon-img">Journal</button>
-    <button class="mn-item" id="mn-stats" onclick="showSection('stats');setMobNav('mn-stats')"><img src="icons/stats-icon.png" class="nav-icon-img">Stats</button>
+    <button class="mn-item active" id="mn-home" onclick="showSection('home');setMobNav('mn-home')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>Journal</button>
+    <button class="mn-item" id="mn-stats" onclick="showSection('stats');setMobNav('mn-stats')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stats</button>
     <button class="mn-item" onclick="openNewTrade()"><div class="mn-center-btn">+</div><span>Add</span></button>
-    <button class="mn-item" id="mn-bot" onclick="showSection('bot');setMobNav('mn-bot')"><img src="icons/assistant-icon.png" class="nav-icon-img">Bot</button>
-    <button class="mn-item" id="mn-profile" onclick="showSection('profile');setMobNav('mn-profile')"><img src="icons/profile-icon.png" class="nav-icon-img">Profile</button>
+    <button class="mn-item" id="mn-bot" onclick="showSection('bot');setMobNav('mn-bot')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>Bot</button>
+    <button class="mn-item" id="mn-profile" onclick="showSection('profile');setMobNav('mn-profile')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
   </div>
 </div>
 
