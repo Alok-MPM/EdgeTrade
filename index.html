@@ -4275,5 +4275,53 @@ async function sendStatsMsg(){
   </div>
 </div>
 
+<script>
+// --- 3D HOVER EFFECT LOGIC ---
+document.addEventListener("DOMContentLoaded", () => {
+  const cards = document.querySelectorAll('.feat, .bal-card, .day-card, .stat-big, .stats-card');
+  
+  cards.forEach(card => {
+    card.classList.add('glass-3d');
+    
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left; // x position within the element
+      const y = e.clientY - rect.top;  // y position within the element
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      // Calculate rotation (max 8 degrees for a premium subtle feel)
+      const rotateX = ((y - centerY) / centerY) * -8;
+      const rotateY = ((x - centerX) / centerX) * 8;
+      
+      // Apply 3D transform and dynamic shadow
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+      card.style.boxShadow = `${-rotateY}px ${rotateX}px 24px rgba(0,0,0,0.3), 0 0 15px rgba(201,168,76,0.1)`;
+    });
+    
+    card.addEventListener('mouseleave', () => {
+      // Reset fluidly when mouse leaves
+      card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+      card.style.boxShadow = '';
+    });
+  });
+
+  // --- SCROLL REVEAL OBSERVER ---
+  const revealElements = document.querySelectorAll('.section, .how-section, .brokers-sec, .cta-sec');
+  revealElements.forEach(el => el.classList.add('reveal-up'));
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target); // Run only once for performance
+      }
+    });
+  }, { threshold: 0.15 });
+
+  revealElements.forEach(el => observer.observe(el));
+});
+</script>
+
 </body>
 </html>
