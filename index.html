@@ -442,8 +442,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .b-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);flex-shrink:0;}
 .b-nm{font-size:13px;font-weight:500;flex:1;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .topbar-right{display:flex;align-items:center;gap:10px;}
-.tb-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;position:relative;}
+.tb-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--white);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;position:relative;}
 .tb-btn:hover{border-color:var(--gold);color:var(--gold);}
+.tb-btn svg{stroke:var(--white) !important;}
+.tb-btn:hover svg{stroke:var(--gold) !important;}
 .notif-dot{width:7px;height:7px;border-radius:50%;background:var(--red);position:absolute;top:5px;right:5px;}
 
 .content-area{flex:1;padding:24px;padding-bottom:120px;overflow-y:auto;}
@@ -1281,8 +1283,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         </div>
       </div>
       <div class="topbar-right">
-        <button class="tb-btn" title="Calculator" onclick="showSection('calculator');setSideNav('snav-calc')"><svg class="nav-icon-svg" style="width: 18px; height: 18px;" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 10v.01M12 10v.01M8 10v.01"/></svg></button>
-        <button class="tb-btn" title="Notifications" style="position:relative;"><svg class="nav-icon-svg" style="width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div class="notif-dot"></div></button>
+        <button class="tb-btn" title="Calculator" onclick="showSection('calculator');setSideNav('snav-calc')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 10v.01M12 10v.01M8 10v.01"/></svg></button>
+        <button class="tb-btn" title="Notifications" style="position:relative;"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div class="notif-dot"></div></button>
         <button class="tb-btn" onclick="showSection('profile')">
           <div style="width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--gold),var(--gold-shade));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--gold-text);" id="topbar-av">A</div>
         </button>
