@@ -4303,10 +4303,10 @@ document.addEventListener("DOMContentLoaded", () => {
   cards.forEach(card => {
     card.classList.add('glass-3d');
     
-    card.addEventListener('mousemove', (e) => {
+    const handleMove = (clientX, clientY) => {
       const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
       const rotateX = ((y - centerY) / centerY) * -8;
@@ -4314,12 +4314,26 @@ document.addEventListener("DOMContentLoaded", () => {
       
       card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
       card.style.boxShadow = `${-rotateY}px ${rotateX}px 24px rgba(0,0,0,0.3), 0 0 15px rgba(201,168,76,0.1)`;
-    });
-    
-    card.addEventListener('mouseleave', () => {
+    };
+
+    const handleReset = () => {
       card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
       card.style.boxShadow = '';
-    });
+    };
+    
+    // Mouse Events (Desktop)
+    card.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+    card.addEventListener('mouseleave', handleReset);
+
+    // Touch Events (Mobile & Tablet)
+    card.addEventListener('touchmove', (e) => {
+      if(e.touches.length > 0) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+    
+    card.addEventListener('touchend', handleReset);
+    card.addEventListener('touchcancel', handleReset);
   });
 
   const revealElements = document.querySelectorAll('.section, .how-section, .brokers-sec, .cta-sec');
