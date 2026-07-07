@@ -2353,7 +2353,7 @@ function makeTradeCard(t,i){
   const dsym=t.direction==='long'?'▲':'▼';
   const dclass=t.direction==='long'?'tc-dir-l':'tc-dir-s';
   const c=document.createElement('div');
-  c.className='trade-card '+(cmap[t.conclusion]||'tc-profit');
+  c.className='trade-card glass-3d '+(cmap[t.conclusion]||'tc-profit');
   c.onclick=()=>openTradeEntry(i);
   c.innerHTML=`<div class="tc-num">${i+1}</div><div class="tc-dir ${dclass}">${dsym}</div><div class="tc-main"><div class="tc-top"><span class="tc-asset">${t.chart_name||'—'}</span><span class="tc-res-badge ${rbadge[t.conclusion]||'trb-profit'}">${rlabel[t.conclusion]||'Profit'}</span>${t.rrr?`<span class="tc-rrr">R:R ${t.rrr}</span>`:''}</div><div class="tc-bottom"><span class="tc-time">${t.entry_time||'—'}</span>${t.strategy?`<span class="tc-strategy">· ${t.strategy.substring(0,35)}${t.strategy.length>35?'...':''}</span>`:''}</div></div><div class="tc-right"><span class="tc-pnl ${t.conclusion==='target'?'tc-pnl-p':t.conclusion==='loss'?'tc-pnl-l':'tc-pnl-b'}">${t.conclusion==='target'?'+':t.conclusion==='loss'?'-':'±'}${t.exit_price||'—'}</span><span class="tc-arrow">›</span></div>`;
   return c;
@@ -4352,6 +4352,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
   revealElements.forEach(el => observer.observe(el));
 });
+
+// --- GENTLE 3D HOVER FOR TRADE CARDS (dynamically created, event delegation) ---
+(function(){
+  const list = document.getElementById('trades-list');
+  if(!list) return;
+
+  const handleMove = (card, clientX, clientY) => {
+    const rect = card.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = ((y - centerY) / centerY) * -3;
+    const rotateY = ((x - centerX) / centerX) * 3;
+
+    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.008, 1.008, 1.008)`;
+    card.style.boxShadow = `${-rotateY}px ${rotateX}px 14px rgba(0,0,0,0.15), 0 0 8px rgba(201,168,76,0.06)`;
+  };
+
+  const handleReset = (card) => {
+    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+    card.style.boxShadow = '';
+  };
+
+  list.addEventListener('mousemove', (e) => {
+    const card = e.target.closest('.trade-card');
+    if(!card) return;
+    handleMove(card, e.clientX, e.clientY);
+  });
+
+  list.addEventListener('mouseleave', (e) => {
+    const card = e.target.closest('.trade-card');
+    if(card) handleReset(card);
+  }, true);
+
+  list.addEventListener('touchmove', (e) => {
+    const card = e.target.closest('.trade-card');
+    if(!card) return;
+    const touch = e.touches[0];
+    handleMove(card, touch.clientX, touch.clientY);
+  }, {passive:true});
+
+  list.addEventListener('touchend', (e) => {
+    const card = e.target.closest('.trade-card');
+    if(card) handleReset(card);
+  });
+})();
 </script>
 </body>
 </html>
