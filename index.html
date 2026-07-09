@@ -373,22 +373,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all 0.18s;color:var(--muted);font-size:16px;border:1px solid transparent;background:none;width:100%;font-family:'Outfit',sans-serif;position:relative;overflow:visible;}
   .nav-item:hover{background:var(--gold-dim);color:var(--white);} 
   .nav-item.active {
-    background: linear-gradient(
-      to bottom,
-      #42506d 0%,
-      #2a354b 22%,
-      #161b34 40%,
-      #0a0c25 50%,
-      #62626a 51%,
-      #2c2a2d 58%,
-      #353533 70%,
-      #4d4b50 78%,
-      #2c2a2d 90%,
-      #1a1309 96%
-    );
-    border: 2px solid #6b5238;
-    border-radius: 999px;
+    background: var(--gold-dim);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
     box-shadow: none;
+    color: var(--gold);
   }
 
   /* Make sure content sits above animated border layers */
@@ -414,25 +403,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
     transform: scale(1.1);
   }
 
-  /* Active nav item: simple highlighted background (no glow) */
-  .nav-item.active {
-    background: linear-gradient(
-      to bottom,
-      #42506d 0%,
-      #2a354b 22%,
-      #161b34 40%,
-      #0a0c25 50%,
-      #62626a 51%,
-      #2c2a2d 58%,
-      #353533 70%,
-      #4d4b50 78%,
-      #2c2a2d 90%,
-      #1a1309 96%
-    );
-    border: 2px solid #6b5238;
-    border-radius: 999px;
-    box-shadow: none;
-  }
 .sidebar-bottom{padding:14px 10px;border-top:1px solid var(--border);}
 .sidebar-user{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background 0.2s;}
 .sidebar-user:hover{background:var(--gold-dim);}
