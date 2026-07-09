@@ -796,6 +796,49 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .create-manual-btn:hover{border-color:var(--gold);background:var(--gold-dim);}
 
 /* ════════════════════════════════
+   BROKER CENTRE (PAGE 1) & ADD BROKER (PAGE 2)
+════════════════════════════════ */
+.bc-overlay{z-index:205;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 20px;}
+.bc-panel-outer{background:var(--bg);border:1px solid var(--border);border-radius:20px;width:100%;max-width:1040px;padding:30px 32px 34px;position:relative;overflow:hidden;}
+.bc-panel-outer::before{content:'';position:absolute;top:0;left:6%;right:6%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),var(--blue),transparent);}
+.bc-panel-outer-single{max-width:760px;}
+.bc-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.bc-brand{display:flex;align-items:center;gap:8px;}
+.bc-brand-txt{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:var(--gold);} 
+.bc-brand-txt span{color:var(--white);} 
+.bc-title{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;margin:2px 0 22px;background:linear-gradient(90deg,var(--white),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.bc-cols{display:grid;grid-template-columns:2.1fr 1fr;gap:18px;align-items:start;}
+.bc-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;}
+.bc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),var(--blue));opacity:0.55;}
+.bc-card-hdr{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;margin-bottom:14px;color:var(--white);} 
+.bc-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;max-height:400px;overflow-y:auto;padding-bottom:2px;}
+.broker-tile{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:16px 10px 12px;border-radius:12px;border:1px solid var(--border2);background:var(--bg3);cursor:pointer;transition:all 0.2s;}
+.broker-tile:hover,.broker-tile.selected{border-color:#3B9DFF;box-shadow:0 0 16px rgba(59,157,255,0.30);transform:translateY(-1px);}
+.bt-name{font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;}
+.bt-type{font-size:10px;color:var(--muted);} 
+.bc-addnew-btn{width:100%;margin-top:16px;padding:12px;border-radius:30px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold-shade));color:var(--gold-text);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:filter 0.2s;}
+.bc-addnew-btn:hover{filter:brightness(1.08);} 
+.bc-sync-list{display:flex;flex-direction:column;gap:10px;max-height:400px;overflow-y:auto;}
+.bc-sync-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);} 
+.bc-sync-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+.bc-sync-nm{font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;}
+.bc-sync-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+#broker-add-overlay .avail-grid{grid-template-columns:1fr 1fr 1fr;}
+#broker-form-popup{z-index:220;}
+@media(max-width:768px){
+  .bc-cols{grid-template-columns:1fr;}
+  .bc-panel-outer{padding:22px 16px 26px;border-radius:14px;}
+  .bc-title{font-size:24px;margin-bottom:16px;}
+  .bc-grid{grid-template-columns:1fr 1fr;}
+  #broker-add-overlay .avail-grid{grid-template-columns:1fr 1fr;}
+}
+.light-mode .bc-panel-outer{background:var(--bg2);} 
+.light-mode .bc-card{background:var(--bg3);} 
+.light-mode .broker-tile{background:var(--bg2);} 
+.light-mode .bc-sync-item{background:var(--bg2);} 
+
+
+/* ════════════════════════════════
    MOBILE
 ════════════════════════════════ */
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(17,19,23,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:7px 0 12px;}
@@ -1790,7 +1833,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   </div>
 </div>
 
-<!-- BROKER POPUP -->
+<!-- BROKER POPUP (trimmed — connected accounts only) -->
 <div class="popup-overlay" id="broker-popup" onclick="closeBrokerOutside(event)">
   <div class="popup-panel" style="max-height:90vh;">
 
@@ -1800,9 +1843,9 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <h3 class="popup-title">Brokers & Exchanges</h3>
         <button class="popup-close" onclick="closeBrokerPopup()">✕</button>
       </div>
-      <div class="connected-sec">
+      <div class="connected-sec" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;border-bottom:none;">
         <div class="conn-lbl">Your Connected Accounts</div>
-        <div class="conn-list" id="conn-list">
+        <div class="conn-list" id="conn-list" style="max-height:none;flex:1;">
           <div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;">Loading...</div>
         </div>
       </div>
@@ -1811,30 +1854,76 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
         <button class="conn-filter-btn" id="cf-real" onclick="filterConnected('real')"><span class="acct-dot real"></span>Real</button>
         <button class="conn-filter-btn" id="cf-demo" onclick="filterConnected('demo')"><span class="acct-dot demo"></span>Demo</button>
       </div>
-      <div class="add-broker-sec">
-        <div class="add-broker-lbl">Available Brokers</div>
-        <div class="broker-search-w">
-          <span class="broker-search-icon">🔍</span>
-          <input type="text" class="broker-search" placeholder="Search broker..." oninput="filterBrokers(this.value)">
-        </div>
-        <div class="avail-grid" id="avail-grid"></div>
-      </div>
       <div class="popup-footer">
-        <button class="create-manual-btn" onclick="showManualForm()">+ Create Broker / Demo Account (Manual)</button>
+        <button class="create-manual-btn" onclick="openBrokerCentre()">⚙ Manage Brokers</button>
       </div>
     </div>
+
+  </div>
+</div>
+
+<!-- BROKER CENTRE — PAGE 1 (connected brokers + sync status) -->
+<div class="popup-overlay bc-overlay" id="broker-centre-overlay" onclick="closeBrokerCentreOutside(event)">
+  <div class="bc-panel-outer">
+    <div class="bc-top-row">
+      <div class="bc-brand">
+        <svg width="24" height="24" viewBox="0 0 38 38" fill="none"><rect width="38" height="38" rx="6" fill="rgba(212,184,134,0.08)" stroke="var(--gold)" stroke-width="0.8"/><line x1="10" y1="9" x2="28" y2="9" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="9" x2="10" y2="29" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="19" x2="24" y2="19" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="29" x2="26" y2="29" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="square"/></svg>
+        <span class="bc-brand-txt">Edge<span>Trade</span></span>
+      </div>
+      <button class="popup-close" onclick="closeBrokerCentre()">✕</button>
+    </div>
+    <h2 class="bc-title">Broker Centre</h2>
+    <div class="bc-cols">
+      <div class="bc-card">
+        <div class="bc-card-hdr">Connected Brokers</div>
+        <div class="broker-search-w" style="margin-bottom:14px;">
+          <span class="broker-search-icon">🔍</span>
+          <input type="text" class="broker-search" id="bc-search" placeholder="Search your brokers..." oninput="filterBcGrid(this.value)">
+        </div>
+        <div class="bc-grid" id="bc-grid"></div>
+        <button class="bc-addnew-btn" onclick="openBrokerAddPage()">+ Add New Broker</button>
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-hdr">Sync Status</div>
+        <div class="bc-sync-list" id="bc-sync-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD NEW BROKER — PAGE 2 (full broker list) -->
+<div class="popup-overlay bc-overlay" id="broker-add-overlay" onclick="closeBrokerAddOutside(event)">
+  <div class="bc-panel-outer bc-panel-outer-single">
+    <div class="bc-top-row">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="popup-close" onclick="showBrokerCentreFromAdd()" title="Back">←</button>
+        <h2 class="bc-title" style="margin:0;font-size:22px;">Add New Broker</h2>
+      </div>
+      <button class="popup-close" onclick="closeBrokerAddPage()">✕</button>
+    </div>
+    <div class="broker-search-w" style="margin:18px 0 14px;">
+      <span class="broker-search-icon">🔍</span>
+      <input type="text" class="broker-search" placeholder="Search broker..." oninput="filterBrokers(this.value)">
+    </div>
+    <div class="avail-grid" id="avail-grid"></div>
+    <button class="create-manual-btn" style="margin-top:14px;" onclick="showManualForm()">+ Create Broker / Demo Account (Manual)</button>
+  </div>
+</div>
+
+<!-- BROKER CONNECT / MANUAL FORM (opens on top of Page 2) -->
+<div class="popup-overlay" id="broker-form-popup" onclick="closeBrokerFormOutside(event)">
+  <div class="popup-panel" style="max-height:90vh;">
 
     <!-- API KEY INPUT VIEW -->
     <div id="broker-connect-view" style="display:none;">
       <div class="popup-hdr">
         <div style="display:flex;align-items:center;gap:10px;">
-          <button onclick="showBrokerMain()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0;">←</button>
+          <button onclick="showBrokerFormBack()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0;">←</button>
           <h3 class="popup-title" id="connect-broker-title">Connect Broker</h3>
         </div>
-        <button class="popup-close" onclick="closeBrokerPopup()">✕</button>
+        <button class="popup-close" onclick="closeBrokerFormPopup()">✕</button>
       </div>
       <div style="padding:16px 22px;overflow-y:auto;max-height:60vh;">
-        <!-- Broker info -->
         <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg3);border-radius:10px;margin-bottom:16px;border:1px solid var(--border);">
           <div style="font-size:28px;" id="connect-broker-emoji">🏦</div>
           <div>
@@ -1844,19 +1933,16 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           <a id="connect-broker-link" href="#" target="_blank" style="margin-left:auto;font-size:12px;color:var(--gold);text-decoration:none;">Website →</a>
         </div>
 
-        <!-- Instructions -->
         <div style="background:var(--gold-dim);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
           <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;font-weight:600;" id="connect-instructions-title">How to get API Key</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.6;" id="connect-instructions">Instructions will appear here.</div>
         </div>
 
-        <!-- Account Label -->
         <div class="field" style="margin-bottom:14px;">
           <label>Account Label</label>
           <input type="text" id="conn-label" placeholder="e.g. My Binance Account, Futures Account">
         </div>
 
-        <!-- Account Type Selector -->
         <div class="atype-row" id="atype-row">
           <span class="atype-label">Account Type</span>
           <div class="atype-btns">
@@ -1866,13 +1952,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           <div class="atype-note" id="atype-note"></div>
         </div>
 
-        <!-- API Key -->
         <div class="field" id="field-api-key" style="margin-bottom:14px;">
           <label id="label-api-key">API Key</label>
           <input type="text" id="conn-api-key" placeholder="Paste your API key here" autocomplete="off">
         </div>
 
-        <!-- API Secret -->
         <div class="field" id="field-api-secret" style="margin-bottom:14px;">
           <label>API Secret</label>
           <div style="position:relative;">
@@ -1881,25 +1965,21 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           </div>
         </div>
 
-        <!-- Passphrase (OKX, KuCoin) -->
         <div class="field" id="field-passphrase" style="margin-bottom:14px;display:none;">
           <label>Passphrase</label>
           <input type="password" id="conn-passphrase" placeholder="API Passphrase" autocomplete="off">
         </div>
 
-        <!-- MT4/MT5 Server -->
         <div class="field" id="field-mt-server" style="margin-bottom:14px;display:none;">
           <label>Server</label>
           <input type="text" id="conn-mt-server" placeholder="e.g. Exness-MT5Real32" autocomplete="off">
         </div>
 
-        <!-- MT4/MT5 Login -->
         <div class="field" id="field-mt-login" style="margin-bottom:14px;display:none;">
           <label>Login (Account Number)</label>
           <input type="text" id="conn-mt-login" placeholder="e.g. 250075250" autocomplete="off" inputmode="numeric">
         </div>
 
-        <!-- MT4/MT5 Investor Password -->
         <div class="field" id="field-mt-password" style="margin-bottom:14px;display:none;">
           <label>Investor Password (read-only)</label>
           <div style="position:relative;">
@@ -1908,15 +1988,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           </div>
         </div>
 
-        <!-- Warning -->
         <div style="background:var(--red-dim);border:1px solid rgba(224,82,82,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.6;">
           🔒 <strong style="color:var(--red);">Read Only</strong> permission only. We never place trades. Your funds are safe.
         </div>
 
-        <!-- Error msg -->
         <div id="conn-error" style="display:none;background:var(--red-dim);border:1px solid rgba(224,82,82,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:12px;"></div>
 
-        <!-- Connect button -->
         <button id="conn-submit-btn" onclick="submitBrokerConnection()" style="width:100%;padding:13px;border-radius:8px;background:var(--gold);color:var(--gold-text);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;">
           Connect Account
         </button>
@@ -1927,10 +2004,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
     <div id="broker-manual-view" style="display:none;">
       <div class="popup-hdr">
         <div style="display:flex;align-items:center;gap:10px;">
-          <button onclick="showBrokerMain()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0;">←</button>
+          <button onclick="showBrokerFormBack()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0;">←</button>
           <h3 class="popup-title">Create Manual Account</h3>
         </div>
-        <button class="popup-close" onclick="closeBrokerPopup()">✕</button>
+        <button class="popup-close" onclick="closeBrokerFormPopup()">✕</button>
       </div>
       <div style="padding:16px 22px;">
         <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6;">
@@ -2781,6 +2858,103 @@ function closeBrokerPopup(){
 }
 function closeBrokerOutside(e){if(e.target===document.getElementById('broker-popup'))closeBrokerPopup();}
 
+// ── BROKER CENTRE (PAGE 1) ──
+async function openBrokerCentre(){
+  closeBrokerPopup();
+  document.getElementById('broker-centre-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  await loadBrokerConfigs();
+  renderBcGrid();
+  renderSyncStatus();
+}
+function closeBrokerCentre(){
+  document.getElementById('broker-centre-overlay').classList.remove('open');
+  document.getElementById('broker-add-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+function closeBrokerCentreOutside(e){if(e.target===document.getElementById('broker-centre-overlay'))closeBrokerCentre();}
+
+function renderBcGrid(filterVal){
+  const el = document.getElementById('bc-grid');
+  if(!el) return;
+  el.innerHTML='';
+  let list = state.brokers;
+  if(filterVal){
+    const f = filterVal.toLowerCase();
+    list = list.filter(b=>(b.account_label||b.name||'').toLowerCase().includes(f));
+  }
+  if(!list.length){
+    el.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--muted);padding:20px;text-align:center;">No brokers connected yet. Tap "Add New Broker" below.</div>';
+    return;
+  }
+  list.forEach(b=>{
+    const config = allBrokerConfigs.find(c=>c.id===b.broker_id) || {};
+    const brokerName = config.name || b.name;
+    const isSelected = state.activeBroker === b.id;
+    const logoHTML = getBrokerLogoHTML(brokerName, 40) || `<div class="conn-logo">${config.emoji||b.emoji||'🏦'}</div>`;
+    const d = document.createElement('div');
+    d.className = 'broker-tile' + (isSelected?' selected':'');
+    d.onclick = ()=>selectBroker(b);
+    d.innerHTML = `
+      ${logoHTML}
+      <div class="bt-name">${b.account_label||b.name}</div>
+      <div class="bt-type">${config.type||b.type||'Manual'}</div>
+    `;
+    el.appendChild(d);
+  });
+}
+function filterBcGrid(val){ renderBcGrid(val); }
+
+function renderSyncStatus(){
+  const el = document.getElementById('bc-sync-list');
+  if(!el) return;
+  el.innerHTML='';
+  if(!state.brokers.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;">No accounts yet.</div>';
+    return;
+  }
+  state.brokers.forEach(b=>{
+    const lastSync = b.last_sync ? new Date(b.last_sync).toLocaleString() : (b.is_manual?'Manual entry':'Never');
+    const statusColor = b.sync_status==='success'?'var(--green)':b.sync_status==='error'?'var(--red)':'var(--gold)';
+    const row = document.createElement('div');
+    row.className = 'bc-sync-item';
+    row.innerHTML = `
+      <span class="bc-sync-dot" style="background:${statusColor};box-shadow:0 0 5px ${statusColor};"></span>
+      <div>
+        <div class="bc-sync-nm">${b.account_label||b.name}</div>
+        <div class="bc-sync-sub">Last Synced: ${lastSync}</div>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+// ── ADD NEW BROKER (PAGE 2) ──
+function openBrokerAddPage(){
+  document.getElementById('broker-centre-overlay').classList.remove('open');
+  document.getElementById('broker-add-overlay').classList.add('open');
+  loadBrokerConfigs();
+}
+function showBrokerCentreFromAdd(){
+  document.getElementById('broker-add-overlay').classList.remove('open');
+  document.getElementById('broker-centre-overlay').classList.add('open');
+}
+function closeBrokerAddPage(){
+  document.getElementById('broker-add-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+function closeBrokerAddOutside(e){if(e.target===document.getElementById('broker-add-overlay'))closeBrokerAddPage();}
+
+// ── CONNECT / MANUAL FORM (opens over Page 2) ──
+function closeBrokerFormPopup(){
+  document.getElementById('broker-form-popup').classList.remove('open');
+  const addOpen = document.getElementById('broker-add-overlay').classList.contains('open');
+  const centreOpen = document.getElementById('broker-centre-overlay').classList.contains('open');
+  if(!addOpen && !centreOpen) document.body.style.overflow='';
+}
+function closeBrokerFormOutside(e){if(e.target===document.getElementById('broker-form-popup'))closeBrokerFormPopup();}
+function showBrokerFormBack(){ closeBrokerFormPopup(); }
+
 // Block page scroll when broker popup is open
 (function(){
   const overlay = document.getElementById('broker-popup');
@@ -2810,16 +2984,18 @@ function showBrokerMain(){
 }
 
 function showManualForm(){
-  document.getElementById('broker-main-view').style.display='none';
+  document.getElementById('broker-form-popup').classList.add('open');
   document.getElementById('broker-connect-view').style.display='none';
   document.getElementById('broker-manual-view').style.display='block';
+  document.body.style.overflow='hidden';
 }
 
 function showConnectForm(config){
   selectedBrokerConfig = config;
-  document.getElementById('broker-main-view').style.display='none';
+  document.getElementById('broker-form-popup').classList.add('open');
   document.getElementById('broker-connect-view').style.display='block';
   document.getElementById('broker-manual-view').style.display='none';
+  document.body.style.overflow='hidden';
 
   // Fill broker info
   document.getElementById('connect-broker-title').textContent = 'Connect ' + config.name;
@@ -3048,6 +3224,9 @@ function selectBroker(b){
   const name = b.account_label || b.name;
   document.getElementById('active-broker-nm').textContent = name;
   closeBrokerPopup();
+  closeBrokerCentre();
+  closeBrokerAddPage();
+  document.body.style.overflow='';
   refreshHome();
   showToast(name+' selected!','success');
 }
