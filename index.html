@@ -13,12 +13,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
-  --bg:#0A0A0F; --bg2:#0F0F18; --bg3:#13131E; --bg4:#17172A;
-  --gold:#C9A84C; --gold-dim:rgba(201,168,76,0.10); --gold-glow:rgba(201,168,76,0.22);
-  --gold-text:#0A0A0F; --gold-shade:var(--gold-shade);
+  --bg:#111317; --bg2:#1A1D24; --bg3:#20242C; --bg4:#262B34;
+  --gold:#D4B886; --gold-dim:rgba(212,184,134,0.10); --gold-glow:rgba(212,184,134,0.18);
+  --gold-text:#111317; --gold-shade:#A8875A;
   --blue:#2A6496; --blue-dim:rgba(42,100,150,0.12);
-  --white:#F5F0E8; --muted:#6B7280;
-  --border:rgba(201,168,76,0.10); --border2:rgba(255,255,255,0.06);
+  --white:#EAECEF; --muted:#8B949E;
+  --border:rgba(212,184,134,0.08); --border2:rgba(255,255,255,0.06);
   --green:#4CAF7D; --green-dim:rgba(76,175,125,0.10);
   --red:#E05252; --red-dim:rgba(224,82,82,0.10);
   --sidebar:220px;
@@ -104,6 +104,14 @@
 .light-mode .pass-card-title,
 .light-mode .popup-title,
 .light-mode .strat-compare-wr{
+  font-family: Georgia, 'Times New Roman', serif;
+}
+.logo-text, .hero-title, .sbar-num, .sec-title, .feat-title, .step-n, .step-title,
+.cta-title, .footer-logo, .auth-left-name, .auth-tagline, .auth-form-title,
+.sidebar-logo-text, .bal-val, .sec-main-title, .empty-title, .dc-count,
+.page-hdr-title, .tc-num, .entry-sec-title, .stat-big-val, .cg-meta-val,
+.stats-card-title, .profile-name, .settings-card-title, .pass-card-title,
+.popup-title, .strat-compare-wr{
   font-family: Georgia, 'Times New Roman', serif;
 }
 
@@ -433,7 +441,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .user-role{font-size:11px;color:var(--muted);}
 
 .main-content{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
-.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:13px 24px;background:rgba(10,10,15,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
+.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:13px 24px;background:rgba(17,19,23,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
 .topbar-left{display:flex;align-items:center;gap:14px;}
 .mob-menu{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--white);cursor:pointer;font-size:18px;}
 .light-mode .mob-menu{background:var(--bg3);border-color:rgba(0,0,0,0.15);color:var(--white);}
@@ -442,10 +450,14 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .b-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);flex-shrink:0;}
 .b-nm{font-size:13px;font-weight:500;flex:1;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .topbar-right{display:flex;align-items:center;gap:10px;}
-.tb-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--gold);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;position:relative;}
+.tb-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--white);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;position:relative;}
 .tb-btn:hover{border-color:var(--gold);color:var(--gold); filter: drop-shadow(0 0 6px var(--gold-glow));}
-.tb-btn svg{stroke:var(--gold) !important; stroke-width: 2px; transition: all 0.2s ease;}
+.tb-btn svg{stroke:var(--white) !important; stroke-width: 2px; transition: all 0.2s ease;}
 .tb-btn:hover svg{stroke:var(--gold) !important;}
+.light-mode .tb-btn{color:rgba(243,228,201,0.75);}
+.light-mode .tb-btn svg{stroke:rgba(243,228,201,0.75) !important;}
+.light-mode .tb-btn:hover{border-color:var(--cream);color:var(--cream);filter:none;}
+.light-mode .tb-btn:hover svg{stroke:var(--cream) !important;}
 .notif-dot{width:7px;height:7px;border-radius:50%;background:var(--red);position:absolute;top:5px;right:5px;}
 
 .content-area{flex:1;padding:24px;padding-bottom:120px;overflow-y:auto;}
@@ -816,7 +828,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* ════════════════════════════════
    MOBILE
 ════════════════════════════════ */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(10,10,15,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:7px 0 12px;}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(17,19,23,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:7px 0 12px;}
 .mn-items{display:flex;}
 .mn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 0;font-size:9px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted);transition:color 0.2s;border:none;background:none;font-family:'Outfit',sans-serif;}
 .mn-item .mni{font-size:19px;transition:transform 0.2s;}
@@ -3537,15 +3549,15 @@ function changeDP(){
 function setTheme(t,btn){
   document.querySelectorAll('.theme-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  if(t==='light')document.body.classList.add('light-mode');
-  else document.body.classList.remove('light-mode');
+  if(t==='light')document.documentElement.classList.add('light-mode');
+  else document.documentElement.classList.remove('light-mode');
   localStorage.setItem('et-theme',t);
 }
 
 function setAccent(a,el){
   document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
   el.classList.add('active');
-  document.documentElement.className='';
+  document.documentElement.classList.remove('theme-cyan','theme-green','theme-purple','theme-steel');
   if(a!=='gold')document.documentElement.classList.add('theme-'+a);
   localStorage.setItem('et-accent',a);
 }
@@ -3553,7 +3565,7 @@ function setAccent(a,el){
 function loadPrefs(){
   const t=localStorage.getItem('et-theme');
   const a=localStorage.getItem('et-accent');
-  if(t==='light')document.body.classList.add('light-mode');
+  if(t==='light')document.documentElement.classList.add('light-mode');
   if(a&&a!=='gold')document.documentElement.classList.add('theme-'+a);
 }
 
