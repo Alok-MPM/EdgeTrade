@@ -797,16 +797,17 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 /* ════════════════════════════════
    BROKER CENTRE (PAGE 1) & ADD BROKER (PAGE 2)
+   — now FULL-SCREEN PAGES, not popup cards —
 ════════════════════════════════ */
-.bc-overlay{z-index:205;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 20px;}
-.bc-panel-outer{background:var(--bg);border:1px solid var(--border);border-radius:20px;width:100%;max-width:1040px;padding:30px 32px 34px;position:relative;overflow:hidden;}
+.bc-overlay{z-index:205;align-items:flex-start;justify-content:center;overflow-y:auto;padding:0;background:var(--bg);backdrop-filter:none;}
+.bc-panel-outer{background:var(--bg);border:none;border-radius:0;box-shadow:none;width:100%;max-width:1040px;min-height:100vh;min-height:100dvh;margin:0 auto;padding:30px 32px 40px;position:relative;overflow:visible;}
 .bc-panel-outer::before{content:'';position:absolute;top:0;left:6%;right:6%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),var(--blue),transparent);}
 .bc-panel-outer-single{max-width:760px;}
-.bc-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.bc-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding-top:calc(4px + env(safe-area-inset-top));padding-bottom:12px;margin-left:-32px;margin-right:-32px;padding-left:32px;padding-right:32px;border-bottom:1px solid var(--border);}
 .bc-brand{display:flex;align-items:center;gap:8px;}
 .bc-brand-txt{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:var(--gold);} 
 .bc-brand-txt span{color:var(--white);} 
-.bc-title{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;margin:2px 0 22px;background:linear-gradient(90deg,var(--white),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.bc-title{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;margin:18px 0 22px;background:linear-gradient(90deg,var(--white),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
 .bc-cols{display:grid;grid-template-columns:2.1fr 1fr;gap:18px;align-items:start;}
 .bc-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;}
 .bc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),var(--blue));opacity:0.55;}
@@ -827,7 +828,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 #broker-form-popup{z-index:220;}
 @media(max-width:768px){
   .bc-cols{grid-template-columns:1fr;}
-  .bc-panel-outer{padding:22px 16px 26px;border-radius:14px;}
+  .bc-panel-outer{padding:22px 16px 30px;}
+  .bc-top-row{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px;}
   .bc-title{font-size:24px;margin-bottom:16px;}
   .bc-grid{grid-template-columns:1fr 1fr;}
   #broker-add-overlay .avail-grid{grid-template-columns:1fr 1fr;}
