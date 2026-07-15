@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — EdgeTrade</title>
+<style>
+  body{background:#0a0a0a;color:#e8e8e8;font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.7;max-width:820px;margin:0 auto;padding:40px 24px 80px}
+  h1{color:#d4af37;font-size:28px;margin-bottom:4px}
+  .updated{color:#888;font-size:13px;margin-bottom:32px}
+  h2{color:#d4af37;font-size:19px;margin-top:36px;border-bottom:1px solid #2a2a2a;padding-bottom:8px}
+  p,li{color:#c8c8c8;font-size:15px}
+  a{color:#d4af37}
+  ul{padding-left:20px}
+  .back{display:inline-block;margin-bottom:24px;color:#d4af37;text-decoration:none}
+</style>
+</head>
+<body>
+<a href="/" class="back">← Back to EdgeTrade</a>
+<h1>Privacy Policy</h1>
+<div class="updated">Last updated: July 15, 2026</div>
+
+<p>EdgeTrade ("we", "our", "us") operates a free trading journal platform at edge-trade-sigma.vercel.app. This policy explains what data we collect, how we use it, and how we protect it.</p>
+
+<h2>1. Information We Collect</h2>
+<ul>
+<li><strong>Account data:</strong> name, email address, and encrypted password when you register.</li>
+<li><strong>Trading data:</strong> trades you log manually or that sync from a connected broker — entry/exit price, direction, P&L, strategy, psychology notes, and screenshots you upload.</li>
+<li><strong>Broker API credentials:</strong> if you connect a broker, your API key and secret are encrypted (AES-GCM) before storage. We request read-only permissions only and never place, modify, or cancel trades on your behalf.</li>
+<li><strong>Usage data:</strong> basic technical logs (device type, browser) for debugging and security.</li>
+</ul>
+
+<h2>2. How We Use Your Information</h2>
+<ul>
+<li>To operate your journal — display trades, calculate statistics, and sync broker data.</li>
+<li>To power the AI Assistant, AI Statistics Analyst, and AI Calculator features, which analyze your journal data (and, if you choose to upload one, a chart screenshot) to generate insights. These features never receive your broker API keys.</li>
+<li>To maintain account security and prevent unauthorized access.</li>
+</ul>
+
+<h2>3. How We Store Your Data</h2>
+<p>Data is stored using Supabase (PostgreSQL) with row-level security, meaning your data is only accessible to your own authenticated account. Broker API keys are encrypted at rest and decrypted only in memory, server-side, when syncing trades.</p>
+
+<h2>4. Third-Party Services</h2>
+<ul>
+<li><strong>Supabase</strong> — database, authentication, and backend functions.</li>
+<li><strong>Vercel</strong> — website hosting.</li>
+<li><strong>Broker/Exchange APIs</strong> (Binance, Delta Exchange, Zerodha, etc.) — read-only trade history sync, only for brokers you explicitly connect.</li>
+<li><strong>AI providers</strong> (e.g. Google Gemini, Groq) — process journal text you submit to the AI Assistant/Analyst to generate responses. No broker credentials are ever sent to these providers.</li>
+<li><strong>TradingView</strong> — charting library used to display market charts.</li>
+</ul>
+
+<h2>5. Data Retention & Deletion</h2>
+<p>We retain your data as long as your account is active. You can disconnect a broker or delete your account at any time from Settings; this permanently removes your stored trades and credentials.</p>
+
+<h2>6. Your Rights</h2>
+<p>You may access, correct, export, or delete your data at any time through the app, or by contacting us.</p>
+
+<h2>7. Cookies</h2>
+<p>We use minimal essential cookies/local storage strictly for session authentication — no third-party advertising trackers.</p>
+
+<h2>8. Children's Privacy</h2>
+<p>EdgeTrade is not directed at individuals under 18 and we do not knowingly collect data from minors.</p>
+
+<h2>9. Changes to This Policy</h2>
+<p>We may update this policy as EdgeTrade evolves. Material changes will be reflected here with an updated date.</p>
+
+<h2>10. Contact</h2>
+<p>Questions about this policy? Reach out via the in-app Support option.</p>
+
+</body>
+</html>
