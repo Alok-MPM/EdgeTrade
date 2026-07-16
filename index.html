@@ -4226,35 +4226,45 @@ let activeIndicators = {};
 let klineSocket = null;
 
 async function initMainChart(){
-  if(mainChartInstance) return;
-  mainChartInstance = klinecharts.init('klineMainChart');
-  mainChartInstance.setStyles({
-    grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
-    candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
-  });
-
+  const container = document.getElementById('klineMainChart');
   try {
+    container.innerHTML = '<div style="padding:20px;color:var(--muted);">Loading chart library...</div>';
+    if (typeof klinecharts === 'undefined') {
+      throw new Error('klinecharts library did not load from CDN (script tag failed or wrong URL)');
+    }
+    container.innerHTML = '';
+    if(mainChartInstance) return;
+    mainChartInstance = klinecharts.init('klineMainChart');
+    if (!mainChartInstance) throw new Error('klinecharts.init() returned null — check container id');
+
+    mainChartInstance.setStyles({
+      grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
+      candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
+    });
+
     const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=300');
+    if (!res.ok) throw new Error('Binance API fetch failed: ' + res.status);
     const raw = await res.json();
     const data = raw.map(k => ({
       timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]),
       low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
     }));
     mainChartInstance.applyNewData(data);
-  } catch(e) {
-    console.error('Failed to load Binance klines', e);
-  }
 
-  if(klineSocket) klineSocket.close();
-  klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
-  klineSocket.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    const k = msg.k;
-    mainChartInstance.updateData({
-      timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
-      low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
-    });
-  };
+    if(klineSocket) klineSocket.close();
+    klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+    klineSocket.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      const k = msg.k;
+      mainChartInstance.updateData({
+        timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
+        low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+      });
+    };
+  } catch(err) {
+    container.innerHTML = '<div style="padding:20px;color:#E05252;font-family:monospace;font-size:13px;white-space:pre-wrap;">CHART ERROR:\n' + err.message + '</div>';
+    console.error('Chart init failed:', err);
+  }
 }
 
 function toggleIndicator(name, overlayOnCandle){
