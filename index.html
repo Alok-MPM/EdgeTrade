@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/klinecharts/dist/klinecharts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/klinecharts@9.8.5/dist/klinecharts.min.js"></script>
 <style>
 :root{
   --bg:#111317; --bg2:#1A1D24; --bg3:#20242C; --bg4:#262B34;
@@ -1037,7 +1037,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   opacity: 1;
   transform: translateY(0);
 }
-</style>
+
+.chart-tool-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;}
+.chart-tool-btn:hover{background:var(--gold-dim);color:var(--white);}
+.chart-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);} </style>
 </head>
 <body>
 
@@ -1326,6 +1329,26 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
       <div class="content-section" id="section-chart">
         <div style="padding:20px;">
           <h2 style="color:var(--white);font-family:'Outfit',sans-serif;margin-bottom:16px;">Chart</h2>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <span style="color:var(--muted);font-size:12px;align-self:center;">Indicators:</span>
+            <button class="chart-tool-btn" id="ind-btn-MA" onclick="toggleIndicator('MA', true)">MA</button>
+            <button class="chart-tool-btn" id="ind-btn-EMA" onclick="toggleIndicator('EMA', true)">EMA</button>
+            <button class="chart-tool-btn" id="ind-btn-BOLL" onclick="toggleIndicator('BOLL', true)">BOLL</button>
+            <button class="chart-tool-btn" id="ind-btn-VOL" onclick="toggleIndicator('VOL', false)">VOL</button>
+            <button class="chart-tool-btn" id="ind-btn-MACD" onclick="toggleIndicator('MACD', false)">MACD</button>
+            <button class="chart-tool-btn" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
+            <button class="chart-tool-btn" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <span style="color:var(--muted);font-size:12px;align-self:center;">Draw:</span>
+            <button class="chart-tool-btn" onclick="useDrawTool('straightLine')">Trend Line</button>
+            <button class="chart-tool-btn" onclick="useDrawTool('horizontalStraightLine')">Horizontal</button>
+            <button class="chart-tool-btn" onclick="useDrawTool('rayLine')">Ray</button>
+            <button class="chart-tool-btn" onclick="useDrawTool('segment')">Segment</button>
+            <button class="chart-tool-btn" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
+            <button class="chart-tool-btn" onclick="useDrawTool('priceLine')">Price Line</button>
+            <button class="chart-tool-btn" onclick="clearDrawings()" style="color:var(--red);">Clear All</button>
+          </div>
           <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
         </div>
       </div>
@@ -4199,26 +4222,65 @@ function toggleStratDetail(id){
 
 let calcImg = null;
 let mainChartInstance = null;
-function initMainChart(){
-  if(mainChartInstance) return; // already initialized, don't re-init
-  mainChartInstance = klinecharts.init('klineMainChart');
+let activeIndicators = {};
+let klineSocket = null;
 
-  const sampleData = [];
-  let basePrice = 60000;
-  let baseTime = Date.now() - 100 * 60 * 1000;
-  for (let i = 0; i < 100; i++) {
-    const open = basePrice;
-    const close = open + (Math.random() - 0.5) * 200;
-    const high = Math.max(open, close) + Math.random() * 100;
-    const low = Math.min(open, close) - Math.random() * 100;
-    sampleData.push({ timestamp: baseTime + i * 60000, open, high, low, close, volume: Math.random() * 100 });
-    basePrice = close;
-  }
-  mainChartInstance.applyNewData(sampleData);
+async function initMainChart(){
+  if(mainChartInstance) return;
+  mainChartInstance = klinecharts.init('klineMainChart');
   mainChartInstance.setStyles({
-    grid: { show: true, horizontal: { color: '#1a1a1a' }, vertical: { color: '#1a1a1a' } },
-    candle: { bar: { upColor: '#D4B886', downColor: '#555555', noChangeColor: '#888888' } }
+    grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
+    candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
   });
+
+  try {
+    const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=300');
+    const raw = await res.json();
+    const data = raw.map(k => ({
+      timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]),
+      low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+    }));
+    mainChartInstance.applyNewData(data);
+  } catch(e) {
+    console.error('Failed to load Binance klines', e);
+  }
+
+  if(klineSocket) klineSocket.close();
+  klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+  klineSocket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const k = msg.k;
+    mainChartInstance.updateData({
+      timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
+      low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+    });
+  };
+}
+
+function toggleIndicator(name, overlayOnCandle){
+  const btn = document.getElementById('ind-btn-'+name);
+  if(activeIndicators[name]){
+    mainChartInstance.removeIndicator(activeIndicators[name], name);
+    delete activeIndicators[name];
+    if(btn) btn.classList.remove('active-tool');
+  } else {
+    let paneId;
+    if(overlayOnCandle){
+      paneId = mainChartInstance.createIndicator(name, true, {id:'candle_pane'});
+    } else {
+      paneId = mainChartInstance.createIndicator(name);
+    }
+    activeIndicators[name] = paneId;
+    if(btn) btn.classList.add('active-tool');
+  }
+}
+
+function useDrawTool(name){
+  mainChartInstance.createOverlay(name);
+}
+
+function clearDrawings(){
+  mainChartInstance.removeOverlay();
 }
 
 function initCalcBrokers(){
