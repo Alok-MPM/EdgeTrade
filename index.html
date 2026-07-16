@@ -1040,7 +1040,36 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 .chart-tool-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;}
 .chart-tool-btn:hover{background:var(--gold-dim);color:var(--white);}
-.chart-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);} </style>
+.chart-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);} 
+.terminal-row{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;}
+.chart-panel-wrap{flex:3 1 500px;}
+.orderbook-panel{flex:1 1 240px;max-width:280px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.terminal-panel{flex:1 1 280px;max-width:320px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.ob-row{display:flex;justify-content:space-between;position:relative;padding:4px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;overflow:hidden;border-radius:3px;margin-bottom:1px;}
+.ob-row .ob-bar{position:absolute;top:0;right:0;bottom:0;z-index:0;}
+.ob-row.ask .ob-bar{background:var(--red-dim);}
+.ob-row.bid .ob-bar{background:var(--green-dim);}
+.ob-row span{position:relative;z-index:1;color:var(--white);}
+.ob-price.ask{color:var(--red)!important;}
+.ob-price.bid{color:var(--green)!important;}
+.ob-spread{text-align:center;padding:8px 0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;color:var(--gold);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:4px 0;}
+.term-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.term-tab-btn{flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--white);font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;}
+.term-tab-btn.long-active{background:var(--green);color:#fff;border-color:var(--green);}
+.term-tab-btn.short-active{background:var(--red);color:#fff;border-color:var(--red);}
+.term-input-row{margin-bottom:14px;}
+.term-input-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.term-input-row input,.term-input-row select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--white);font-family:'Outfit',sans-serif;box-sizing:border-box;}
+.term-quick-pct{display:flex;gap:6px;margin-top:8px;}
+.term-quick-pct button{flex:1;padding:6px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;}
+.term-submit-btn{width:100%;padding:14px;border-radius:10px;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-top:6px;font-family:'Outfit',sans-serif;}
+.term-submit-btn.long{background:var(--green);color:#fff;}
+.term-submit-btn.short{background:var(--red);color:#fff;}
+.bottom-tabs-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.bottom-tab-nav{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.bottom-tab-item{padding:8px 4px 12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:500;border-bottom:2px solid transparent;}
+.bottom-tab-item.active{color:var(--gold);border-bottom-color:var(--gold);}
+.bottom-tab-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}</style>
 </head>
 <body>
 
@@ -1349,7 +1378,51 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             <button class="chart-tool-btn" onclick="useDrawTool('priceLine')">Price Line</button>
             <button class="chart-tool-btn" onclick="clearDrawings()" style="color:var(--red);">Clear All</button>
           </div>
-          <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
+          <div class="terminal-row">
+            <div class="chart-panel-wrap">
+              <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
+            </div>
+            <div class="orderbook-panel">
+              <div style="color:var(--white);font-weight:600;margin-bottom:10px;font-family:'Outfit',sans-serif;">Order Book</div>
+              <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
+            </div>
+            <div class="terminal-panel">
+              <div class="term-tabs">
+                <button class="term-tab-btn long-active" id="term-btn-long" onclick="setTermSide('long')">Long</button>
+                <button class="term-tab-btn" id="term-btn-short" onclick="setTermSide('short')">Short</button>
+              </div>
+              <div class="term-input-row">
+                <label>Leverage</label>
+                <select id="term-leverage">
+                  <option>5x</option><option>10x</option><option selected>20x</option><option>50x</option><option>100x</option>
+                </select>
+              </div>
+              <div class="term-input-row">
+                <label>Quantity (USD)</label>
+                <input type="number" id="term-qty" placeholder="0.00">
+                <div class="term-quick-pct">
+                  <button onclick="document.getElementById('term-qty').value=25">25%</button>
+                  <button onclick="document.getElementById('term-qty').value=50">50%</button>
+                  <button onclick="document.getElementById('term-qty').value=75">75%</button>
+                  <button onclick="document.getElementById('term-qty').value=100">100%</button>
+                </div>
+              </div>
+              <button class="term-submit-btn long" id="term-submit-btn" onclick="submitDemoOrder()">Buy / Long</button>
+              <div style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center;">Demo mode — no real funds</div>
+            </div>
+          </div>
+          <div class="bottom-tabs-wrap">
+            <div class="bottom-tab-nav">
+              <div class="bottom-tab-item active" id="btab-positions" onclick="switchBottomTab('positions')">Open Positions</div>
+              <div class="bottom-tab-item" id="btab-history" onclick="switchBottomTab('history')">Trade History</div>
+            </div>
+            <div class="bottom-tab-content" id="btab-content-positions">
+              <div class="bottom-tab-empty">No open positions — place a demo trade to see it here.</div>
+            </div>
+            <div class="bottom-tab-content" id="btab-content-history" style="display:none;">
+              <div class="bottom-tab-empty">No trades yet — demo trading terminal coming in the next update.</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2136,7 +2209,7 @@ function showSection(key){
   if(key==='calculator') {
     initCalcBrokers();
   }
-  if(key==='chart') initMainChart();
+  if(key==='chart') { initMainChart(); initOrderBook(); }
 }
 
 function setSideNav(id){
@@ -4224,6 +4297,7 @@ let calcImg = null;
 let mainChartInstance = null;
 let activeIndicators = {};
 let klineSocket = null;
+let obSocket = null;
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
@@ -4291,6 +4365,70 @@ function useDrawTool(name){
 
 function clearDrawings(){
   mainChartInstance.removeOverlay();
+}
+
+function initOrderBook(){
+  if(obSocket) return;
+  obSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@depth20@100ms');
+  obSocket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    renderOrderBook(data.bids, data.asks);
+  };
+  obSocket.onerror = () => {
+    const c = document.getElementById('orderBookBody');
+    if(c) c.innerHTML = '<div style="color:var(--red);font-size:12px;padding:10px;">Order book failed to load</div>';
+  };
+}
+
+function renderOrderBook(bids, asks){
+  const container = document.getElementById('orderBookBody');
+  if(!container) return;
+  const topAsks = asks.slice(0,8).reverse();
+  const topBids = bids.slice(0,8);
+  const allQty = [...topAsks, ...topBids].map(x => parseFloat(x[1]));
+  const maxQty = Math.max(...allQty, 0.001);
+  let html = '';
+  topAsks.forEach(([price, qty]) => {
+    const pct = (parseFloat(qty)/maxQty*100).toFixed(0);
+    html += '<div class="ob-row ask"><div class="ob-bar" style="width:'+pct+'%"></div><span class="ob-price ask">'+parseFloat(price).toFixed(1)+'</span><span>'+parseFloat(qty).toFixed(4)+'</span></div>';
+  });
+  const bestBid = topBids[0] ? parseFloat(topBids[0][0]) : 0;
+  const bestAsk = topAsks[topAsks.length-1] ? parseFloat(topAsks[topAsks.length-1][0]) : 0;
+  html += '<div class="ob-spread">'+(bestAsk && bestBid ? (bestAsk-bestBid).toFixed(1) : '--')+' spread</div>';
+  topBids.forEach(([price, qty]) => {
+    const pct = (parseFloat(qty)/maxQty*100).toFixed(0);
+    html += '<div class="ob-row bid"><div class="ob-bar" style="width:'+pct+'%"></div><span class="ob-price bid">'+parseFloat(price).toFixed(1)+'</span><span>'+parseFloat(qty).toFixed(4)+'</span></div>';
+  });
+  container.innerHTML = html;
+}
+
+let selectedSide = 'long';
+function setTermSide(side){
+  selectedSide = side;
+  document.getElementById('term-btn-long').classList.toggle('long-active', side==='long');
+  document.getElementById('term-btn-short').classList.toggle('short-active', side==='short');
+  const submitBtn = document.getElementById('term-submit-btn');
+  submitBtn.textContent = side==='long' ? 'Buy / Long' : 'Sell / Short';
+  submitBtn.className = 'term-submit-btn ' + side;
+}
+
+function submitDemoOrder(){
+  showToast('Demo trading terminal coming soon — this will place a real demo order 🚀');
+}
+
+function showToast(msg){
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--white);padding:12px 20px;border-radius:10px;border:1px solid var(--gold);z-index:9999;font-family:Outfit,sans-serif;font-size:14px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90vw;text-align:center;';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+function switchBottomTab(tab){
+  document.querySelectorAll('.bottom-tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('btab-'+tab).classList.add('active');
+  document.querySelectorAll('.bottom-tab-content').forEach(c => c.style.display='none');
+  document.getElementById('btab-content-'+tab).style.display='block';
 }
 
 function initCalcBrokers(){
