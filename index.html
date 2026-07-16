@@ -1069,7 +1069,18 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .bottom-tab-nav{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:16px;}
 .bottom-tab-item{padding:8px 4px 12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:500;border-bottom:2px solid transparent;}
 .bottom-tab-item.active{color:var(--gold);border-bottom-color:var(--gold);}
-.bottom-tab-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}</style>
+.bottom-tab-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}
+.pos-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;flex-wrap:wrap;}
+.pos-side{font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px;font-family:'Outfit',sans-serif;}
+.pos-side.long{background:rgba(76,175,125,0.15);color:var(--green);}
+.pos-side.short{background:rgba(224,82,82,0.15);color:var(--red);}
+.pos-meta{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.pos-pnl{font-weight:700;font-family:'JetBrains Mono',monospace;font-size:14px;}
+.pos-pnl.pos{color:var(--green);}
+.pos-pnl.neg{color:var(--red);}
+.pos-close-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--white);font-size:12px;font-weight:600;cursor:pointer;}
+.pos-close-btn:hover{border-color:var(--red);color:var(--red);}
+</style>
 </head>
 <body>
 
@@ -1387,6 +1398,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
               <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
             </div>
             <div class="terminal-panel">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px;color:var(--muted);">
+                <span>Demo Balance</span>
+                <span id="term-balance" style="color:var(--gold);font-weight:600;font-family:'JetBrains Mono',monospace;">—</span>
+              </div>
               <div class="term-tabs">
                 <button class="term-tab-btn long-active" id="term-btn-long" onclick="setTermSide('long')">Long</button>
                 <button class="term-tab-btn" id="term-btn-short" onclick="setTermSide('short')">Short</button>
@@ -1398,15 +1413,24 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
                 </select>
               </div>
               <div class="term-input-row">
-                <label>Quantity (USD)</label>
+                <label>Margin (USD)</label>
                 <input type="number" id="term-qty" placeholder="0.00">
                 <div class="term-quick-pct">
-                  <button onclick="document.getElementById('term-qty').value=25">25%</button>
-                  <button onclick="document.getElementById('term-qty').value=50">50%</button>
-                  <button onclick="document.getElementById('term-qty').value=75">75%</button>
-                  <button onclick="document.getElementById('term-qty').value=100">100%</button>
+                  <button onclick="setTermPct(25)">25%</button>
+                  <button onclick="setTermPct(50)">50%</button>
+                  <button onclick="setTermPct(75)">75%</button>
+                  <button onclick="setTermPct(100)">100%</button>
                 </div>
               </div>
+              <div class="term-input-row">
+                <label>Take Profit (optional)</label>
+                <input type="number" id="term-tp" placeholder="Price">
+              </div>
+              <div class="term-input-row">
+                <label>Stop Loss (optional)</label>
+                <input type="number" id="term-sl" placeholder="Price">
+              </div>
+              <div id="term-liq-preview" style="font-size:12px;color:var(--muted);margin-bottom:10px;"></div>
               <button class="term-submit-btn long" id="term-submit-btn" onclick="submitDemoOrder()">Buy / Long</button>
               <div style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center;">Demo mode — no real funds</div>
             </div>
@@ -4307,6 +4331,7 @@ async function initMainChart(){
       throw new Error('klinecharts library did not load from CDN (script tag failed or wrong URL)');
     }
     container.innerHTML = '';
+    ensureDemoAccount().then(loadDemoPositions);
     if(mainChartInstance) return;
     mainChartInstance = klinecharts.init('klineMainChart');
     if (!mainChartInstance) throw new Error('klinecharts.init() returned null — check container id');
@@ -4334,6 +4359,9 @@ async function initMainChart(){
         timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
         low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
       });
+      latestPrice = parseFloat(k.c);
+      checkTpSlLiquidation(latestPrice);
+      updateOpenPositionsPnL(latestPrice);
     };
   } catch(err) {
     container.innerHTML = '<div style="padding:20px;color:#E05252;font-family:monospace;font-size:13px;white-space:pre-wrap;">CHART ERROR:\n' + err.message + '</div>';
@@ -4402,7 +4430,15 @@ function renderOrderBook(bids, asks){
   container.innerHTML = html;
 }
 
+// ══════════════════════════════════════
+// DEMO TRADING TERMINAL
+// ══════════════════════════════════════
 let selectedSide = 'long';
+let latestPrice = null;
+let demoBalance = 0;
+let openPositions = [];
+let entryOverlays = {};
+
 function setTermSide(side){
   selectedSide = side;
   document.getElementById('term-btn-long').classList.toggle('long-active', side==='long');
@@ -4410,18 +4446,204 @@ function setTermSide(side){
   const submitBtn = document.getElementById('term-submit-btn');
   submitBtn.textContent = side==='long' ? 'Buy / Long' : 'Sell / Short';
   submitBtn.className = 'term-submit-btn ' + side;
+  updateLiqPreview();
 }
 
-function submitDemoOrder(){
-  showToast('Demo trading terminal coming soon — this will place a real demo order 🚀');
+function setTermPct(pct){
+  const val = (demoBalance * pct / 100).toFixed(2);
+  document.getElementById('term-qty').value = val;
+  updateLiqPreview();
 }
 
-function showToast(msg){
-  const toast = document.createElement('div');
-  toast.textContent = msg;
-  toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--white);padding:12px 20px;border-radius:10px;border:1px solid var(--gold);z-index:9999;font-family:Outfit,sans-serif;font-size:14px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90vw;text-align:center;';
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
+function updateLiqPreview(){
+  const qty = parseFloat(document.getElementById('term-qty').value) || 0;
+  const lev = parseInt(document.getElementById('term-leverage').value) || 1;
+  const preview = document.getElementById('term-liq-preview');
+  if(!qty || !latestPrice){ preview.textContent = ''; return; }
+  const liq = selectedSide==='long' ? latestPrice*(1-1/lev) : latestPrice*(1+1/lev);
+  preview.textContent = 'Est. liquidation: ' + liq.toFixed(1) + ' | Margin used: $' + qty.toFixed(2);
+}
+document.addEventListener('input', (e) => {
+  if(e.target && (e.target.id==='term-qty' || e.target.id==='term-leverage')) updateLiqPreview();
+});
+
+async function ensureDemoAccount(){
+  if(!state.user) return;
+  const {data} = await db.from('demo_accounts').select('*').eq('user_id', state.user.id).maybeSingle();
+  if(data){
+    demoBalance = parseFloat(data.balance);
+  } else {
+    const {data: created} = await db.from('demo_accounts').insert([{user_id: state.user.id}]).select().single();
+    demoBalance = created ? parseFloat(created.balance) : 10000;
+  }
+  const el = document.getElementById('term-balance');
+  if(el) el.textContent = '$' + demoBalance.toFixed(2);
+}
+
+async function updateDemoBalance(newBalance){
+  demoBalance = newBalance;
+  const el = document.getElementById('term-balance');
+  if(el) el.textContent = '$' + demoBalance.toFixed(2);
+  if(state.user) await db.from('demo_accounts').update({balance: newBalance, updated_at: new Date().toISOString()}).eq('user_id', state.user.id);
+}
+
+function calcPnl(pos, price){
+  const units = (pos.quantity_usd * pos.leverage) / pos.entry_price;
+  return pos.side==='long' ? units*(price-pos.entry_price) : units*(pos.entry_price-price);
+}
+
+function calcLiqPrice(pos){
+  return pos.side==='long' ? pos.entry_price*(1-1/pos.leverage) : pos.entry_price*(1+1/pos.leverage);
+}
+
+async function submitDemoOrder(){
+  if(!state.user){ showToast('Please sign in first','error'); return; }
+  if(!latestPrice){ showToast('Waiting for live price, try again in a sec','error'); return; }
+  const qty = parseFloat(document.getElementById('term-qty').value);
+  const lev = parseInt(document.getElementById('term-leverage').value);
+  const tp = parseFloat(document.getElementById('term-tp').value) || null;
+  const sl = parseFloat(document.getElementById('term-sl').value) || null;
+  if(!qty || qty<=0){ showToast('Enter a valid margin amount','error'); return; }
+  if(qty > demoBalance){ showToast('Insufficient demo balance','error'); return; }
+
+  const {data, error} = await db.from('demo_positions').insert([{
+    user_id: state.user.id, symbol:'BTCUSDT', side: selectedSide, leverage: lev,
+    quantity_usd: qty, entry_price: latestPrice, status:'open',
+    take_profit: tp, stop_loss: sl
+  }]).select().single();
+
+  if(error){ showToast('Order failed: ' + error.message, 'error'); return; }
+
+  await updateDemoBalance(demoBalance - qty);
+  showToast((selectedSide==='long'?'Long':'Short')+' opened @ '+latestPrice.toFixed(1));
+  document.getElementById('term-qty').value = '';
+  document.getElementById('term-tp').value = '';
+  document.getElementById('term-sl').value = '';
+  updateLiqPreview();
+  await loadDemoPositions();
+}
+
+async function loadDemoPositions(){
+  if(!state.user) return;
+  const {data: open} = await db.from('demo_positions').select('*').eq('user_id', state.user.id).eq('status','open').order('opened_at',{ascending:false});
+  openPositions = open || [];
+  renderPositions();
+  drawEntryOverlays();
+
+  const {data: closed} = await db.from('demo_positions').select('*').eq('user_id', state.user.id).eq('status','closed').order('closed_at',{ascending:false}).limit(30);
+  renderHistory(closed || []);
+}
+
+function renderPositions(){
+  const c = document.getElementById('btab-content-positions');
+  if(!c) return;
+  if(!openPositions.length){
+    c.innerHTML = '<div class="bottom-tab-empty">No open positions — place a demo trade to see it here.</div>';
+    return;
+  }
+  c.innerHTML = openPositions.map(pos => {
+    const pnl = latestPrice ? calcPnl(pos, latestPrice) : 0;
+    const pnlClass = pnl>=0 ? 'pos' : 'neg';
+    return '<div class="pos-row" data-id="'+pos.id+'">'
+      + '<span class="pos-side '+pos.side+'">'+pos.side.toUpperCase()+' '+pos.leverage+'x</span>'
+      + '<span class="pos-meta">Entry '+pos.entry_price.toFixed(1)+' · Margin $'+pos.quantity_usd.toFixed(2)+'</span>'
+      + '<span class="pos-pnl '+pnlClass+'" id="pnl-'+pos.id+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+' USD</span>'
+      + '<button class="pos-close-btn" onclick="closePosition(\''+pos.id+'\',\'manual\')">Close</button>'
+      + '</div>';
+  }).join('');
+}
+
+function renderHistory(closed){
+  const c = document.getElementById('btab-content-history');
+  if(!c) return;
+  if(!closed.length){
+    c.innerHTML = '<div class="bottom-tab-empty">No closed trades yet.</div>';
+    return;
+  }
+  c.innerHTML = closed.map(pos => {
+    const pnl = parseFloat(pos.pnl)||0;
+    const pnlClass = pnl>=0 ? 'pos' : 'neg';
+    return '<div class="pos-row">'
+      + '<span class="pos-side '+pos.side+'">'+pos.side.toUpperCase()+' '+pos.leverage+'x</span>'
+      + '<span class="pos-meta">'+pos.entry_price.toFixed(1)+' → '+(pos.exit_price||0).toFixed(1)+'</span>'
+      + '<span class="pos-pnl '+pnlClass+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+' USD</span>'
+      + '</div>';
+  }).join('');
+}
+
+function updateOpenPositionsPnL(price){
+  openPositions.forEach(pos => {
+    const el = document.getElementById('pnl-'+pos.id);
+    if(!el) return;
+    const pnl = calcPnl(pos, price);
+    el.textContent = (pnl>=0?'+':'')+pnl.toFixed(2)+' USD';
+    el.className = 'pos-pnl ' + (pnl>=0?'pos':'neg');
+  });
+  updateLiqPreview();
+}
+
+function checkTpSlLiquidation(price){
+  if(!openPositions.length) return;
+  openPositions.slice().forEach(pos => {
+    const liq = calcLiqPrice(pos);
+    if(pos.side==='long'){
+      if(price<=liq){ closePosition(pos.id,'liquidated', liq); return; }
+      if(pos.take_profit && price>=pos.take_profit){ closePosition(pos.id,'tp_hit', pos.take_profit); return; }
+      if(pos.stop_loss && price<=pos.stop_loss){ closePosition(pos.id,'sl_hit', pos.stop_loss); return; }
+    } else {
+      if(price>=liq){ closePosition(pos.id,'liquidated', liq); return; }
+      if(pos.take_profit && price<=pos.take_profit){ closePosition(pos.id,'tp_hit', pos.take_profit); return; }
+      if(pos.stop_loss && price>=pos.stop_loss){ closePosition(pos.id,'sl_hit', pos.stop_loss); return; }
+    }
+  });
+}
+
+let closingInProgress = {};
+async function closePosition(id, reason, forcedPrice){
+  if(closingInProgress[id]) return;
+  closingInProgress[id] = true;
+  const pos = openPositions.find(p => p.id===id);
+  if(!pos){ closingInProgress[id] = false; return; }
+  const exitPrice = forcedPrice || latestPrice || pos.entry_price;
+  const pnl = calcPnl(pos, exitPrice);
+
+  const {error} = await db.from('demo_positions').update({
+    status:'closed', exit_price: exitPrice, pnl: pnl, closed_at: new Date().toISOString()
+  }).eq('id', id);
+
+  if(error){ showToast('Close failed: '+error.message,'error'); closingInProgress[id]=false; return; }
+
+  await updateDemoBalance(demoBalance + pos.quantity_usd + pnl);
+  removeEntryOverlay(id);
+
+  const labels = {manual:'Position closed', liquidated:'Position liquidated ⚠️', tp_hit:'Take profit hit 🎯', sl_hit:'Stop loss hit'};
+  showToast((labels[reason]||'Closed')+' @ '+exitPrice.toFixed(1)+' | PnL '+(pnl>=0?'+':'')+pnl.toFixed(2), pnl>=0?'success':'error');
+
+  closingInProgress[id] = false;
+  await loadDemoPositions();
+}
+
+function drawEntryOverlays(){
+  if(!mainChartInstance) return;
+  Object.values(entryOverlays).forEach(id => { try{ mainChartInstance.removeOverlay(id); }catch(e){} });
+  entryOverlays = {};
+  openPositions.forEach(pos => {
+    try {
+      const id = mainChartInstance.createOverlay({
+        name: 'priceLine',
+        points: [{value: pos.entry_price}],
+        styles: { line: { color: pos.side==='long' ? '#4CAF7D' : '#E05252', style:'dashed' } }
+      });
+      entryOverlays[pos.id] = id;
+    } catch(e){ console.warn('overlay failed', e); }
+  });
+}
+
+function removeEntryOverlay(id){
+  if(entryOverlays[id] && mainChartInstance){
+    try{ mainChartInstance.removeOverlay(entryOverlays[id]); }catch(e){}
+    delete entryOverlays[id];
+  }
 }
 
 function switchBottomTab(tab){
