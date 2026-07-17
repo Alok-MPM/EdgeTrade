@@ -1079,6 +1079,15 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .pos-pnl.pos{color:var(--green);}
 .pos-pnl.neg{color:var(--red);}
 .pos-close-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--white);font-size:12px;font-weight:600;cursor:pointer;}
+.pos-tpsl-btn{padding:7px 12px;border-radius:8px;border:1px solid rgba(212,184,134,0.35);background:rgba(212,184,134,0.08);color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;}
+.chart-panel-wrap{position:relative;}
+.cw-badge{position:absolute;right:6px;transform:translateY(-50%);padding:3px 9px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
+.cw-badge-entry{background:var(--bg4);border:1px solid var(--border2);color:var(--white);}
+.cw-badge-tp{background:#4CAF7D;color:#0B1A12;}
+.cw-badge-sl{background:#E05252;color:#210A0A;}
+.cw-fill-band{position:absolute;left:0;right:0;pointer-events:none;z-index:3;display:none;}
+.cw-fill-tp{background:linear-gradient(180deg,rgba(76,175,125,0.24),rgba(76,175,125,0.04));}
+.cw-fill-sl{background:linear-gradient(180deg,rgba(224,82,82,0.04),rgba(224,82,82,0.24));}
 .pos-close-btn:hover{border-color:var(--red);color:var(--red);}
 </style>
 </head>
@@ -4450,8 +4459,13 @@ function setTermSide(side){
 }
 
 function setTermPct(pct){
-  const val = (demoBalance * pct / 100).toFixed(2);
-  document.getElementById('term-qty').value = val;
+  // Floor to 2 decimals (never round up) so 100% never exceeds actual balance
+  const raw = demoBalance * pct / 100;
+  const val = pct >= 100 ? Math.floor(demoBalance * 100) / 100 : Math.floor(raw * 100) / 100;
+  document.getElementById('term-qty').value = val.toFixed(2);
+  document.querySelectorAll('.term-quick-pct button').forEach(b => b.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.term-quick-pct button')].find(b => b.textContent.trim() === pct+'%');
+  if(btn) btn.classList.add('active');
   updateLiqPreview();
 }
 
@@ -4499,12 +4513,13 @@ function calcLiqPrice(pos){
 async function submitDemoOrder(){
   if(!state.user){ showToast('Please sign in first','error'); return; }
   if(!latestPrice){ showToast('Waiting for live price, try again in a sec','error'); return; }
-  const qty = parseFloat(document.getElementById('term-qty').value);
+  let qty = parseFloat(document.getElementById('term-qty').value);
   const lev = parseInt(document.getElementById('term-leverage').value);
   const tp = parseFloat(document.getElementById('term-tp').value) || null;
   const sl = parseFloat(document.getElementById('term-sl').value) || null;
   if(!qty || qty<=0){ showToast('Enter a valid margin amount','error'); return; }
-  if(qty > demoBalance){ showToast('Insufficient demo balance','error'); return; }
+  if(qty > demoBalance + 0.01){ showToast('Insufficient demo balance','error'); return; }
+  if(qty > demoBalance) qty = demoBalance; // clamp tiny float overshoot (e.g. 100% selection)
 
   const {data, error} = await db.from('demo_positions').insert([{
     user_id: state.user.id, symbol:'BTCUSDT', side: selectedSide, leverage: lev,
@@ -4544,10 +4559,13 @@ function renderPositions(){
   c.innerHTML = openPositions.map(pos => {
     const pnl = latestPrice ? calcPnl(pos, latestPrice) : 0;
     const pnlClass = pnl>=0 ? 'pos' : 'neg';
+    const needsTpSl = (pos.take_profit==null || pos.stop_loss==null);
+    const tpSlBtn = needsTpSl ? '<button class="pos-tpsl-btn" onclick="quickAddTpSl(\''+pos.id+'\')">+ TP/SL</button>' : '';
     return '<div class="pos-row" data-id="'+pos.id+'">'
       + '<span class="pos-side '+pos.side+'">'+pos.side.toUpperCase()+' '+pos.leverage+'x</span>'
       + '<span class="pos-meta">Entry '+pos.entry_price.toFixed(1)+' · Margin $'+pos.quantity_usd.toFixed(2)+'</span>'
       + '<span class="pos-pnl '+pnlClass+'" id="pnl-'+pos.id+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+' USD</span>'
+      + tpSlBtn
       + '<button class="pos-close-btn" onclick="closePosition(\''+pos.id+'\',\'manual\')">Close</button>'
       + '</div>';
   }).join('');
@@ -4579,8 +4597,11 @@ function updateOpenPositionsPnL(price){
     el.textContent = (pnl>=0?'+':'')+pnl.toFixed(2)+' USD';
     el.className = 'pos-pnl ' + (pnl>=0?'pos':'neg');
   });
+  repositionAllBadges(price);
   updateLiqPreview();
 }
+
+window.addEventListener('resize', () => { if(latestPrice) repositionAllBadges(latestPrice); });
 
 function checkTpSlLiquidation(price){
   if(!openPositions.length) return;
@@ -4623,20 +4644,86 @@ async function closePosition(id, reason, forcedPrice){
   await loadDemoPositions();
 }
 
+// ══════════════════════════════════════
+// TP/SL — draggable chart lines, live PnL badges, fill band
+// ══════════════════════════════════════
+let tpSlBoxes = {};   // posId -> { entryEl, tpEl, slEl, tpOverlayId, slOverlayId }
+let activeDrag = null; // { posId, kind } while a TP/SL line is being dragged
+
+function getChartWrap(){
+  return document.querySelector('.chart-panel-wrap');
+}
+
+function fmtPnl(v){
+  return (v>=0?'+':'') + v.toFixed(2) + ' USDT';
+}
+
+function priceToY(price){
+  if(!mainChartInstance || price==null) return null;
+  try {
+    const px = mainChartInstance.convertToPixel({value: price}, {paneId:'candle_pane'});
+    return Array.isArray(px) ? px[0]?.y : px?.y;
+  } catch(e){ return null; }
+}
+
+function ensureBadgeEls(posId){
+  let box = tpSlBoxes[posId];
+  if(box && box.entryEl) return box;
+  const wrap = getChartWrap();
+  if(!wrap) return null;
+  const entryEl = document.createElement('div');
+  entryEl.className = 'cw-badge cw-badge-entry';
+  const tpEl = document.createElement('div');
+  tpEl.className = 'cw-badge cw-badge-tp';
+  tpEl.style.display = 'none';
+  const slEl = document.createElement('div');
+  slEl.className = 'cw-badge cw-badge-sl';
+  slEl.style.display = 'none';
+  const bandEl = document.createElement('div');
+  bandEl.className = 'cw-fill-band';
+  wrap.appendChild(entryEl); wrap.appendChild(tpEl); wrap.appendChild(slEl); wrap.appendChild(bandEl);
+  box = { entryEl, tpEl, slEl, bandEl, tpOverlayId:null, slOverlayId:null };
+  tpSlBoxes[posId] = box;
+  return box;
+}
+
+function removePositionUI(posId){
+  const box = tpSlBoxes[posId];
+  if(!box) return;
+  [box.entryEl, box.tpEl, box.slEl, box.bandEl].forEach(el => el && el.remove());
+  if(mainChartInstance){
+    if(box.tpOverlayId) try{ mainChartInstance.removeOverlay(box.tpOverlayId); }catch(e){}
+    if(box.slOverlayId) try{ mainChartInstance.removeOverlay(box.slOverlayId); }catch(e){}
+  }
+  delete tpSlBoxes[posId];
+}
+
 function drawEntryOverlays(){
   if(!mainChartInstance) return;
   Object.values(entryOverlays).forEach(id => { try{ mainChartInstance.removeOverlay(id); }catch(e){} });
   entryOverlays = {};
+
+  // Drop UI for positions that no longer exist
+  const liveIds = openPositions.map(p => p.id);
+  Object.keys(tpSlBoxes).forEach(id => { if(!liveIds.includes(id)) removePositionUI(id); });
+
   openPositions.forEach(pos => {
     try {
       const id = mainChartInstance.createOverlay({
         name: 'priceLine',
         points: [{value: pos.entry_price}],
-        styles: { line: { color: pos.side==='long' ? '#4CAF7D' : '#E05252', style:'dashed' } }
+        lock: true,
+        styles: { line: { color: pos.side==='long' ? '#4CAF7D' : '#E05252', style:'dashed', size:1 } }
       });
       entryOverlays[pos.id] = id;
     } catch(e){ console.warn('overlay failed', e); }
+
+    ensureBadgeEls(pos.id);
+    drawTpSlLine(pos, 'tp');
+    drawTpSlLine(pos, 'sl');
   });
+
+  repositionAllBadges(latestPrice);
 }
 
 function removeEntryOverlay(id){
@@ -4644,6 +4731,144 @@ function removeEntryOverlay(id){
     try{ mainChartInstance.removeOverlay(entryOverlays[id]); }catch(e){}
     delete entryOverlays[id];
   }
+  removePositionUI(id);
+}
+
+// Draw/refresh a single TP or SL draggable line for a position
+function drawTpSlLine(pos, kind){
+  if(!mainChartInstance) return;
+  const box = ensureBadgeEls(pos.id);
+  if(!box) return;
+  const field = kind==='tp' ? 'take_profit' : 'stop_loss';
+  const overlayKey = kind==='tp' ? 'tpOverlayId' : 'slOverlayId';
+  const price = pos[field];
+
+  if(box[overlayKey]){ try{ mainChartInstance.removeOverlay(box[overlayKey]); }catch(e){} box[overlayKey] = null; }
+  const el = kind==='tp' ? box.tpEl : box.slEl;
+
+  if(price == null){ el.style.display = 'none'; return; }
+
+  const color = kind==='tp' ? '#4CAF7D' : '#E05252';
+  const overlayId = mainChartInstance.createOverlay({
+    name: 'priceLine',
+    points: [{ value: price }],
+    lock: false,
+    styles: { line: { color, style:'solid', size:2 } },
+    onPressedMoveStart: () => { onTpSlDragStart(pos.id, kind); },
+    onPressedMoving: (evt) => { onTpSlDragging(pos.id, kind, evt); },
+    onPressedMoveEnd: (evt) => { onTpSlDragEnd(pos.id, kind, evt); }
+  });
+  box[overlayKey] = overlayId;
+  el.style.display = 'block';
+}
+
+function getOverlayPrice(evt){
+  try {
+    const pts = evt && evt.overlay && evt.overlay.points;
+    if(pts && pts[0] && typeof pts[0].value === 'number') return pts[0].value;
+  } catch(e){}
+  return null;
+}
+
+function onTpSlDragStart(posId, kind){
+  activeDrag = { posId, kind };
+  const box = tpSlBoxes[posId];
+  if(box) box.bandEl.style.display = 'block';
+}
+
+function onTpSlDragging(posId, kind, evt){
+  const pos = openPositions.find(p => p.id===posId);
+  const box = tpSlBoxes[posId];
+  if(!pos || !box) return;
+  const price = getOverlayPrice(evt);
+  if(price == null) return;
+  updateTpSlBadge(pos, kind, price);
+  updateFillBand(pos, kind, price);
+}
+
+async function onTpSlDragEnd(posId, kind, evt){
+  const pos = openPositions.find(p => p.id===posId);
+  const box = tpSlBoxes[posId];
+  activeDrag = null;
+  if(box) box.bandEl.style.display = 'none';
+  if(!pos) return;
+  const price = getOverlayPrice(evt);
+  if(price == null) return;
+  const field = kind==='tp' ? 'take_profit' : 'stop_loss';
+  pos[field] = price;
+  updateTpSlBadge(pos, kind, price);
+  const patch = {}; patch[field] = price;
+  const { error } = await db.from('demo_positions').update(patch).eq('id', posId);
+  if(error){ showToast('Could not save '+kind.toUpperCase()+': '+error.message, 'error'); }
+  else { showToast(kind.toUpperCase()+' set @ '+price.toFixed(1)); }
+}
+
+function updateTpSlBadge(pos, kind, price){
+  const box = tpSlBoxes[pos.id];
+  if(!box) return;
+  const el = kind==='tp' ? box.tpEl : box.slEl;
+  const y = priceToY(price);
+  if(y==null) return;
+  const pnl = calcPnl(pos, price);
+  el.style.top = y + 'px';
+  el.textContent = (kind==='tp'?'TP ':'SL ') + price.toFixed(1) + '  ' + fmtPnl(pnl);
+  el.style.display = 'block';
+}
+
+function updateFillBand(pos, kind, draggedPrice){
+  const box = tpSlBoxes[pos.id];
+  if(!box) return;
+  const entryY = priceToY(pos.entry_price);
+  const dragY = priceToY(draggedPrice);
+  if(entryY==null || dragY==null) return;
+  const top = Math.min(entryY, dragY);
+  const height = Math.max(2, Math.abs(entryY - dragY));
+  box.bandEl.className = 'cw-fill-band ' + (kind==='tp' ? 'cw-fill-tp' : 'cw-fill-sl');
+  box.bandEl.style.top = top + 'px';
+  box.bandEl.style.height = height + 'px';
+  box.bandEl.style.display = 'block';
+}
+
+function repositionAllBadges(price){
+  openPositions.forEach(pos => {
+    const box = tpSlBoxes[pos.id];
+    if(!box) return;
+    const entryY = priceToY(pos.entry_price);
+    if(entryY!=null){
+      box.entryEl.style.top = entryY + 'px';
+      const pnl = price!=null ? calcPnl(pos, price) : 0;
+      box.entryEl.textContent = pos.side.toUpperCase()+' · $'+pos.quantity_usd.toFixed(2)+' used · '+fmtPnl(pnl);
+    }
+    // Don't fight the live drag redraw for the line currently being dragged
+    if(!(activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='tp') && pos.take_profit!=null){
+      updateTpSlBadge(pos, 'tp', pos.take_profit);
+    }
+    if(!(activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='sl') && pos.stop_loss!=null){
+      updateTpSlBadge(pos, 'sl', pos.stop_loss);
+    }
+  });
+}
+
+// Quick "+ TP/SL" button on a position row — adds sensible default levels the user can then drag
+async function quickAddTpSl(posId){
+  const pos = openPositions.find(p => p.id===posId);
+  if(!pos || !latestPrice) return;
+  const patch = {};
+  if(pos.take_profit == null){
+    patch.take_profit = pos.side==='long' ? pos.entry_price*1.005 : pos.entry_price*0.995;
+  }
+  if(pos.stop_loss == null){
+    patch.stop_loss = pos.side==='long' ? pos.entry_price*0.995 : pos.entry_price*1.005;
+  }
+  if(Object.keys(patch).length===0) return;
+  const { error } = await db.from('demo_positions').update(patch).eq('id', posId);
+  if(error){ showToast('Failed to add TP/SL: '+error.message, 'error'); return; }
+  Object.assign(pos, patch);
+  drawTpSlLine(pos, 'tp');
+  drawTpSlLine(pos, 'sl');
+  repositionAllBadges(latestPrice);
+  renderPositions();
+  showToast('TP/SL added — drag the lines on the chart to adjust');
 }
 
 function switchBottomTab(tab){
