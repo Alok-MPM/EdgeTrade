@@ -1416,6 +1416,16 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             <button class="chart-tool-btn" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
             <button class="chart-tool-btn" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
+            <span style="color:var(--muted);font-size:12px;">Market:</span>
+            <div class="chart-wrap" style="width:170px;">
+              <button class="chart-tool-btn" id="market-select-btn" onclick="toggleMarketDropdown()" style="width:100%;text-align:left;font-family:'JetBrains Mono',monospace;">BTC/USDT ▾</button>
+              <div class="chart-dd" id="market-dd">
+                <div class="chart-search-w"><input type="text" class="chart-search" id="market-search" placeholder="Search market..." oninput="filterMarketList(this.value)"></div>
+                <div class="chart-list" id="market-list"><div style="padding:10px;color:var(--muted);font-size:12px;">Loading markets...</div></div>
+              </div>
+            </div>
+          </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
             <span style="color:var(--muted);font-size:12px;align-self:center;">Timeframe:</span>
             <button class="chart-tool-btn active-tool" id="tf-btn-1m" onclick="switchTimeframe('1m')">1m</button>
@@ -4381,6 +4391,8 @@ let activeIndicators = {};
 let klineSocket = null;
 let obSocket = null;
 let currentInterval = '1m';
+let currentSymbol = 'BTCUSDT';
+let binanceMarkets = null;
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
@@ -4410,7 +4422,7 @@ async function initMainChart(){
 // Fetches candles for the given Binance interval (1m/5m/15m/1h/4h/1d), applies them
 // to the chart, and re-subscribes the live kline WebSocket to that same interval.
 async function loadChartInterval(interval){
-  const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=' + interval + '&limit=300');
+  const res = await fetch('https://api.binance.com/api/v3/klines?symbol=' + currentSymbol + '&interval=' + interval + '&limit=300');
   if (!res.ok) throw new Error('Binance API fetch failed: ' + res.status);
   const raw = await res.json();
   const data = raw.map(k => ({
@@ -4420,7 +4432,7 @@ async function loadChartInterval(interval){
   mainChartInstance.applyNewData(data);
 
   if(klineSocket) klineSocket.close();
-  klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_' + interval);
+  klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/' + currentSymbol.toLowerCase() + '@kline_' + interval);
   klineSocket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
     const k = msg.k;
@@ -4438,10 +4450,14 @@ async function loadChartInterval(interval){
 
 let chartMaximized = false;
 let prevMaxOverlayPrice = null;
+function formatPriceDisplay(price){
+  if(price >= 1) return price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  return price.toPrecision(4);
+}
 function updateMaxPriceOverlay(price){
   const el = document.getElementById('chart-max-price');
   if(!el) return;
-  el.textContent = price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  el.textContent = formatPriceDisplay(price);
   if(prevMaxOverlayPrice != null){
     el.style.color = price >= prevMaxOverlayPrice ? 'var(--green)' : 'var(--red)';
   }
@@ -4497,6 +4513,80 @@ function switchChartType(type){
   currentChartType = type;
 }
 
+function formatSymbolLabel(sym){
+  return sym.replace(/USDT$/, '') + '/USDT';
+}
+
+async function loadBinanceMarkets(){
+  if(binanceMarkets) return binanceMarkets;
+  try{
+    const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+    const data = await res.json();
+    binanceMarkets = data
+      .filter(t => t.symbol.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(t.symbol))
+      .sort((a,b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+      .slice(0, 150)
+      .map(t => t.symbol);
+  }catch(err){
+    console.error('Failed to load markets:', err);
+    binanceMarkets = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT'];
+  }
+  return binanceMarkets;
+}
+
+function renderMarketList(list){
+  const el = document.getElementById('market-list');
+  if(!el) return;
+  if(!list.length){ el.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;">No match</div>'; return; }
+  el.innerHTML = list.map(sym =>
+    '<div class="chart-item" onclick="selectMarket(\'' + sym + '\')"><span>' + formatSymbolLabel(sym) + '</span><span class="chart-item-cat">Binance</span></div>'
+  ).join('');
+}
+
+async function toggleMarketDropdown(){
+  const dd = document.getElementById('market-dd');
+  if(!dd) return;
+  const opening = !dd.classList.contains('open');
+  dd.classList.toggle('open');
+  if(opening){
+    const list = await loadBinanceMarkets();
+    renderMarketList(list);
+    const s = document.getElementById('market-search');
+    if(s) setTimeout(() => s.focus(), 50);
+  }
+}
+
+function filterMarketList(val){
+  if(!binanceMarkets) return;
+  const v = val.trim().toUpperCase();
+  renderMarketList(v ? binanceMarkets.filter(s => s.includes(v)) : binanceMarkets);
+}
+
+async function selectMarket(symbol){
+  const dd = document.getElementById('market-dd');
+  if(dd) dd.classList.remove('open');
+  if(symbol === currentSymbol || !mainChartInstance) return;
+  currentSymbol = symbol;
+  const label = formatSymbolLabel(symbol);
+  const btn = document.getElementById('market-select-btn');
+  if(btn) btn.textContent = label + ' ▾';
+  const nameEl = document.querySelector('#chart-symbol-overlay .csym-name');
+  if(nameEl) nameEl.innerHTML = label + ' <span class="csym-sub">· Binance</span>';
+  prevMaxOverlayPrice = null;
+  try{
+    await loadChartInterval(currentInterval);
+    connectOrderBook(currentSymbol);
+  }catch(err){ console.error('Symbol switch failed:', err); }
+}
+
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('market-dd');
+  const btn = document.getElementById('market-select-btn');
+  if(dd && dd.classList.contains('open') && !dd.contains(e.target) && e.target !== btn){
+    dd.classList.remove('open');
+  }
+});
+
 function toggleIndicator(name, overlayOnCandle){
   const btn = document.getElementById('ind-btn-'+name);
   if(activeIndicators[name]){
@@ -4523,9 +4613,9 @@ function clearDrawings(){
   mainChartInstance.removeOverlay();
 }
 
-function initOrderBook(){
-  if(obSocket) return;
-  obSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@depth20@100ms');
+function connectOrderBook(symbol){
+  if(obSocket){ obSocket.close(); obSocket = null; }
+  obSocket = new WebSocket('wss://stream.binance.com:9443/ws/' + symbol.toLowerCase() + '@depth20@100ms');
   obSocket.onmessage = (event) => {
     const data = JSON.parse(event.data);
     renderOrderBook(data.bids, data.asks);
@@ -4534,6 +4624,9 @@ function initOrderBook(){
     const c = document.getElementById('orderBookBody');
     if(c) c.innerHTML = '<div style="color:var(--red);font-size:12px;padding:10px;">Order book failed to load</div>';
   };
+}
+function initOrderBook(){
+  connectOrderBook(currentSymbol);
 }
 
 function renderOrderBook(bids, asks){
@@ -4641,7 +4734,7 @@ async function submitDemoOrder(){
   if(qty > demoBalance) qty = demoBalance; // clamp tiny float overshoot (e.g. 100% selection)
 
   const {data, error} = await db.from('demo_positions').insert([{
-    user_id: state.user.id, symbol:'BTCUSDT', side: selectedSide, leverage: lev,
+    user_id: state.user.id, symbol: currentSymbol, side: selectedSide, leverage: lev,
     quantity_usd: qty, entry_price: latestPrice, status:'open',
     take_profit: tp, stop_loss: sl
   }]).select().single();
