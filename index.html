@@ -1094,6 +1094,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cw-badge-ghost .cw-seg-tp{color:#4CAF7D;}
 .cw-badge-ghost .cw-seg-sl{color:#E05252;}
 .cw-fill-band{position:absolute;left:0;right:0;pointer-events:none;z-index:3;display:none;}
+.cw-badge-combo{pointer-events:auto;}
+.cw-toggle{background:var(--bg4);color:var(--muted);border:1px solid var(--border2);border-right:none;cursor:pointer;pointer-events:auto;user-select:none;}
+.cw-toggle-active-tp{background:#4CAF7D;color:#0B1A12;}
+.cw-toggle-active-sl{background:#E05252;color:#210A0A;}
+.cw-seg-ghost-price{background:var(--bg3);color:var(--muted);border:1px solid var(--border2);}
 .cw-fill-tp{background:linear-gradient(180deg,rgba(76,175,125,0.24),rgba(76,175,125,0.04));}
 .cw-fill-sl{background:linear-gradient(180deg,rgba(224,82,82,0.04),rgba(224,82,82,0.24));}
 #tpsl-modal-overlay .popup-panel{width:360px;}
@@ -4739,10 +4744,13 @@ function ensureBadgeEls(posId){
   const slEl = document.createElement('div');
   slEl.className = 'cw-badge';
   slEl.style.display = 'none';
+  const comboEl = document.createElement('div');
+  comboEl.className = 'cw-badge cw-badge-combo';
+  comboEl.style.display = 'none';
   const bandEl = document.createElement('div');
   bandEl.className = 'cw-fill-band';
-  wrap.appendChild(entryEl); wrap.appendChild(tpEl); wrap.appendChild(slEl); wrap.appendChild(bandEl);
-  box = { entryEl, tpEl, slEl, bandEl, tpOverlayId:null, slOverlayId:null };
+  wrap.appendChild(entryEl); wrap.appendChild(tpEl); wrap.appendChild(slEl); wrap.appendChild(comboEl); wrap.appendChild(bandEl);
+  box = { entryEl, tpEl, slEl, comboEl, bandEl, tpOverlayId:null, slOverlayId:null, comboOverlayId:null, armedKind:'tp' };
   tpSlBoxes[posId] = box;
   return box;
 }
@@ -4750,10 +4758,11 @@ function ensureBadgeEls(posId){
 function removePositionUI(posId){
   const box = tpSlBoxes[posId];
   if(!box) return;
-  [box.entryEl, box.tpEl, box.slEl, box.bandEl].forEach(el => el && el.remove());
+  [box.entryEl, box.tpEl, box.slEl, box.comboEl, box.bandEl].forEach(el => el && el.remove());
   if(mainChartInstance){
     if(box.tpOverlayId) try{ mainChartInstance.removeOverlay(box.tpOverlayId); }catch(e){}
     if(box.slOverlayId) try{ mainChartInstance.removeOverlay(box.slOverlayId); }catch(e){}
+    if(box.comboOverlayId) try{ mainChartInstance.removeOverlay(box.comboOverlayId); }catch(e){}
   }
   delete tpSlBoxes[posId];
 }
@@ -4779,8 +4788,7 @@ function drawEntryOverlays(){
     } catch(e){ console.warn('overlay failed', e); }
 
     ensureBadgeEls(pos.id);
-    drawTpSlLine(pos, 'tp');
-    drawTpSlLine(pos, 'sl');
+    refreshTpSlDisplay(pos);
   });
 
   repositionAllBadges(latestPrice);
@@ -4792,6 +4800,99 @@ function removeEntryOverlay(id){
     delete entryOverlays[id];
   }
   removePositionUI(id);
+}
+
+// Decide whether to show the combined "one line, TP|SL toggle" ghost (neither set yet)
+// or the normal individual TP/SL lines (at least one is set).
+function refreshTpSlDisplay(pos){
+  const box = ensureBadgeEls(pos.id);
+  if(!box) return;
+  const bothUnset = pos.take_profit == null && pos.stop_loss == null;
+  if(bothUnset){
+    ['tpOverlayId','slOverlayId'].forEach(k => { if(box[k]){ try{ mainChartInstance.removeOverlay(box[k]); }catch(e){} box[k]=null; } });
+    box.tpEl.style.display = 'none';
+    box.slEl.style.display = 'none';
+    drawCombinedGhostLine(pos);
+  } else {
+    if(box.comboOverlayId){ try{ mainChartInstance.removeOverlay(box.comboOverlayId); }catch(e){} box.comboOverlayId = null; }
+    box.comboEl.style.display = 'none';
+    drawTpSlLine(pos, 'tp');
+    drawTpSlLine(pos, 'sl');
+  }
+}
+
+// Delta-style: ONE draggable ghost line with a TP/SL toggle box on it, instead of
+// two separate ghost lines floating apart above/below the entry.
+function drawCombinedGhostLine(pos){
+  if(!mainChartInstance) return;
+  const box = ensureBadgeEls(pos.id);
+  if(!box) return;
+  if(box.comboOverlayId){ try{ mainChartInstance.removeOverlay(box.comboOverlayId); }catch(e){} box.comboOverlayId = null; }
+  const price = ghostPrice(pos, box.armedKind);
+  if(price == null){ box.comboEl.style.display = 'none'; return; }
+  const overlayId = mainChartInstance.createOverlay({
+    name: 'tpslDragLine',
+    points: [{ value: price }],
+    lock: false,
+    styles: { line: { color: '#D4B886', style: 'dashed', size: 1 } },
+    onPressedMoveStart: () => { onTpSlDragStart(pos.id, box.armedKind); },
+    onPressedMoving: (evt) => { onComboDragging(pos.id, evt); },
+    onPressedMoveEnd: (evt) => { onComboDragEnd(pos.id, evt); }
+  });
+  box.comboOverlayId = overlayId;
+  updateComboBadge(pos, price);
+}
+
+function updateComboBadge(pos, price){
+  const box = tpSlBoxes[pos.id];
+  if(!box) return;
+  const y = priceToY(price);
+  if(y==null) return;
+  const armed = box.armedKind;
+  box.comboEl.style.top = y + 'px';
+  box.comboEl.innerHTML =
+      '<span class="cw-seg cw-toggle '+(armed==='tp'?'cw-toggle-active-tp':'')+'" onclick="armTpSlCombo(\''+pos.id+'\',\'tp\')">TP</span>'
+    + '<span class="cw-seg cw-toggle '+(armed==='sl'?'cw-toggle-active-sl':'')+'" onclick="armTpSlCombo(\''+pos.id+'\',\'sl\')">SL</span>'
+    + '<span class="cw-seg cw-seg-ghost-price">'+price.toFixed(2)+'</span>';
+  box.comboEl.style.display = 'block';
+}
+
+// Switch which of TP/SL the single combined line currently controls
+function armTpSlCombo(posId, kind){
+  const box = tpSlBoxes[posId];
+  const pos = openPositions.find(p => p.id===posId);
+  if(!box || !pos) return;
+  box.armedKind = kind;
+  drawCombinedGhostLine(pos);
+}
+
+function onComboDragging(posId, evt){
+  const box = tpSlBoxes[posId];
+  const pos = openPositions.find(p => p.id===posId);
+  if(!box || !pos) return;
+  const price = getOverlayPrice(evt);
+  if(price == null) return;
+  updateComboBadge(pos, price);
+  updateFillBand(pos, box.armedKind, price);
+}
+
+async function onComboDragEnd(posId, evt){
+  const box = tpSlBoxes[posId];
+  const pos = openPositions.find(p => p.id===posId);
+  activeDrag = null;
+  if(box) box.bandEl.style.display = 'none';
+  if(!box || !pos) return;
+  let price = getOverlayPrice(evt);
+  if(price == null) return;
+  price = Math.round(price * 100) / 100;
+  const kind = box.armedKind;
+  const field = kind==='tp' ? 'take_profit' : 'stop_loss';
+  pos[field] = price;
+  refreshTpSlDisplay(pos);
+  const patch = {}; patch[field] = price;
+  const { error } = await db.from('demo_positions').update(patch).eq('id', posId);
+  if(error){ showToast('Could not save '+kind.toUpperCase()+': '+error.message, 'error'); }
+  else { showToast(kind.toUpperCase()+' set @ '+price.toFixed(2)); }
 }
 
 // Draw/refresh a single TP or SL line for a position.
@@ -4863,7 +4964,7 @@ async function onTpSlDragEnd(posId, kind, evt){
   const field = kind==='tp' ? 'take_profit' : 'stop_loss';
   pos[field] = price; // dragging (even a ghost line) always confirms the value
   updateTpSlBadge(pos, kind, price, false);
-  drawTpSlLine(pos, kind); // redraw solid now that it's confirmed
+  refreshTpSlDisplay(pos); // redraw solid now that it's confirmed
   const patch = {}; patch[field] = price;
   const { error } = await db.from('demo_positions').update(patch).eq('id', posId);
   if(error){ showToast('Could not save '+kind.toUpperCase()+': '+error.message, 'error'); }
@@ -4914,15 +5015,23 @@ function repositionAllBadges(price){
         + '<span class="cw-seg cw-seg-pnl '+pnlClass+'">'+fmtPnl(pnl)+'</span>';
     }
     // Don't fight the live drag redraw for the line currently being dragged
+    const bothUnset = pos.take_profit==null && pos.stop_loss==null;
     const draggingTp = activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='tp';
     const draggingSl = activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='sl';
-    if(!draggingTp){
-      const tpPrice = pos.take_profit != null ? pos.take_profit : ghostPrice(pos, 'tp');
-      if(tpPrice != null) updateTpSlBadge(pos, 'tp', tpPrice, pos.take_profit == null);
+    if(!bothUnset){
+      if(!draggingTp){
+        const tpPrice = pos.take_profit != null ? pos.take_profit : ghostPrice(pos, 'tp');
+        if(tpPrice != null) updateTpSlBadge(pos, 'tp', tpPrice, pos.take_profit == null);
+      }
+      if(!draggingSl){
+        const slPrice = pos.stop_loss != null ? pos.stop_loss : ghostPrice(pos, 'sl');
+        if(slPrice != null) updateTpSlBadge(pos, 'sl', slPrice, pos.stop_loss == null);
+      }
     }
-    if(!draggingSl){
-      const slPrice = pos.stop_loss != null ? pos.stop_loss : ghostPrice(pos, 'sl');
-      if(slPrice != null) updateTpSlBadge(pos, 'sl', slPrice, pos.stop_loss == null);
+    const draggingCombo = activeDrag && activeDrag.posId===pos.id && box.comboOverlayId;
+    if(!draggingCombo && bothUnset && box.comboOverlayId){
+      const comboPrice = ghostPrice(pos, box.armedKind);
+      if(comboPrice != null) updateComboBadge(pos, comboPrice);
     }
   });
 }
@@ -4957,8 +5066,7 @@ async function saveTpSlModal(){
   pos.take_profit = patch.take_profit;
   pos.stop_loss = patch.stop_loss;
   closeTpSlModal();
-  drawTpSlLine(pos, 'tp');
-  drawTpSlLine(pos, 'sl');
+  refreshTpSlDisplay(pos);
   repositionAllBadges(latestPrice);
   showToast('TP/SL saved');
 }
