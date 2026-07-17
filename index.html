@@ -1082,6 +1082,14 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .pos-edit-btn{width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid rgba(212,184,134,0.35);background:rgba(212,184,134,0.08);color:var(--gold);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
 .pos-edit-btn:hover{background:var(--gold-dim);border-color:var(--gold);}
 .chart-panel-wrap{position:relative;}
+.chart-maximize-btn{position:absolute;top:10px;right:10px;z-index:8;width:34px;height:34px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);color:var(--white);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.chart-maximize-btn:hover{background:var(--gold-dim);}
+.chart-symbol-overlay{display:none;position:absolute;top:10px;left:10px;z-index:7;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);padding:6px 12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.chart-symbol-overlay .csym-name{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:13px;}
+.chart-symbol-overlay .csym-sub{color:var(--muted);font-weight:400;}
+.chart-symbol-overlay .csym-price{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;}
+.chart-panel-wrap.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);padding:10px;border-radius:0;display:flex;flex-direction:column;}
+.chart-panel-wrap.chart-maximized #klineMainChart{border-radius:8px;}
 .cw-badge{position:absolute;right:76px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
 .cw-seg{padding:2px 6px;}
 .cw-seg-main{background:var(--bg4);color:var(--white);border:1px solid var(--border2);border-right:none;}
@@ -1429,6 +1437,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
           </div>
           <div class="terminal-row">
             <div class="chart-panel-wrap">
+              <div class="chart-symbol-overlay" id="chart-symbol-overlay">
+                <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
+                <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
+              </div>
+              <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
               <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
             </div>
             <div class="orderbook-panel">
@@ -4411,9 +4424,49 @@ async function loadChartInterval(interval){
     latestPrice = parseFloat(k.c);
     checkTpSlLiquidation(latestPrice);
     updateOpenPositionsPnL(latestPrice);
+    updateMaxPriceOverlay(latestPrice);
   };
   currentInterval = interval;
 }
+
+let chartMaximized = false;
+let prevMaxOverlayPrice = null;
+function updateMaxPriceOverlay(price){
+  const el = document.getElementById('chart-max-price');
+  if(!el) return;
+  el.textContent = price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  if(prevMaxOverlayPrice != null){
+    el.style.color = price >= prevMaxOverlayPrice ? 'var(--green)' : 'var(--red)';
+  }
+  prevMaxOverlayPrice = price;
+}
+
+function toggleChartMaximize(){
+  const wrap = document.querySelector('.chart-panel-wrap');
+  const chartDiv = document.getElementById('klineMainChart');
+  const overlay = document.getElementById('chart-symbol-overlay');
+  const btn = document.getElementById('chart-maximize-btn');
+  if(!wrap || !chartDiv) return;
+  chartMaximized = !chartMaximized;
+  if(chartMaximized){
+    wrap.classList.add('chart-maximized');
+    document.body.style.overflow = 'hidden';
+    chartDiv.style.height = 'calc(100vh - 20px)';
+    if(overlay) overlay.style.display = 'flex';
+    if(btn){ btn.innerHTML = '✕'; btn.title = 'Exit fullscreen'; }
+  } else {
+    wrap.classList.remove('chart-maximized');
+    document.body.style.overflow = '';
+    chartDiv.style.height = '500px';
+    if(overlay) overlay.style.display = 'none';
+    if(btn){ btn.innerHTML = '⛶'; btn.title = 'Maximize chart'; }
+  }
+  setTimeout(() => {
+    if(mainChartInstance && mainChartInstance.resize) mainChartInstance.resize();
+    window.dispatchEvent(new Event('resize'));
+  }, 50);
+}
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape' && chartMaximized) toggleChartMaximize(); });
 
 async function switchTimeframe(tf){
   if(tf === currentInterval || !mainChartInstance) return;
