@@ -4872,8 +4872,10 @@ function onComboDragging(posId, evt){
   const box = tpSlBoxes[posId];
   const pos = openPositions.find(p => p.id===posId);
   if(!box || !pos) return;
-  const price = getOverlayPrice(evt);
-  if(price == null) return;
+  const raw = getOverlayPrice(evt);
+  if(raw == null) return;
+  const price = snapPrice(raw);
+  if(box.comboOverlayId){ try{ mainChartInstance.overrideOverlay({ id: box.comboOverlayId, points: [{ value: price }] }); }catch(e){} }
   updateComboBadge(pos, price);
   updateFillBand(pos, box.armedKind, price);
 }
@@ -4948,8 +4950,11 @@ function onTpSlDragging(posId, kind, evt){
   const pos = openPositions.find(p => p.id===posId);
   const box = tpSlBoxes[posId];
   if(!pos || !box) return;
-  const price = getOverlayPrice(evt);
-  if(price == null) return;
+  const raw = getOverlayPrice(evt);
+  if(raw == null) return;
+  const price = snapPrice(raw);
+  const overlayId = kind==='tp' ? box.tpOverlayId : box.slOverlayId;
+  if(overlayId){ try{ mainChartInstance.overrideOverlay({ id: overlayId, points: [{ value: price }] }); }catch(e){} }
   updateTpSlBadge(pos, kind, price, false);
   updateFillBand(pos, kind, price);
 }
