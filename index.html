@@ -1425,6 +1425,13 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             <button class="chart-tool-btn" id="tf-btn-4h" onclick="switchTimeframe('4h')">4H</button>
             <button class="chart-tool-btn" id="tf-btn-1d" onclick="switchTimeframe('1d')">1D</button>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <span style="color:var(--muted);font-size:12px;align-self:center;">Chart Type:</span>
+            <button class="chart-tool-btn active-tool" id="ct-btn-candle_solid" onclick="switchChartType('candle_solid')">Candle</button>
+            <button class="chart-tool-btn" id="ct-btn-candle_stroke" onclick="switchChartType('candle_stroke')">Hollow Candle</button>
+            <button class="chart-tool-btn" id="ct-btn-ohlc" onclick="switchChartType('ohlc')">OHLC Bars</button>
+            <button class="chart-tool-btn" id="ct-btn-area" onclick="switchChartType('area')">Area</button>
+          </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
             <span style="color:var(--muted);font-size:12px;align-self:center;">Draw:</span>
             <button class="chart-tool-btn" onclick="useDrawTool('straightLine')">Trend Line</button>
@@ -4478,6 +4485,16 @@ async function switchTimeframe(tf){
   } catch(err) {
     console.error('Timeframe switch failed:', err);
   }
+}
+
+let currentChartType = 'candle_solid';
+function switchChartType(type){
+  if(!mainChartInstance || type === currentChartType) return;
+  mainChartInstance.setStyles({ candle: { type } });
+  document.querySelectorAll('.chart-tool-btn[id^="ct-btn-"]').forEach(b => b.classList.remove('active-tool'));
+  const activeBtn = document.getElementById('ct-btn-' + type);
+  if(activeBtn) activeBtn.classList.add('active-tool');
+  currentChartType = type;
 }
 
 function toggleIndicator(name, overlayOnCandle){
