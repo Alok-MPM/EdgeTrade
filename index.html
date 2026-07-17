@@ -4857,8 +4857,9 @@ async function onTpSlDragEnd(posId, kind, evt){
   activeDrag = null;
   if(box) box.bandEl.style.display = 'none';
   if(!pos) return;
-  const price = getOverlayPrice(evt);
+  let price = getOverlayPrice(evt);
   if(price == null) return;
+  price = Math.round(price * 100) / 100; // keep to 2 decimals
   const field = kind==='tp' ? 'take_profit' : 'stop_loss';
   pos[field] = price; // dragging (even a ghost line) always confirms the value
   updateTpSlBadge(pos, kind, price, false);
@@ -4909,7 +4910,7 @@ function repositionAllBadges(price){
       box.entryEl.className = 'cw-badge';
       const pnl = price!=null ? calcPnl(pos, price) : 0;
       const pnlClass = pnl>=0 ? 'pos' : 'neg';
-      box.entryEl.innerHTML = '<span class="cw-seg cw-seg-main">'+pos.side.toUpperCase()+' · $'+pos.quantity_usd.toFixed(2)+'</span>'
+      box.entryEl.innerHTML = '<span class="cw-seg cw-seg-main">$'+pos.quantity_usd.toFixed(2)+'</span>'
         + '<span class="cw-seg cw-seg-pnl '+pnlClass+'">'+fmtPnl(pnl)+'</span>';
     }
     // Don't fight the live drag redraw for the line currently being dragged
@@ -4932,8 +4933,8 @@ function openTpSlModal(posId){
   if(!pos) return;
   tpSlModalPosId = posId;
   document.getElementById('tpsl-modal-entry').textContent = pos.entry_price.toFixed(2);
-  document.getElementById('tpsl-modal-tp').value = pos.take_profit != null ? pos.take_profit : '';
-  document.getElementById('tpsl-modal-sl').value = pos.stop_loss != null ? pos.stop_loss : '';
+  document.getElementById('tpsl-modal-tp').value = pos.take_profit != null ? pos.take_profit.toFixed(2) : '';
+  document.getElementById('tpsl-modal-sl').value = pos.stop_loss != null ? pos.stop_loss.toFixed(2) : '';
   document.getElementById('tpsl-modal-overlay').classList.add('open');
 }
 
@@ -4948,8 +4949,8 @@ async function saveTpSlModal(){
   const tpRaw = document.getElementById('tpsl-modal-tp').value;
   const slRaw = document.getElementById('tpsl-modal-sl').value;
   const patch = {
-    take_profit: tpRaw === '' ? null : parseFloat(tpRaw),
-    stop_loss: slRaw === '' ? null : parseFloat(slRaw)
+    take_profit: tpRaw === '' ? null : Math.round(parseFloat(tpRaw) * 100) / 100,
+    stop_loss: slRaw === '' ? null : Math.round(parseFloat(slRaw) * 100) / 100
   };
   const { error } = await db.from('demo_positions').update(patch).eq('id', pos.id);
   if(error){ showToast('Failed to save TP/SL: '+error.message, 'error'); return; }
@@ -5237,11 +5238,11 @@ async function sendStatsMsg(){
       </div>
       <div>
         <label class="tpsl-field-lbl" style="color:#4CAF7D;">Take Profit</label>
-        <input type="number" class="tpsl-input" id="tpsl-modal-tp" placeholder="Price (optional)">
+        <input type="number" step="0.01" class="tpsl-input" id="tpsl-modal-tp" placeholder="Price (optional)">
       </div>
       <div>
         <label class="tpsl-field-lbl" style="color:#E05252;">Stop Loss</label>
-        <input type="number" class="tpsl-input" id="tpsl-modal-sl" placeholder="Price (optional)">
+        <input type="number" step="0.01" class="tpsl-input" id="tpsl-modal-sl" placeholder="Price (optional)">
       </div>
     </div>
     <div class="popup-footer">
