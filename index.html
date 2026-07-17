@@ -1079,15 +1079,30 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .pos-pnl.pos{color:var(--green);}
 .pos-pnl.neg{color:var(--red);}
 .pos-close-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--white);font-size:12px;font-weight:600;cursor:pointer;}
-.pos-tpsl-btn{padding:7px 12px;border-radius:8px;border:1px solid rgba(212,184,134,0.35);background:rgba(212,184,134,0.08);color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;}
+.pos-edit-btn{width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid rgba(212,184,134,0.35);background:rgba(212,184,134,0.08);color:var(--gold);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.pos-edit-btn:hover{background:var(--gold-dim);border-color:var(--gold);}
 .chart-panel-wrap{position:relative;}
-.cw-badge{position:absolute;right:6px;transform:translateY(-50%);padding:3px 9px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
-.cw-badge-entry{background:var(--bg4);border:1px solid var(--border2);color:var(--white);}
-.cw-badge-tp{background:#4CAF7D;color:#0B1A12;}
-.cw-badge-sl{background:#E05252;color:#210A0A;}
+.cw-badge{position:absolute;right:6px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
+.cw-seg{padding:3px 8px;}
+.cw-seg-main{background:var(--bg4);color:var(--white);border:1px solid var(--border2);border-right:none;}
+.cw-seg-tp{background:#4CAF7D;color:#0B1A12;}
+.cw-seg-sl{background:#E05252;color:#210A0A;}
+.cw-seg-pnl.pos{background:rgba(76,175,125,0.92);color:#0B1A12;}
+.cw-seg-pnl.neg{background:rgba(224,82,82,0.92);color:#210A0A;}
+.cw-badge-ghost{opacity:0.55;}
+.cw-badge-ghost .cw-seg-tp,.cw-badge-ghost .cw-seg-sl{background:transparent;border:1px dashed currentColor;}
+.cw-badge-ghost .cw-seg-tp{color:#4CAF7D;}
+.cw-badge-ghost .cw-seg-sl{color:#E05252;}
 .cw-fill-band{position:absolute;left:0;right:0;pointer-events:none;z-index:3;display:none;}
 .cw-fill-tp{background:linear-gradient(180deg,rgba(76,175,125,0.24),rgba(76,175,125,0.04));}
 .cw-fill-sl{background:linear-gradient(180deg,rgba(224,82,82,0.04),rgba(224,82,82,0.24));}
+#tpsl-modal-overlay .popup-panel{width:360px;}
+.tpsl-modal-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px;}
+.tpsl-modal-entry-lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.tpsl-modal-entry-val{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--white);font-weight:700;}
+.tpsl-field-lbl{font-size:12px;font-weight:600;margin-bottom:6px;display:block;}
+.tpsl-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;}
+.tpsl-input:focus{border-color:var(--gold);}
 .pos-close-btn:hover{border-color:var(--red);color:var(--red);}
 </style>
 </head>
@@ -4559,13 +4574,11 @@ function renderPositions(){
   c.innerHTML = openPositions.map(pos => {
     const pnl = latestPrice ? calcPnl(pos, latestPrice) : 0;
     const pnlClass = pnl>=0 ? 'pos' : 'neg';
-    const needsTpSl = (pos.take_profit==null || pos.stop_loss==null);
-    const tpSlBtn = needsTpSl ? '<button class="pos-tpsl-btn" onclick="quickAddTpSl(\''+pos.id+'\')">+ TP/SL</button>' : '';
     return '<div class="pos-row" data-id="'+pos.id+'">'
       + '<span class="pos-side '+pos.side+'">'+pos.side.toUpperCase()+' '+pos.leverage+'x</span>'
       + '<span class="pos-meta">Entry '+pos.entry_price.toFixed(1)+' · Margin $'+pos.quantity_usd.toFixed(2)+'</span>'
       + '<span class="pos-pnl '+pnlClass+'" id="pnl-'+pos.id+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+' USD</span>'
-      + tpSlBtn
+      + '<button class="pos-edit-btn" title="Set TP/SL" onclick="openTpSlModal(\''+pos.id+'\')">✎</button>'
       + '<button class="pos-close-btn" onclick="closePosition(\''+pos.id+'\',\'manual\')">Close</button>'
       + '</div>';
   }).join('');
@@ -4645,10 +4658,11 @@ async function closePosition(id, reason, forcedPrice){
 }
 
 // ══════════════════════════════════════
-// TP/SL — draggable chart lines, live PnL badges, fill band
+// TP/SL — draggable chart lines (ghost placeholders + real), live PnL badges, fill band
 // ══════════════════════════════════════
 let tpSlBoxes = {};   // posId -> { entryEl, tpEl, slEl, tpOverlayId, slOverlayId }
 let activeDrag = null; // { posId, kind } while a TP/SL line is being dragged
+let tpSlModalPosId = null;
 
 function getChartWrap(){
   return document.querySelector('.chart-panel-wrap');
@@ -4666,18 +4680,33 @@ function priceToY(price){
   } catch(e){ return null; }
 }
 
+// Small pixel-offset placeholder near the entry line (never far off-screen, unlike a % based default)
+function ghostPrice(pos, kind){
+  if(!mainChartInstance) return null;
+  const entryY = priceToY(pos.entry_price);
+  if(entryY==null) return null;
+  const offsetPx = 42;
+  const above = kind==='tp' ? pos.side==='long' : pos.side!=='long';
+  const y = above ? entryY - offsetPx : entryY + offsetPx;
+  try {
+    const res = mainChartInstance.convertFromPixel({x:120, y}, {paneId:'candle_pane'});
+    const v = Array.isArray(res) ? res[0]?.value : res?.value;
+    return typeof v === 'number' ? v : null;
+  } catch(e){ return null; }
+}
+
 function ensureBadgeEls(posId){
   let box = tpSlBoxes[posId];
   if(box && box.entryEl) return box;
   const wrap = getChartWrap();
   if(!wrap) return null;
   const entryEl = document.createElement('div');
-  entryEl.className = 'cw-badge cw-badge-entry';
+  entryEl.className = 'cw-badge';
   const tpEl = document.createElement('div');
-  tpEl.className = 'cw-badge cw-badge-tp';
+  tpEl.className = 'cw-badge';
   tpEl.style.display = 'none';
   const slEl = document.createElement('div');
-  slEl.className = 'cw-badge cw-badge-sl';
+  slEl.className = 'cw-badge';
   slEl.style.display = 'none';
   const bandEl = document.createElement('div');
   bandEl.className = 'cw-fill-band';
@@ -4734,14 +4763,17 @@ function removeEntryOverlay(id){
   removePositionUI(id);
 }
 
-// Draw/refresh a single TP or SL draggable line for a position
+// Draw/refresh a single TP or SL line for a position.
+// If not set yet, draws a dashed "ghost" placeholder right next to the entry line
+// (never far away) that becomes a real TP/SL the moment the user drags it.
 function drawTpSlLine(pos, kind){
   if(!mainChartInstance) return;
   const box = ensureBadgeEls(pos.id);
   if(!box) return;
   const field = kind==='tp' ? 'take_profit' : 'stop_loss';
   const overlayKey = kind==='tp' ? 'tpOverlayId' : 'slOverlayId';
-  const price = pos[field];
+  const isSet = pos[field] != null;
+  const price = isSet ? pos[field] : ghostPrice(pos, kind);
 
   if(box[overlayKey]){ try{ mainChartInstance.removeOverlay(box[overlayKey]); }catch(e){} box[overlayKey] = null; }
   const el = kind==='tp' ? box.tpEl : box.slEl;
@@ -4753,12 +4785,13 @@ function drawTpSlLine(pos, kind){
     name: 'priceLine',
     points: [{ value: price }],
     lock: false,
-    styles: { line: { color, style:'solid', size:2 } },
+    styles: { line: { color, style: isSet ? 'solid' : 'dashed', size: isSet ? 2 : 1 } },
     onPressedMoveStart: () => { onTpSlDragStart(pos.id, kind); },
     onPressedMoving: (evt) => { onTpSlDragging(pos.id, kind, evt); },
     onPressedMoveEnd: (evt) => { onTpSlDragEnd(pos.id, kind, evt); }
   });
   box[overlayKey] = overlayId;
+  updateTpSlBadge(pos, kind, price, !isSet);
   el.style.display = 'block';
 }
 
@@ -4776,13 +4809,14 @@ function onTpSlDragStart(posId, kind){
   if(box) box.bandEl.style.display = 'block';
 }
 
+// Fires continuously while dragging — recalculates live PnL on every pixel/price change
 function onTpSlDragging(posId, kind, evt){
   const pos = openPositions.find(p => p.id===posId);
   const box = tpSlBoxes[posId];
   if(!pos || !box) return;
   const price = getOverlayPrice(evt);
   if(price == null) return;
-  updateTpSlBadge(pos, kind, price);
+  updateTpSlBadge(pos, kind, price, false);
   updateFillBand(pos, kind, price);
 }
 
@@ -4795,23 +4829,28 @@ async function onTpSlDragEnd(posId, kind, evt){
   const price = getOverlayPrice(evt);
   if(price == null) return;
   const field = kind==='tp' ? 'take_profit' : 'stop_loss';
-  pos[field] = price;
-  updateTpSlBadge(pos, kind, price);
+  pos[field] = price; // dragging (even a ghost line) always confirms the value
+  updateTpSlBadge(pos, kind, price, false);
+  drawTpSlLine(pos, kind); // redraw solid now that it's confirmed
   const patch = {}; patch[field] = price;
   const { error } = await db.from('demo_positions').update(patch).eq('id', posId);
   if(error){ showToast('Could not save '+kind.toUpperCase()+': '+error.message, 'error'); }
   else { showToast(kind.toUpperCase()+' set @ '+price.toFixed(1)); }
 }
 
-function updateTpSlBadge(pos, kind, price){
+// Two-segment Delta-style badge: left = label/price, right = live colored PnL
+function updateTpSlBadge(pos, kind, price, ghost){
   const box = tpSlBoxes[pos.id];
   if(!box) return;
   const el = kind==='tp' ? box.tpEl : box.slEl;
   const y = priceToY(price);
   if(y==null) return;
   const pnl = calcPnl(pos, price);
+  const pnlClass = pnl>=0 ? 'pos' : 'neg';
   el.style.top = y + 'px';
-  el.textContent = (kind==='tp'?'TP ':'SL ') + price.toFixed(1) + '  ' + fmtPnl(pnl);
+  el.className = 'cw-badge' + (ghost ? ' cw-badge-ghost' : '');
+  el.innerHTML = '<span class="cw-seg cw-seg-'+kind+'">'+(ghost ? (kind==='tp'?'Set TP':'Set SL') : (kind==='tp'?'TP ':'SL ')+price.toFixed(2))+'</span>'
+    + '<span class="cw-seg cw-seg-pnl '+pnlClass+'">'+fmtPnl(pnl)+'</span>';
   el.style.display = 'block';
 }
 
@@ -4836,39 +4875,60 @@ function repositionAllBadges(price){
     const entryY = priceToY(pos.entry_price);
     if(entryY!=null){
       box.entryEl.style.top = entryY + 'px';
+      box.entryEl.className = 'cw-badge';
       const pnl = price!=null ? calcPnl(pos, price) : 0;
-      box.entryEl.textContent = pos.side.toUpperCase()+' · $'+pos.quantity_usd.toFixed(2)+' used · '+fmtPnl(pnl);
+      const pnlClass = pnl>=0 ? 'pos' : 'neg';
+      box.entryEl.innerHTML = '<span class="cw-seg cw-seg-main">'+pos.side.toUpperCase()+' · $'+pos.quantity_usd.toFixed(2)+'</span>'
+        + '<span class="cw-seg cw-seg-pnl '+pnlClass+'">'+fmtPnl(pnl)+'</span>';
     }
     // Don't fight the live drag redraw for the line currently being dragged
-    if(!(activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='tp') && pos.take_profit!=null){
-      updateTpSlBadge(pos, 'tp', pos.take_profit);
+    const draggingTp = activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='tp';
+    const draggingSl = activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='sl';
+    if(!draggingTp){
+      const tpPrice = pos.take_profit != null ? pos.take_profit : ghostPrice(pos, 'tp');
+      if(tpPrice != null) updateTpSlBadge(pos, 'tp', tpPrice, pos.take_profit == null);
     }
-    if(!(activeDrag && activeDrag.posId===pos.id && activeDrag.kind==='sl') && pos.stop_loss!=null){
-      updateTpSlBadge(pos, 'sl', pos.stop_loss);
+    if(!draggingSl){
+      const slPrice = pos.stop_loss != null ? pos.stop_loss : ghostPrice(pos, 'sl');
+      if(slPrice != null) updateTpSlBadge(pos, 'sl', slPrice, pos.stop_loss == null);
     }
   });
 }
 
-// Quick "+ TP/SL" button on a position row — adds sensible default levels the user can then drag
-async function quickAddTpSl(posId){
+// ── Pencil icon → typing popup (Solution 1) ──
+function openTpSlModal(posId){
   const pos = openPositions.find(p => p.id===posId);
-  if(!pos || !latestPrice) return;
-  const patch = {};
-  if(pos.take_profit == null){
-    patch.take_profit = pos.side==='long' ? pos.entry_price*1.005 : pos.entry_price*0.995;
-  }
-  if(pos.stop_loss == null){
-    patch.stop_loss = pos.side==='long' ? pos.entry_price*0.995 : pos.entry_price*1.005;
-  }
-  if(Object.keys(patch).length===0) return;
-  const { error } = await db.from('demo_positions').update(patch).eq('id', posId);
-  if(error){ showToast('Failed to add TP/SL: '+error.message, 'error'); return; }
-  Object.assign(pos, patch);
+  if(!pos) return;
+  tpSlModalPosId = posId;
+  document.getElementById('tpsl-modal-entry').textContent = pos.entry_price.toFixed(2);
+  document.getElementById('tpsl-modal-tp').value = pos.take_profit != null ? pos.take_profit : '';
+  document.getElementById('tpsl-modal-sl').value = pos.stop_loss != null ? pos.stop_loss : '';
+  document.getElementById('tpsl-modal-overlay').classList.add('open');
+}
+
+function closeTpSlModal(){
+  document.getElementById('tpsl-modal-overlay').classList.remove('open');
+  tpSlModalPosId = null;
+}
+
+async function saveTpSlModal(){
+  const pos = openPositions.find(p => p.id===tpSlModalPosId);
+  if(!pos) return;
+  const tpRaw = document.getElementById('tpsl-modal-tp').value;
+  const slRaw = document.getElementById('tpsl-modal-sl').value;
+  const patch = {
+    take_profit: tpRaw === '' ? null : parseFloat(tpRaw),
+    stop_loss: slRaw === '' ? null : parseFloat(slRaw)
+  };
+  const { error } = await db.from('demo_positions').update(patch).eq('id', pos.id);
+  if(error){ showToast('Failed to save TP/SL: '+error.message, 'error'); return; }
+  pos.take_profit = patch.take_profit;
+  pos.stop_loss = patch.stop_loss;
+  closeTpSlModal();
   drawTpSlLine(pos, 'tp');
   drawTpSlLine(pos, 'sl');
   repositionAllBadges(latestPrice);
-  renderPositions();
-  showToast('TP/SL added — drag the lines on the chart to adjust');
+  showToast('TP/SL saved');
 }
 
 function switchBottomTab(tab){
@@ -5131,6 +5191,33 @@ async function sendStatsMsg(){
   msgs.scrollTop=msgs.scrollHeight;
 }
 </script>
+
+<!-- TP / SL SET MODAL -->
+<div class="popup-overlay" id="tpsl-modal-overlay" onclick="if(event.target===this) closeTpSlModal()">
+  <div class="popup-panel">
+    <div class="popup-hdr">
+      <div class="popup-title">Set Take Profit / Stop Loss</div>
+      <button class="popup-close" onclick="closeTpSlModal()">✕</button>
+    </div>
+    <div class="tpsl-modal-body">
+      <div>
+        <div class="tpsl-modal-entry-lbl">Entry Price</div>
+        <div class="tpsl-modal-entry-val" id="tpsl-modal-entry">—</div>
+      </div>
+      <div>
+        <label class="tpsl-field-lbl" style="color:#4CAF7D;">Take Profit</label>
+        <input type="number" class="tpsl-input" id="tpsl-modal-tp" placeholder="Price (optional)">
+      </div>
+      <div>
+        <label class="tpsl-field-lbl" style="color:#E05252;">Stop Loss</label>
+        <input type="number" class="tpsl-input" id="tpsl-modal-sl" placeholder="Price (optional)">
+      </div>
+    </div>
+    <div class="popup-footer">
+      <button class="btn-reset" style="width:100%;" onclick="saveTpSlModal()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- STRATEGY MODAL -->
 <div class="strategy-modal-overlay" id="strategy-modal-overlay" onclick="closeStrategyDD(event)">
