@@ -1082,8 +1082,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .pos-edit-btn{width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid rgba(212,184,134,0.35);background:rgba(212,184,134,0.08);color:var(--gold);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
 .pos-edit-btn:hover{background:var(--gold-dim);border-color:var(--gold);}
 .chart-panel-wrap{position:relative;}
-.cw-badge{position:absolute;right:6px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
-.cw-seg{padding:3px 8px;}
+.cw-badge{position:absolute;right:76px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
+.cw-seg{padding:2px 6px;}
 .cw-seg-main{background:var(--bg4);color:var(--white);border:1px solid var(--border2);border-right:none;}
 .cw-seg-tp{background:#4CAF7D;color:#0B1A12;}
 .cw-seg-sl{background:#E05252;color:#210A0A;}
@@ -1093,7 +1093,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cw-badge-ghost .cw-seg-tp,.cw-badge-ghost .cw-seg-sl{background:transparent;border:1px dashed currentColor;}
 .cw-badge-ghost .cw-seg-tp{color:#4CAF7D;}
 .cw-badge-ghost .cw-seg-sl{color:#E05252;}
-.cw-fill-band{position:absolute;left:0;right:0;pointer-events:none;z-index:3;display:none;}
+.cw-fill-band{position:absolute;left:0;right:76px;pointer-events:none;z-index:3;display:none;}
 .cw-badge-combo{pointer-events:auto;}
 .cw-toggle{background:var(--bg4);color:var(--muted);border:1px solid var(--border2);border-right:none;cursor:pointer;pointer-events:auto;user-select:none;}
 .cw-toggle-active-tp{background:#4CAF7D;color:#0B1A12;}
@@ -4668,6 +4668,8 @@ async function closePosition(id, reason, forcedPrice){
 let tpSlBoxes = {};   // posId -> { entryEl, tpEl, slEl, tpOverlayId, slOverlayId }
 let activeDrag = null; // { posId, kind } while a TP/SL line is being dragged
 let tpSlModalPosId = null;
+const TP_SL_TICK = 0.5; // TP/SL always locks to this clean price step, Delta-style
+function snapPrice(v){ return Math.round(v / TP_SL_TICK) * TP_SL_TICK; }
 
 // Custom overlay: draws the exact same horizontal line as before, but adds an
 // invisible ~30px-tall touch band over it so tapping/dragging TP & SL is easy
@@ -4686,7 +4688,7 @@ if (typeof klinecharts !== 'undefined') {
         {
           type: 'rect',
           ignoreEvent: false,
-          attrs: { x: 0, y: y - 15, width: bounding.width, height: 30 },
+          attrs: { x: 0, y: y - 23, width: bounding.width, height: 46 },
           styles: { style: 'fill', color: 'rgba(0,0,0,0.01)' }
         },
         {
@@ -4884,7 +4886,7 @@ async function onComboDragEnd(posId, evt){
   if(!box || !pos) return;
   let price = getOverlayPrice(evt);
   if(price == null) return;
-  price = Math.round(price * 100) / 100;
+  price = snapPrice(price);
   const kind = box.armedKind;
   const field = kind==='tp' ? 'take_profit' : 'stop_loss';
   pos[field] = price;
@@ -4960,7 +4962,7 @@ async function onTpSlDragEnd(posId, kind, evt){
   if(!pos) return;
   let price = getOverlayPrice(evt);
   if(price == null) return;
-  price = Math.round(price * 100) / 100; // keep to 2 decimals
+  price = snapPrice(price); // lock to a clean price step, not a random decimal
   const field = kind==='tp' ? 'take_profit' : 'stop_loss';
   pos[field] = price; // dragging (even a ghost line) always confirms the value
   updateTpSlBadge(pos, kind, price, false);
