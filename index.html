@@ -4664,6 +4664,37 @@ let tpSlBoxes = {};   // posId -> { entryEl, tpEl, slEl, tpOverlayId, slOverlayI
 let activeDrag = null; // { posId, kind } while a TP/SL line is being dragged
 let tpSlModalPosId = null;
 
+// Custom overlay: draws the exact same horizontal line as before, but adds an
+// invisible ~30px-tall touch band over it so tapping/dragging TP & SL is easy
+// on a tablet — the thin line itself has a very tight hit-test tolerance in klinecharts.
+if (typeof klinecharts !== 'undefined') {
+  klinecharts.registerOverlay({
+    name: 'tpslDragLine',
+    totalStep: 1,
+    needDefaultPointFigure: false,
+    needDefaultXAxisFigure: false,
+    needDefaultYAxisFigure: false,
+    createPointFigures: ({ coordinates, bounding, overlay }) => {
+      const y = coordinates[0] ? coordinates[0].y : 0;
+      const lineStyles = (overlay.styles && overlay.styles.line) || {};
+      return [
+        {
+          type: 'rect',
+          ignoreEvent: false,
+          attrs: { x: 0, y: y - 15, width: bounding.width, height: 30 },
+          styles: { style: 'fill', color: 'rgba(0,0,0,0.01)' }
+        },
+        {
+          type: 'line',
+          ignoreEvent: true,
+          attrs: { coordinates: [{ x: 0, y }, { x: bounding.width, y }] },
+          styles: lineStyles
+        }
+      ];
+    }
+  });
+}
+
 function getChartWrap(){
   return document.querySelector('.chart-panel-wrap');
 }
@@ -4782,7 +4813,7 @@ function drawTpSlLine(pos, kind){
 
   const color = kind==='tp' ? '#4CAF7D' : '#E05252';
   const overlayId = mainChartInstance.createOverlay({
-    name: 'priceLine',
+    name: 'tpslDragLine',
     points: [{ value: price }],
     lock: false,
     styles: { line: { color, style: isSet ? 'solid' : 'dashed', size: isSet ? 2 : 1 } },
