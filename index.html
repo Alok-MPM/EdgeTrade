@@ -1408,6 +1408,15 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
             <button class="chart-tool-btn" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
             <button class="chart-tool-btn" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <span style="color:var(--muted);font-size:12px;align-self:center;">Timeframe:</span>
+            <button class="chart-tool-btn active-tool" id="tf-btn-1m" onclick="switchTimeframe('1m')">1m</button>
+            <button class="chart-tool-btn" id="tf-btn-5m" onclick="switchTimeframe('5m')">5m</button>
+            <button class="chart-tool-btn" id="tf-btn-15m" onclick="switchTimeframe('15m')">15m</button>
+            <button class="chart-tool-btn" id="tf-btn-1h" onclick="switchTimeframe('1h')">1H</button>
+            <button class="chart-tool-btn" id="tf-btn-4h" onclick="switchTimeframe('4h')">4H</button>
+            <button class="chart-tool-btn" id="tf-btn-1d" onclick="switchTimeframe('1d')">1D</button>
+          </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
             <span style="color:var(--muted);font-size:12px;align-self:center;">Draw:</span>
             <button class="chart-tool-btn" onclick="useDrawTool('straightLine')">Trend Line</button>
@@ -4351,6 +4360,7 @@ let mainChartInstance = null;
 let activeIndicators = {};
 let klineSocket = null;
 let obSocket = null;
+let currentInterval = '1m';
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
@@ -4370,31 +4380,50 @@ async function initMainChart(){
       candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
     });
 
-    const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=300');
-    if (!res.ok) throw new Error('Binance API fetch failed: ' + res.status);
-    const raw = await res.json();
-    const data = raw.map(k => ({
-      timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]),
-      low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
-    }));
-    mainChartInstance.applyNewData(data);
-
-    if(klineSocket) klineSocket.close();
-    klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
-    klineSocket.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      const k = msg.k;
-      mainChartInstance.updateData({
-        timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
-        low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
-      });
-      latestPrice = parseFloat(k.c);
-      checkTpSlLiquidation(latestPrice);
-      updateOpenPositionsPnL(latestPrice);
-    };
+    await loadChartInterval(currentInterval);
   } catch(err) {
     container.innerHTML = '<div style="padding:20px;color:#E05252;font-family:monospace;font-size:13px;white-space:pre-wrap;">CHART ERROR:\n' + err.message + '</div>';
     console.error('Chart init failed:', err);
+  }
+}
+
+// Fetches candles for the given Binance interval (1m/5m/15m/1h/4h/1d), applies them
+// to the chart, and re-subscribes the live kline WebSocket to that same interval.
+async function loadChartInterval(interval){
+  const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=' + interval + '&limit=300');
+  if (!res.ok) throw new Error('Binance API fetch failed: ' + res.status);
+  const raw = await res.json();
+  const data = raw.map(k => ({
+    timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]),
+    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+  }));
+  mainChartInstance.applyNewData(data);
+
+  if(klineSocket) klineSocket.close();
+  klineSocket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_' + interval);
+  klineSocket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const k = msg.k;
+    mainChartInstance.updateData({
+      timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
+      low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+    });
+    latestPrice = parseFloat(k.c);
+    checkTpSlLiquidation(latestPrice);
+    updateOpenPositionsPnL(latestPrice);
+  };
+  currentInterval = interval;
+}
+
+async function switchTimeframe(tf){
+  if(tf === currentInterval || !mainChartInstance) return;
+  document.querySelectorAll('.chart-tool-btn[id^="tf-btn-"]').forEach(b => b.classList.remove('active-tool'));
+  const activeBtn = document.getElementById('tf-btn-' + tf);
+  if(activeBtn) activeBtn.classList.add('active-tool');
+  try {
+    await loadChartInterval(tf);
+  } catch(err) {
+    console.error('Timeframe switch failed:', err);
   }
 }
 
