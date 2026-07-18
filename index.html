@@ -1038,13 +1038,65 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   transform: translateY(0);
 }
 
-.chart-tool-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;}
+.chart-tool-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;}
 .chart-tool-btn:hover{background:var(--gold-dim);color:var(--white);}
 .chart-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);} 
-.terminal-row{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;}
+
+/* ═══════════════════════════════════════════════
+   WORKSPACE ARCHITECTURE — Chart Cockpit / Trading Workspace / Bottom Dock
+   Z-INDEX SCALE: modal 100, context-menu 90, dropdown 80, floating-cockpit 70,
+   ai-overlay 60, chart-overlay 50, panels 40, chart 30, workspace 20, bg 10
+   ═══════════════════════════════════════════════ */
+.workspace-shell{display:flex;gap:14px;align-items:flex-start;min-height:0;}
+.main-workspace{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:14px;}
+
+/* — Chart Workspace + Cockpit — */
+.chart-workspace{position:relative;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.15);}
+.chart-cockpit{position:sticky;top:0;z-index:70;display:flex;align-items:center;gap:0;padding:10px 14px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;background:rgba(26,29,36,0.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
+.light-mode .chart-cockpit{background:rgba(255,253,248,0.72);}
+.chart-cockpit::-webkit-scrollbar{height:4px;}
+.cockpit-group{display:flex;align-items:center;gap:6px;padding:0 12px;flex-shrink:0;}
+.cockpit-group:first-child{padding-left:0;}
+.cockpit-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0;}
+.cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
+.chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;}
 .chart-panel-wrap{flex:3 1 500px;}
-.orderbook-panel{flex:1 1 240px;max-width:280px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;}
-.terminal-panel{flex:1 1 280px;max-width:320px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
+
+/* — Bottom Dock — */
+.bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.dock-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
+.dock-title{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);}
+.dock-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);padding:10px 16px 0;margin-bottom:0;overflow-x:auto;}
+.dock-content{padding:16px;max-height:280px;overflow-y:auto;}
+
+/* — Trading Workspace (right column) — */
+.trading-workspace{flex:0 0 380px;width:380px;min-width:340px;max-width:420px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;}
+@media(min-width:1025px){.trading-workspace{max-height:calc(100vh - 120px);overflow-y:auto;}}
+.orderbook-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;}
+.execution-workspace{background:var(--bg2);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;}
+.execution-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);}
+.execution-body{padding:16px;display:flex;flex-direction:column;}
+.execution-footer{padding:14px 16px 16px;border-top:1px solid var(--border);}
+.trade-summary-box{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;}
+.ts-row{display:flex;justify-content:space-between;font-size:12px;}
+.ts-row span:first-child{color:var(--muted);}
+.ts-row span:last-child{font-family:'JetBrains Mono',monospace;color:var(--white);font-weight:500;}
+
+/* — AI Mentor Dock (placeholder architecture) — */
+.ai-mentor-dock{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;}
+.mentor-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.mentor-header-text{font-size:12.5px;font-weight:600;color:var(--white);font-family:'Outfit',sans-serif;}
+.mentor-status-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+.mentor-insight{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;text-align:center;}
+.mentor-state{font-size:13px;font-weight:600;color:var(--gold);font-family:'Outfit',sans-serif;margin-bottom:4px;}
+.mentor-sub{font-size:11.5px;color:var(--muted);}
+
+@media(max-width:1024px){
+  .workspace-shell{flex-direction:column;}
+  .trading-workspace{width:100%;max-width:100%;min-width:0;flex:1 1 auto;position:static;max-height:none;}
+}
+
 .ob-row{display:flex;justify-content:space-between;position:relative;padding:4px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;overflow:hidden;border-radius:3px;margin-bottom:1px;}
 .ob-row .ob-bar{position:absolute;top:0;right:0;bottom:0;z-index:0;}
 .ob-row.ask .ob-bar{background:var(--red-dim);}
@@ -1065,8 +1117,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .term-submit-btn{width:100%;padding:14px;border-radius:10px;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-top:6px;font-family:'Outfit',sans-serif;}
 .term-submit-btn.long{background:var(--green);color:#fff;}
 .term-submit-btn.short{background:var(--red);color:#fff;}
-.bottom-tabs-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
-.bottom-tab-nav{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.bottom-tab-nav{display:flex;gap:20px;}
 .bottom-tab-item{padding:8px 4px 12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:500;border-bottom:2px solid transparent;}
 .bottom-tab-item.active{color:var(--gold);border-bottom-color:var(--gold);}
 .bottom-tab-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}
@@ -1405,116 +1456,196 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
       <!-- CHART -->
       <div class="content-section" id="section-chart">
         <div style="padding:20px;">
-          <h2 style="color:var(--white);font-family:'Outfit',sans-serif;margin-bottom:16px;">Chart</h2>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-            <span style="color:var(--muted);font-size:12px;align-self:center;">Indicators:</span>
-            <button class="chart-tool-btn" id="ind-btn-MA" onclick="toggleIndicator('MA', true)">MA</button>
-            <button class="chart-tool-btn" id="ind-btn-EMA" onclick="toggleIndicator('EMA', true)">EMA</button>
-            <button class="chart-tool-btn" id="ind-btn-BOLL" onclick="toggleIndicator('BOLL', true)">BOLL</button>
-            <button class="chart-tool-btn" id="ind-btn-VOL" onclick="toggleIndicator('VOL', false)">VOL</button>
-            <button class="chart-tool-btn" id="ind-btn-MACD" onclick="toggleIndicator('MACD', false)">MACD</button>
-            <button class="chart-tool-btn" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
-            <button class="chart-tool-btn" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
-            <span style="color:var(--muted);font-size:12px;">Market:</span>
-            <div class="chart-wrap" style="width:170px;">
-              <button class="chart-tool-btn" id="market-select-btn" onclick="toggleMarketDropdown()" style="width:100%;text-align:left;font-family:'JetBrains Mono',monospace;">BTC/USDT ▾</button>
-              <div class="chart-dd" id="market-dd">
-                <div class="chart-search-w"><input type="text" class="chart-search" id="market-search" placeholder="Search market..." oninput="filterMarketList(this.value)"></div>
-                <div class="chart-list" id="market-list"><div style="padding:10px;color:var(--muted);font-size:12px;">Loading markets...</div></div>
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-            <span style="color:var(--muted);font-size:12px;align-self:center;">Timeframe:</span>
-            <button class="chart-tool-btn active-tool" id="tf-btn-1m" onclick="switchTimeframe('1m')">1m</button>
-            <button class="chart-tool-btn" id="tf-btn-5m" onclick="switchTimeframe('5m')">5m</button>
-            <button class="chart-tool-btn" id="tf-btn-15m" onclick="switchTimeframe('15m')">15m</button>
-            <button class="chart-tool-btn" id="tf-btn-1h" onclick="switchTimeframe('1h')">1H</button>
-            <button class="chart-tool-btn" id="tf-btn-4h" onclick="switchTimeframe('4h')">4H</button>
-            <button class="chart-tool-btn" id="tf-btn-1d" onclick="switchTimeframe('1d')">1D</button>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-            <span style="color:var(--muted);font-size:12px;align-self:center;">Chart Type:</span>
-            <button class="chart-tool-btn active-tool" id="ct-btn-candle_solid" onclick="switchChartType('candle_solid')">Candle</button>
-            <button class="chart-tool-btn" id="ct-btn-candle_stroke" onclick="switchChartType('candle_stroke')">Hollow Candle</button>
-            <button class="chart-tool-btn" id="ct-btn-ohlc" onclick="switchChartType('ohlc')">OHLC Bars</button>
-            <button class="chart-tool-btn" id="ct-btn-area" onclick="switchChartType('area')">Area</button>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
-            <span style="color:var(--muted);font-size:12px;align-self:center;">Draw:</span>
-            <button class="chart-tool-btn" onclick="useDrawTool('straightLine')">Trend Line</button>
-            <button class="chart-tool-btn" onclick="useDrawTool('horizontalStraightLine')">Horizontal</button>
-            <button class="chart-tool-btn" onclick="useDrawTool('rayLine')">Ray</button>
-            <button class="chart-tool-btn" onclick="useDrawTool('segment')">Segment</button>
-            <button class="chart-tool-btn" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
-            <button class="chart-tool-btn" onclick="useDrawTool('priceLine')">Price Line</button>
-            <button class="chart-tool-btn" onclick="clearDrawings()" style="color:var(--red);">Clear All</button>
-          </div>
-          <div class="terminal-row">
-            <div class="chart-panel-wrap">
-              <div class="chart-symbol-overlay" id="chart-symbol-overlay">
-                <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
-                <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
-              </div>
-              <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
-              <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
-            </div>
-            <div class="orderbook-panel">
-              <div style="color:var(--white);font-weight:600;margin-bottom:10px;font-family:'Outfit',sans-serif;">Order Book</div>
-              <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
-            </div>
-            <div class="terminal-panel">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px;color:var(--muted);">
-                <span>Demo Balance</span>
-                <span id="term-balance" style="color:var(--gold);font-weight:600;font-family:'JetBrains Mono',monospace;">—</span>
-              </div>
-              <div class="term-tabs">
-                <button class="term-tab-btn long-active" id="term-btn-long" onclick="setTermSide('long')">Long</button>
-                <button class="term-tab-btn" id="term-btn-short" onclick="setTermSide('short')">Short</button>
-              </div>
-              <div class="term-input-row">
-                <label>Leverage</label>
-                <select id="term-leverage">
-                  <option>5x</option><option>10x</option><option selected>20x</option><option>50x</option><option>100x</option>
-                </select>
-              </div>
-              <div class="term-input-row">
-                <label>Margin (USD)</label>
-                <input type="number" id="term-qty" placeholder="0.00">
-                <div class="term-quick-pct">
-                  <button onclick="setTermPct(25)">25%</button>
-                  <button onclick="setTermPct(50)">50%</button>
-                  <button onclick="setTermPct(75)">75%</button>
-                  <button onclick="setTermPct(100)">100%</button>
+          <div class="workspace-shell">
+
+            <!-- ═══ MAIN WORKSPACE : Chart Workspace + Bottom Dock ═══ -->
+            <div class="main-workspace">
+
+              <!-- CHART WORKSPACE -->
+              <section class="chart-workspace">
+
+                <!-- CHART COCKPIT (sticky toolbar, belongs to the chart) -->
+                <div class="chart-cockpit" id="chart-cockpit">
+
+                  <div class="cockpit-group cockpit-group-market">
+                    <span class="cockpit-lbl">Market</span>
+                    <div class="chart-wrap" style="width:150px;">
+                      <button class="chart-tool-btn" id="market-select-btn" onclick="toggleMarketDropdown()" style="width:100%;text-align:left;font-family:'JetBrains Mono',monospace;">BTC/USDT ▾</button>
+                      <div class="chart-dd" id="market-dd">
+                        <div class="chart-search-w"><input type="text" class="chart-search" id="market-search" placeholder="Search market..." oninput="filterMarketList(this.value)"></div>
+                        <div class="chart-list" id="market-list"><div style="padding:10px;color:var(--muted);font-size:12px;">Loading markets...</div></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="cockpit-divider"></div>
+
+                  <div class="cockpit-group cockpit-group-tf">
+                    <span class="cockpit-lbl">TF</span>
+                    <button class="chart-tool-btn active-tool" id="tf-btn-1m" onclick="switchTimeframe('1m')">1m</button>
+                    <button class="chart-tool-btn" id="tf-btn-5m" onclick="switchTimeframe('5m')">5m</button>
+                    <button class="chart-tool-btn" id="tf-btn-15m" onclick="switchTimeframe('15m')">15m</button>
+                    <button class="chart-tool-btn" id="tf-btn-1h" onclick="switchTimeframe('1h')">1H</button>
+                    <button class="chart-tool-btn" id="tf-btn-4h" onclick="switchTimeframe('4h')">4H</button>
+                    <button class="chart-tool-btn" id="tf-btn-1d" onclick="switchTimeframe('1d')">1D</button>
+                  </div>
+
+                  <div class="cockpit-divider"></div>
+
+                  <div class="cockpit-group cockpit-group-type">
+                    <span class="cockpit-lbl">Chart</span>
+                    <button class="chart-tool-btn active-tool" id="ct-btn-candle_solid" onclick="switchChartType('candle_solid')">Candle</button>
+                    <button class="chart-tool-btn" id="ct-btn-candle_stroke" onclick="switchChartType('candle_stroke')">Hollow</button>
+                    <button class="chart-tool-btn" id="ct-btn-ohlc" onclick="switchChartType('ohlc')">OHLC</button>
+                    <button class="chart-tool-btn" id="ct-btn-area" onclick="switchChartType('area')">Area</button>
+                  </div>
+
+                  <div class="cockpit-divider"></div>
+
+                  <div class="cockpit-group cockpit-group-ind">
+                    <span class="cockpit-lbl">Indicators</span>
+                    <button class="chart-tool-btn" id="ind-btn-MA" onclick="toggleIndicator('MA', true)">MA</button>
+                    <button class="chart-tool-btn" id="ind-btn-EMA" onclick="toggleIndicator('EMA', true)">EMA</button>
+                    <button class="chart-tool-btn" id="ind-btn-BOLL" onclick="toggleIndicator('BOLL', true)">BOLL</button>
+                    <button class="chart-tool-btn" id="ind-btn-VOL" onclick="toggleIndicator('VOL', false)">VOL</button>
+                    <button class="chart-tool-btn" id="ind-btn-MACD" onclick="toggleIndicator('MACD', false)">MACD</button>
+                    <button class="chart-tool-btn" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
+                    <button class="chart-tool-btn" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
+                  </div>
+
+                  <div class="cockpit-divider"></div>
+
+                  <div class="cockpit-group cockpit-group-draw">
+                    <span class="cockpit-lbl">Draw</span>
+                    <button class="chart-tool-btn" onclick="useDrawTool('straightLine')">Trend</button>
+                    <button class="chart-tool-btn" onclick="useDrawTool('horizontalStraightLine')">Horizontal</button>
+                    <button class="chart-tool-btn" onclick="useDrawTool('rayLine')">Ray</button>
+                    <button class="chart-tool-btn" onclick="useDrawTool('segment')">Segment</button>
+                    <button class="chart-tool-btn" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
+                    <button class="chart-tool-btn" onclick="useDrawTool('priceLine')">Price Line</button>
+                    <button class="chart-tool-btn" onclick="clearDrawings()" style="color:var(--red);">Clear</button>
+                  </div>
+
+                  <div class="cockpit-divider"></div>
+
+                  <div class="cockpit-group cockpit-group-workspace">
+                    <span class="cockpit-lbl">Workspace</span>
+                    <button class="chart-tool-btn" id="chart-maximize-btn-cockpit" onclick="toggleChartMaximize()" title="Fullscreen">⛶ Fullscreen</button>
+                  </div>
+
+                </div><!-- /chart-cockpit -->
+
+                <!-- CHART VIEWPORT -->
+                <div class="chart-viewport">
+                  <div class="chart-panel-wrap">
+                    <div class="chart-symbol-overlay" id="chart-symbol-overlay">
+                      <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
+                      <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
+                    </div>
+                    <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
+                    <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
+                  </div>
+                  <!-- Reserved overlay layer — future AI badges, trade markers, replay controls -->
+                  <div class="chart-future-overlay" aria-hidden="true"></div>
+                </div>
+
+              </section><!-- /chart-workspace -->
+
+              <!-- BOTTOM DOCK -->
+              <div class="bottom-dock" id="bottom-dock">
+                <div class="dock-header">
+                  <span class="dock-title">Trade Information</span>
+                </div>
+                <div class="dock-tabs">
+                  <div class="bottom-tab-nav">
+                    <div class="bottom-tab-item active" id="btab-positions" onclick="switchBottomTab('positions')">Open Positions</div>
+                    <div class="bottom-tab-item" id="btab-history" onclick="switchBottomTab('history')">Trade History</div>
+                  </div>
+                </div>
+                <div class="dock-content">
+                  <div class="bottom-tab-content" id="btab-content-positions">
+                    <div class="bottom-tab-empty">No open positions — place a demo trade to see it here.</div>
+                  </div>
+                  <div class="bottom-tab-content" id="btab-content-history" style="display:none;">
+                    <div class="bottom-tab-empty">No trades yet — demo trading terminal coming in the next update.</div>
+                  </div>
                 </div>
               </div>
-              <div class="term-input-row">
-                <label>Take Profit (optional)</label>
-                <input type="number" id="term-tp" placeholder="Price">
+
+            </div><!-- /main-workspace -->
+
+            <!-- ═══ TRADING WORKSPACE : Order Book + Execution + AI Mentor ═══ -->
+            <aside class="trading-workspace">
+
+              <div class="orderbook-panel">
+                <div style="color:var(--white);font-weight:600;margin-bottom:10px;font-family:'Outfit',sans-serif;">Order Book</div>
+                <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
               </div>
-              <div class="term-input-row">
-                <label>Stop Loss (optional)</label>
-                <input type="number" id="term-sl" placeholder="Price">
+
+              <div class="execution-workspace">
+                <div class="execution-header">
+                  <span>Demo Balance</span>
+                  <span id="term-balance" style="color:var(--gold);font-weight:600;font-family:'JetBrains Mono',monospace;">—</span>
+                </div>
+                <div class="execution-body">
+                  <div class="term-tabs">
+                    <button class="term-tab-btn long-active" id="term-btn-long" onclick="setTermSide('long')">Long</button>
+                    <button class="term-tab-btn" id="term-btn-short" onclick="setTermSide('short')">Short</button>
+                  </div>
+                  <div class="term-input-row">
+                    <label>Leverage</label>
+                    <select id="term-leverage">
+                      <option>5x</option><option>10x</option><option selected>20x</option><option>50x</option><option>100x</option>
+                    </select>
+                  </div>
+                  <div class="term-input-row">
+                    <label>Margin (USD)</label>
+                    <input type="number" id="term-qty" placeholder="0.00">
+                    <div class="term-quick-pct">
+                      <button onclick="setTermPct(25)">25%</button>
+                      <button onclick="setTermPct(50)">50%</button>
+                      <button onclick="setTermPct(75)">75%</button>
+                      <button onclick="setTermPct(100)">100%</button>
+                    </div>
+                  </div>
+                  <div class="term-input-row">
+                    <label>Take Profit (optional)</label>
+                    <input type="number" id="term-tp" placeholder="Price">
+                  </div>
+                  <div class="term-input-row" style="margin-bottom:0;">
+                    <label>Stop Loss (optional)</label>
+                    <input type="number" id="term-sl" placeholder="Price">
+                  </div>
+                </div>
+                <div class="execution-footer">
+                  <div class="trade-summary-box">
+                    <div class="ts-row"><span>Est. Margin</span><span id="est-margin">—</span></div>
+                    <div class="ts-row"><span>Est. Position Size</span><span id="est-size">—</span></div>
+                    <div class="ts-row"><span>Est. Liquidation</span><span id="est-liq">—</span></div>
+                    <div class="ts-row"><span>Est. Fees</span><span id="est-fees">—</span></div>
+                    <div class="ts-row"><span>Potential PnL</span><span id="est-pnl">—</span></div>
+                  </div>
+                  <div id="term-liq-preview" style="font-size:12px;color:var(--muted);margin-bottom:10px;"></div>
+                  <button class="term-submit-btn long" id="term-submit-btn" onclick="submitDemoOrder()">Buy / Long</button>
+                  <div style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center;">Demo mode — no real funds</div>
+                </div>
+              </div><!-- /execution-workspace -->
+
+              <!-- AI MENTOR DOCK — reserved architecture, placeholder only -->
+              <div class="ai-mentor-dock" id="ai-mentor-dock">
+                <div class="mentor-header">
+                  <span class="mentor-status-dot"></span>
+                  <span class="mentor-header-text">AI Mentor</span>
+                </div>
+                <div class="mentor-insight">
+                  <div class="mentor-state">Ready</div>
+                  <div class="mentor-sub">Waiting for market analysis...</div>
+                </div>
               </div>
-              <div id="term-liq-preview" style="font-size:12px;color:var(--muted);margin-bottom:10px;"></div>
-              <button class="term-submit-btn long" id="term-submit-btn" onclick="submitDemoOrder()">Buy / Long</button>
-              <div style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center;">Demo mode — no real funds</div>
-            </div>
-          </div>
-          <div class="bottom-tabs-wrap">
-            <div class="bottom-tab-nav">
-              <div class="bottom-tab-item active" id="btab-positions" onclick="switchBottomTab('positions')">Open Positions</div>
-              <div class="bottom-tab-item" id="btab-history" onclick="switchBottomTab('history')">Trade History</div>
-            </div>
-            <div class="bottom-tab-content" id="btab-content-positions">
-              <div class="bottom-tab-empty">No open positions — place a demo trade to see it here.</div>
-            </div>
-            <div class="bottom-tab-content" id="btab-content-history" style="display:none;">
-              <div class="bottom-tab-empty">No trades yet — demo trading terminal coming in the next update.</div>
-            </div>
-          </div>
+
+            </aside><!-- /trading-workspace -->
+
+          </div><!-- /workspace-shell -->
         </div>
       </div>
 
