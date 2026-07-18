@@ -2154,239 +2154,36 @@ function cssVar(name, fallback){
 }
 
 // ============================================================================
-// CHART ZOOM CONTROLS
-// Two independent zoom targets:
-//   1. TIME zoom  — main candle area + the bottom time-axis strip.
-//   2. PRICE zoom — the right-hand price-axis (yAxis) strip only.
-// Both respond to mouse wheel (desktop) and single-finger swipe (touch).
+// CHART ZOOM — using klinecharts' own NATIVE zoom/scroll, not hand-rolled.
+//
+// klinecharts already ships built-in, library-tested gesture handling for
+// exactly this:
+//   - chart.setZoomEnabled(true)  -> wheel/pinch zoom on the main candle
+//     area + time axis (this is what handles TIME zoom).
+//   - chart.setScrollEnabled(true) -> drag/swipe to pan left-right.
+//   - setPaneOptions({ id:'candle_pane', axisOptions:{ scrollZoomEnabled:true } })
+//     -> scroll/swipe zoom on the PRICE (y) axis specifically. Added in
+//     klinecharts ^9.3.0, so it's available in the 9.8.5 build already
+//     loaded here.
+//
+// All 3 of the earlier bugs (price axis scroll triggering horizontal zoom,
+// price zoom rocketing to an extreme, touch swipe being way too aggressive)
+// came from a hand-rolled wheel/touch listener that had to guess pixel
+// boundaries for "is the pointer over the price strip" from the outside —
+// and that listener used capture:true + stopImmediatePropagation(), which
+// blocked klinecharts' own internal handlers from ever seeing the event in
+// the first place, so the native option below could never have worked
+// while that code was attached. Removing the hand-rolled layer and turning
+// on the library's own native flags is both simpler and more correct: the
+// hit-testing for "which axis is the pointer over" now happens inside
+// klinecharts itself, against its own real pixel geometry, instead of our
+// external estimate of it.
 // ============================================================================
-
-// The previous version of this function called chart.zoomAtCoordinate()
-// once per wheel EVENT and hand-rolled its own easing across animation
-// frames. Trackpads/mice can fire many wheel events per physical scroll
-// notch faster than requestAnimationFrame can drain them, so the pending
-// amount kept compounding and one scroll gesture could rocket the chart
-// to max zoom in ~2 notches, with zoom-out barely visible by comparison.
-//
-// Fixed design: wheel events only ACCUMULATE a raw delta. Exactly ONE
-// zoomAtCoordinate() call happens per animation frame (so at most ~60
-// calls/sec, no matter how many wheel events fired), and that one call's
-// scale step is hard-clamped, so a very fast/hard scroll still can't jump
-// more than MAX_STEP in a single frame. klinecharts' own animationDuration
-// parameter is used for the easing instead of a hand-rolled decay loop —
-// one documented, built-in mechanism doing the smoothing instead of two
-// competing ones.
-function attachChartZoomControls(chart, container, yAxisWidth, xAxisHeight){
-  if(!chart || !container || container.dataset.zoomControlsAttached) return;
-  container.dataset.zoomControlsAttached = 'true';
-
-  const MAX_STEP = 0.12;     // hardest possible zoom change in one frame/gesture-tick
-  const MIN_STEP = 0.015;    // smallest step, so slow scrolls still feel responsive
-  const WHEEL_ANIM_MS = 150; // let klinecharts ease the wheel-triggered zoom itself
-
-  function zoneAt(x, y){
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if(x >= w - yAxisWidth && y < h - xAxisHeight) return 'price'; // right-side price axis
-    if(y >= h - xAxisHeight) return 'time';                        // bottom time axis strip
-    return 'time';                                                 // main candle area — same as time-axis strip
-  }
-
-  // ---- TIME zoom (main pane + x-axis strip) ----
-  let timeAccum = 0;
-  let timeRaf = null;
-  let timeCoordinate = null;
-
-  function flushTimeZoom(){
-    timeRaf = null;
-    if(timeAccum === 0) return;
-    const direction = timeAccum > 0 ? 1 : -1;
-    const step = Math.min(Math.max(Math.abs(timeAccum) * 0.0015, MIN_STEP), MAX_STEP) * direction;
-    chart.zoomAtCoordinate(1 + step, timeCoordinate, WHEEL_ANIM_MS);
-    timeAccum = 0;
-  }
-
-  // ---- PRICE zoom (y-axis strip) — see attachPriceAxisZoom() below for why
-  // this is marked experimental. ----
-  function applyPriceZoomStep(step){
-    if(typeof window.__edgeTradeSetPriceZoomStep === 'function'){
-      window.__edgeTradeSetPriceZoomStep(step);
-      try { chart.resize(); } catch(e) { /* no-op — safe to ignore */ }
-    }
-  }
-
-  // Price zoom now gets the SAME per-frame batching as time zoom (previously
-  // it called applyPriceZoomStep() once per raw wheel EVENT with no
-  // batching at all — on a fast scroll that's dozens of compounding calls
-  // in a single frame, which is exactly why price zoom was rocketing to its
-  // max in one scroll).
-  let priceAccum = 0;
-  let priceRaf = null;
-  function flushPriceZoom(){
-    priceRaf = null;
-    if(priceAccum === 0) return;
-    const direction = priceAccum > 0 ? 1 : -1;
-    const step = Math.min(Math.max(Math.abs(priceAccum) * 0.0015, MIN_STEP), MAX_STEP) * direction;
-    applyPriceZoomStep(step);
-    priceAccum = 0;
-  }
-
-  container.addEventListener('wheel', (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    // Use container-relative coords from getBoundingClientRect(), NOT
-    // event.offsetX/offsetY. klinecharts renders the price axis as its own
-    // inner canvas — when the wheel fires over that canvas, offsetX/offsetY
-    // are relative to THAT small canvas (0..~70px), not the full chart
-    // container, so the old "x >= w - yAxisWidth" check against the full
-    // container width could never be true. That's why scrolling on the
-    // price axis was always misclassified as the time zone.
-    const rect = container.getBoundingClientRect();
-    const localX = event.clientX - rect.left;
-    const localY = event.clientY - rect.top;
-    const zone = zoneAt(localX, localY);
-    const rawDelta = -event.deltaY; // scroll up = positive = zoom in
-
-    if(zone === 'price'){
-      priceAccum += rawDelta;
-      if(priceRaf === null) priceRaf = requestAnimationFrame(flushPriceZoom);
-    } else {
-      timeCoordinate = { x: localX, y: localY };
-      timeAccum += rawDelta;
-      if(timeRaf === null) timeRaf = requestAnimationFrame(flushTimeZoom);
-    }
-  }, { capture:true, passive:false });
-
-  // ---- Touch: swipe up/down on the price strip, swipe left/right on the
-  // time strip. Single finger only — a second finger means the user is
-  // pinch-zooming the main chart natively, so we get out of the way. ----
-  let touchId = null;
-  let touchZone = null;
-  let touchLastX = null;
-  let touchLastY = null;
-
-  container.addEventListener('touchstart', (event) => {
-    if(event.touches.length !== 1) { touchId = null; return; }
-    const t = event.touches[0];
-    const rect = container.getBoundingClientRect();
-    const localX = t.clientX - rect.left;
-    const localY = t.clientY - rect.top;
-    const zone = zoneAt(localX, localY);
-    if(zone !== 'price' && !(localY >= container.clientHeight - xAxisHeight)) return; // only hijack the two axis strips
-    touchId = t.identifier;
-    touchZone = (localX >= container.clientWidth - yAxisWidth) ? 'price' : 'time';
-    touchLastX = t.clientX;
-    touchLastY = t.clientY;
-  }, { passive:true });
-
-  // Touch swipes are batched the same way as wheel: accumulate raw finger
-  // movement, apply exactly ONE bounded step per animation frame. Same
-  // MAX_STEP ceiling and same 0.006 sensitivity as before — only the
-  // "call once per touchmove event" part is gone, which is what caused
-  // one direction to blow past max zoom almost instantly while the other
-  // direction (zoom-out) never got a fair, visible step in.
-  let touchTimeAccum = 0;
-  let touchTimeRaf = null;
-  let touchPriceAccum = 0;
-  let touchPriceRaf = null;
-
-  function flushTouchTimeZoom(){
-    touchTimeRaf = null;
-    if(touchTimeAccum === 0) return;
-    const direction = touchTimeAccum > 0 ? 1 : -1;
-    const step = Math.min(Math.abs(touchTimeAccum) * 0.006, MAX_STEP) * direction;
-    chart.zoomAtCoordinate(1 + step, timeCoordinate, 0);
-    touchTimeAccum = 0;
-  }
-  function flushTouchPriceZoom(){
-    touchPriceRaf = null;
-    if(touchPriceAccum === 0) return;
-    const direction = touchPriceAccum > 0 ? 1 : -1;
-    const step = Math.min(Math.abs(touchPriceAccum) * 0.006, MAX_STEP) * direction;
-    applyPriceZoomStep(step);
-    touchPriceAccum = 0;
-  }
-
-  container.addEventListener('touchmove', (event) => {
-    if(touchId === null) return;
-    const t = Array.from(event.touches).find(x => x.identifier === touchId);
-    if(!t) return;
-    event.preventDefault();
-    if(touchZone === 'price'){
-      const deltaY = touchLastY - t.clientY; // swipe up = positive = zoom in
-      touchLastY = t.clientY;
-      touchPriceAccum += deltaY;
-      if(touchPriceRaf === null) touchPriceRaf = requestAnimationFrame(flushTouchPriceZoom);
-    } else {
-      const deltaX = touchLastX - t.clientX; // swipe left = positive = zoom in
-      touchLastX = t.clientX;
-      const rect = container.getBoundingClientRect();
-      timeCoordinate = { x: t.clientX - rect.left, y: t.clientY - rect.top };
-      touchTimeAccum += deltaX;
-      if(touchTimeRaf === null) touchTimeRaf = requestAnimationFrame(flushTouchTimeZoom);
-    }
-  }, { passive:false });
-
-  function endTouch(){
-    touchId = null; touchZone = null; touchLastX = null; touchLastY = null;
-    touchTimeAccum = 0; touchPriceAccum = 0;
-  }
-  container.addEventListener('touchend', endTouch);
-  container.addEventListener('touchcancel', endTouch);
-}
-
-// ----------------------------------------------------------------------------
-// EXPERIMENTAL — independent price-axis (Y) zoom.
-//
-// Honest limitation: zoomAtCoordinate() only zooms the TIME axis — the price
-// axis auto-fits to whatever candles are currently visible, and klinecharts
-// (through 9.8.5) has no simple public "zoom the Y axis" call. The only
-// documented way to control it is registering a fully custom y-axis via
-// registerYAxis()/createRange() (added in ^9.8.0), which is a newer, less
-// battle-tested corner of the library — its exact createRange() INPUT shape
-// isn't fully documented (only its required OUTPUT shape is).
-//
-// This is written defensively so a shape mismatch degrades to "the price-zoom
-// gesture does nothing" rather than breaking the chart's normal rendering:
-// every path that isn't sure what it received just hands back the original
-// range untouched. Please test this specific piece (scroll/swipe on the
-// right-hand price labels) and tell me exactly what happens — works fine,
-// no visible effect, or something looks wrong — so it can be corrected
-// against your actual live chart if the assumption here is off.
-// ----------------------------------------------------------------------------
-function attachPriceAxisZoom(chart){
-  let priceZoomFactor = 1;
-  const MIN_FACTOR = 0.4;
-  const MAX_FACTOR = 3;
-
-  window.__edgeTradeSetPriceZoomStep = function(step){
-    priceZoomFactor = Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, priceZoomFactor * (1 + step)));
-  };
-
-  function readBaseRange(params){
-    const candidate = (params && (params.range || params.defaultRange)) || params;
-    if(candidate && typeof candidate.from === 'number' && typeof candidate.to === 'number') return candidate;
-    return null;
-  }
-
-  try {
-    klinecharts.registerYAxis({
-      name: 'edgetrade_price_zoom',
-      createRange(params){
-        const base = readBaseRange(params);
-        if(!base) return (params && (params.range || params.defaultRange)) || params;
-        if(priceZoomFactor === 1) return base; // untouched — no risk when not actively zooming
-        const mid = (base.from + base.to) / 2;
-        const halfSpan = (base.to - base.from) / 2 / priceZoomFactor;
-        const from = mid - halfSpan;
-        const to = mid + halfSpan;
-        return { from, to, range: to - from, realFrom: from, realTo: to, realRange: to - from, displayFrom: from, displayTo: to, displayRange: to - from };
-      }
-    });
-    chart.setPaneOptions({ id: 'candle_pane', axisOptions: { name: 'edgetrade_price_zoom' } });
-  } catch(err){
-    console.error('[EdgeTrade] Price-axis zoom setup failed — main chart is unaffected, price-zoom gesture just won\'t do anything:', err);
-  }
+function attachChartZoomControls(chart){
+  if(!chart) return;
+  chart.setZoomEnabled(true);
+  chart.setScrollEnabled(true);
+  chart.setPaneOptions({ id: 'candle_pane', axisOptions: { scrollZoomEnabled: true } });
 }
 
 async function initMainChart(){
@@ -2403,10 +2200,6 @@ async function initMainChart(){
     if (!mainChartInstance) throw new Error('klinecharts.init() returned null — check container id');
     window.EdgeTradeChart = mainChartInstance; // stable external handle for future tools/buttons
 
-    // yAxis/xAxis size fixed (not 'auto') so the zoom controls below can
-    // reliably tell "pointer is over the price strip" vs "pointer is over
-    // the time strip" vs "pointer is over the main candle area" — with
-    // 'auto' sizing there'd be no reliable way to know those pixel bounds.
     const Y_AXIS_WIDTH = 70;
     const X_AXIS_HEIGHT = 28;
     mainChartInstance.setStyles({
@@ -2415,8 +2208,7 @@ async function initMainChart(){
       yAxis: { size: Y_AXIS_WIDTH },
       xAxis: { size: X_AXIS_HEIGHT }
     });
-    attachPriceAxisZoom(mainChartInstance);
-    attachChartZoomControls(mainChartInstance, container, Y_AXIS_WIDTH, X_AXIS_HEIGHT);
+    attachChartZoomControls(mainChartInstance);
 
     await loadChartInterval(currentInterval);
   } catch(err) {
