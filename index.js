@@ -2319,8 +2319,8 @@ async function selectMarket(symbol){
   if(symbol === currentSymbol || !mainChartInstance) return;
   currentSymbol = symbol;
   const label = formatSymbolLabel(symbol);
-  const btn = document.getElementById('market-select-btn');
-  if(btn) btn.textContent = label + ' ▾';
+  const labelEl = document.getElementById('market-select-label');
+  if(labelEl) labelEl.textContent = label;
   const nameEl = document.querySelector('#chart-symbol-overlay .csym-name');
   if(nameEl) nameEl.innerHTML = label + ' <span class="csym-sub">· Binance</span>';
   prevMaxOverlayPrice = null;
@@ -3380,4 +3380,267 @@ document.addEventListener("DOMContentLoaded", () => {
     const card = e.target.closest('.trade-card');
     if(card) handleReset(card);
   });
+})();
+
+// ══════════════════════════════════════════════════════════════════
+// COMMAND BAR — Chart Toolbar Interaction (Part 3 / standalone module)
+// Reads/enhances the DOM from Part 1 (.chart-commandbar) and the
+// classes from Part 2 CSS (.command-pill, .command-panel, .command-item).
+// Does not modify or duplicate existing toolbar logic (switchTimeframe,
+// switchChartType, toggleIndicator, useDrawTool, clearDrawings,
+// toggleMarketDropdown, filterMarketList, selectMarket) — it only
+// layers open/close, keyboard, label, hover and AI-cockpit behaviour
+// on top via DOM observation and event delegation.
+// ══════════════════════════════════════════════════════════════════
+(function(){
+
+  const BAR_ID = 'chart-cockpit'; // kept from Part 1 (element now has class="chart-commandbar")
+  let activeGroup = null; // the currently open .command-group, if any
+
+  function bar(){ return document.getElementById(BAR_ID); }
+
+  function isMarketGroup(group){
+    return !!(group && group.querySelector('#market-dd'));
+  }
+
+  // ── Open / close primitives ─────────────────────────────────────
+  function openCommandMenu(group){
+    if(!group || group === activeGroup) return;
+    if(isMarketGroup(group)){
+      const dd = group.querySelector('#market-dd');
+      if(dd && !dd.classList.contains('open')) toggleMarketDropdown(); // reuse existing loader/focus logic
+      return; // group's own 'open' class is kept in sync by the MutationObserver below
+    }
+    group.classList.add('open','is-active');
+    const pill = group.querySelector('.command-pill');
+    if(pill) pill.setAttribute('aria-expanded','true');
+    activeGroup = group;
+    // Move focus to the first menu item for keyboard users
+    requestAnimationFrame(() => {
+      const first = group.querySelector('.command-panel .command-item, .command-panel .command-search');
+      if(first) first.focus({preventScroll:true});
+    });
+  }
+
+  function closeCommandMenu(group){
+    if(!group) return;
+    if(isMarketGroup(group)){
+      const dd = group.querySelector('#market-dd');
+      if(dd) dd.classList.remove('open'); // MutationObserver syncs the group's classes
+      if(activeGroup === group) activeGroup = null;
+      return;
+    }
+    group.classList.remove('open','is-active');
+    const pill = group.querySelector('.command-pill');
+    if(pill) pill.setAttribute('aria-expanded','false');
+    if(activeGroup === group) activeGroup = null;
+  }
+
+  function closeAllMenus(exceptGroup){
+    const root = bar();
+    if(!root) return;
+    root.querySelectorAll('.command-group.open').forEach(g => {
+      if(g !== exceptGroup) closeCommandMenu(g);
+    });
+    const dd = document.getElementById('market-dd');
+    if(dd && dd.classList.contains('open') && dd.closest('.command-group') !== exceptGroup){
+      dd.classList.remove('open');
+    }
+  }
+
+  // ── Keep the Market group's classes/ARIA in sync with #market-dd,
+  //    whose 'open' class is toggled by the existing toggleMarketDropdown()
+  //    / selectMarket() / outside-click logic already in this file. ──
+  function initMarketGroupSync(){
+    const dd = document.getElementById('market-dd');
+    const group = dd ? dd.closest('.command-group') : null;
+    if(!dd || !group) return;
+    const sync = () => {
+      const isOpen = dd.classList.contains('open');
+      group.classList.toggle('open', isOpen);
+      group.classList.toggle('is-active', isOpen);
+      dd.setAttribute('aria-hidden', String(!isOpen));
+      const pill = group.querySelector('.command-pill');
+      if(pill) pill.setAttribute('aria-expanded', String(isOpen));
+      activeGroup = isOpen ? group : (activeGroup === group ? null : activeGroup);
+    };
+    sync();
+    new MutationObserver(sync).observe(dd, {attributes:true, attributeFilter:['class']});
+  }
+
+  // ── Pill click delegation (single source of truth for "only one open") ──
+  function initPillClicks(){
+    const root = bar();
+    if(!root) return;
+    root.addEventListener('click', (e) => {
+      const pill = e.target.closest('.command-pill');
+      if(!pill || !root.contains(pill)) return;
+      const group = pill.closest('.command-group');
+      if(!group) return;
+
+      if(isMarketGroup(group)){
+        // toggleMarketDropdown() already ran via the button's own onclick
+        // (fires before this delegated listener); just close everyone else.
+        closeAllMenus(group);
+        return;
+      }
+      const willOpen = !group.classList.contains('open');
+      closeAllMenus(group);
+      if(willOpen) openCommandMenu(group); else closeCommandMenu(group);
+    });
+
+    // Selecting a menu item closes that item's menu (existing onclick,
+    // e.g. switchTimeframe/toggleIndicator, still fires first as normal).
+    root.addEventListener('click', (e) => {
+      const item = e.target.closest('.command-item');
+      if(!item || !root.contains(item)) return;
+      const group = item.closest('.command-group');
+      closeCommandMenu(group);
+    });
+  }
+
+  // ── Outside click / Escape ────────────────────────────────────────
+  function initGlobalClose(){
+    document.addEventListener('click', (e) => {
+      const root = bar();
+      if(!root) return;
+      if(!root.contains(e.target)) closeAllMenus();
+    });
+    document.addEventListener('keydown', (e) => {
+      if(e.key !== 'Escape' || !activeGroup) return;
+      const group = activeGroup;
+      closeCommandMenu(group);
+      const pill = group.querySelector('.command-pill');
+      if(pill) pill.focus({preventScroll:true});
+    });
+  }
+
+  // ── Keyboard navigation inside an open panel ──────────────────────
+  function initKeyboardNavigation(){
+    document.addEventListener('keydown', (e) => {
+      if(!activeGroup || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+      const panel = activeGroup.querySelector('.command-panel');
+      if(!panel) return;
+      const focusables = Array.from(panel.querySelectorAll('.command-item, .command-search'));
+      if(!focusables.length) return;
+      e.preventDefault();
+      const idx = focusables.indexOf(document.activeElement);
+      let next;
+      if(e.key === 'ArrowDown') next = idx < 0 ? 0 : (idx + 1) % focusables.length;
+      else next = idx < 0 ? focusables.length - 1 : (idx - 1 + focusables.length) % focusables.length;
+      focusables[next].focus({preventScroll:true});
+    });
+  }
+
+  // ── Magnetic hover (desktop pointer only, capped at 3px, rAF-throttled) ──
+  function initMagneticHover(){
+    const canHover = window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    const root = bar();
+    if(!root || !canHover || reduced) return;
+
+    const MAX = 3;
+    let ticking = false;
+    let pending = null;
+
+    root.querySelectorAll('.command-pill').forEach(pill => {
+      pill.addEventListener('mousemove', (e) => {
+        const rect = pill.getBoundingClientRect();
+        const dx = ((e.clientX - rect.left) / rect.width - 0.5) * 2 * MAX;
+        const dy = ((e.clientY - rect.top) / rect.height - 0.5) * 2 * MAX;
+        pending = { pill, dx, dy };
+        if(!ticking){
+          ticking = true;
+          requestAnimationFrame(() => {
+            if(pending){
+              pending.pill.style.transform = `translateY(-2px) translate(${pending.dx}px, ${pending.dy}px)`;
+            }
+            ticking = false;
+          });
+        }
+      });
+      pill.addEventListener('mouseleave', () => {
+        pending = null;
+        pill.style.transform = '';
+      });
+    });
+  }
+
+  // ── Label sync: pill text reflects the current single-select state ──
+  // Watches .command-item's active-tool class (set by the existing
+  // switchTimeframe / switchChartType / toggleIndicator functions) and
+  // updates the pill label — without touching those functions.
+  function initLabelSync(){
+    const root = bar();
+    if(!root) return;
+    root.querySelectorAll('.command-group').forEach(group => {
+      if(isMarketGroup(group)) return; // market label already handled in selectMarket()
+      const panel = group.querySelector('.command-panel');
+      const pill = group.querySelector('.command-pill');
+      const labelSpan = pill ? pill.querySelector('span') : null;
+      if(!panel || !labelSpan) return;
+      const defaultLabel = labelSpan.textContent;
+
+      const refresh = () => {
+        const active = panel.querySelectorAll('.command-item.active-tool');
+        if(active.length === 1) labelSpan.textContent = active[0].textContent.trim();
+        else if(active.length > 1) labelSpan.textContent = defaultLabel + ' \u00b7 ' + active.length;
+        else labelSpan.textContent = defaultLabel;
+      };
+      new MutationObserver(refresh).observe(panel, {subtree:true, attributes:true, attributeFilter:['class']});
+      refresh();
+    });
+  }
+
+  // ── AI Cockpit — placeholder only, no backend ─────────────────────
+  function buildAICockpitPanel(aiGroup){
+    const panel = document.createElement('div');
+    panel.className = 'command-panel';
+    panel.id = 'ai-cockpit-panel';
+    panel.style.minWidth = '260px';
+    panel.innerHTML = `
+      <div style="padding:4px 10px 10px;font-size:10.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">AI Cockpit</div>
+      ${[
+        ['Market Status','Standby'],
+        ['Bias','Neutral'],
+        ['Confidence','—'],
+        ['Risk Meter','—'],
+        ['Smart Suggestions','Coming soon']
+      ].map(([label,value]) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:12px;">
+          <span style="font-size:13px;color:var(--muted);">${label}</span>
+          <span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold);">${value}</span>
+        </div>
+      `).join('')}
+    `;
+    aiGroup.appendChild(panel);
+    return panel;
+  }
+
+  function initAICockpit(){
+    const root = bar();
+    const aiGroup = root ? root.querySelector('.ai-group') : null;
+    if(!aiGroup) return;
+    buildAICockpitPanel(aiGroup); // .ai-group now behaves like any other command-group
+  }
+
+  // ── Entry point ────────────────────────────────────────────────────
+  function initCommandBar(){
+    const root = bar();
+    if(!root) return;
+    initAICockpit();          // build the AI panel before wiring generic pill clicks
+    initMarketGroupSync();
+    initPillClicks();
+    initGlobalClose();
+    initKeyboardNavigation();
+    initMagneticHover();
+    initLabelSync();
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initCommandBar);
+  } else {
+    initCommandBar();
+  }
+
 })();

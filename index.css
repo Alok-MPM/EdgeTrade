@@ -1152,3 +1152,219 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .tpsl-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;}
 .tpsl-input:focus{border-color:var(--gold);}
 .pos-close-btn:hover{border-color:var(--red);color:var(--red);}
+
+/* ══════════════════════════════════════════════════════════════════
+   COMMAND BAR — Chart Toolbar Redesign (Part 2 / CSS only)
+   Targets HTML classes from Part 1: .chart-commandbar, .command-group,
+   .command-pill, .command-panel, .command-item, .chevron, .ai-group,
+   .command-search, .command-loading, .command-item-danger
+   Uses only existing theme variables — no hardcoded gold.
+   Animates transform / opacity / filter only.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* NOTE: .chart-workspace has overflow:hidden (existing rule, untouched)
+   which would clip an open dropdown panel. This single conditional
+   override only relaxes overflow while a panel is actually open, so
+   the original clipping behavior is unaffected the rest of the time. */
+.chart-workspace:has(.command-group.open){ overflow:visible; }
+
+.chart-commandbar{
+  position:sticky; top:0; z-index:70;
+  display:flex; align-items:center; gap:6px;
+  height:60px; margin:14px 14px 0 14px; padding:0 10px;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:20px;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:0 1px 2px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.16);
+  overflow-x:auto; overflow-y:visible;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.chart-commandbar::-webkit-scrollbar{ display:none; }
+.light-mode .chart-commandbar{
+  background:var(--bg2);
+  box-shadow:0 1px 2px rgba(10,41,71,0.06), 0 8px 24px rgba(10,41,71,0.08);
+}
+
+.command-group{ position:relative; flex-shrink:0; }
+
+.command-pill{
+  display:flex; align-items:center; gap:6px;
+  height:40px; padding:0 18px;
+  border-radius:999px;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--muted);
+  font-family:'Outfit',sans-serif;
+  font-size:13px; font-weight:500; letter-spacing:0.2px;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:transform 200ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease, color 200ms ease;
+}
+.command-pill:hover{
+  background:linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border-color:var(--border2);
+  color:var(--white);
+  transform:translateY(-2px);
+  box-shadow:0 6px 16px rgba(0,0,0,0.18), 0 0 0 1px var(--gold-dim);
+}
+.light-mode .command-pill:hover{
+  background:linear-gradient(180deg, rgba(10,41,71,0.05), rgba(10,41,71,0.02));
+  box-shadow:0 6px 16px rgba(10,41,71,0.08), 0 0 0 1px var(--gold-dim);
+}
+.command-group.open .command-pill{
+  background:var(--gold-dim);
+  border-color:var(--gold);
+  color:var(--white);
+  box-shadow:inset 0 0 0 1px var(--gold-dim), 0 0 14px var(--gold-glow);
+}
+
+.command-pill .chevron{
+  width:7px; height:7px;
+  border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor;
+  transform:rotate(45deg);
+  margin-top:-3px;
+  opacity:0.6;
+  transition:transform 220ms ease, opacity 220ms ease;
+}
+.command-group.open .chevron{
+  transform:rotate(225deg);
+  opacity:1;
+}
+
+/* Market pill shows its live symbol label in mono, others stay in Outfit */
+#market-select-btn span{ font-family:'JetBrains Mono',monospace; }
+
+/* ── Dropdown panels ───────────────────────────────────────────── */
+.command-panel{
+  position:absolute; top:calc(100% + 10px); left:0;
+  z-index:80;
+  min-width:190px;
+  max-height:320px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:2px;
+  padding:10px;
+  background:#171A20;
+  border:1px solid var(--border2);
+  border-radius:20px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.24), 0 16px 40px rgba(0,0,0,0.32);
+  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  opacity:0; pointer-events:none;
+  transform:scale(0.96) translateY(-8px);
+  transform-origin:top left;
+  transition:opacity 200ms ease, transform 200ms ease;
+  scrollbar-width:thin;
+}
+.light-mode .command-panel{
+  background:var(--bg2);
+  box-shadow:0 4px 12px rgba(10,41,71,0.08), 0 16px 40px rgba(10,41,71,0.10);
+}
+/* Supports either JS convention: .open toggled on the group, or directly
+   on the panel itself (matches the existing #market-dd / toggleMarketDropdown
+   behavior carried over from Part 1). */
+.command-group.open .command-panel,
+.command-panel.open{
+  opacity:1; pointer-events:auto;
+  transform:scale(1) translateY(0);
+}
+
+.command-panel .command-search-w{ padding:2px 2px 8px 2px; }
+.command-panel .command-search{
+  width:100%; background:rgba(255,255,255,0.05);
+  border:1px solid var(--border2); border-radius:10px;
+  padding:9px 12px; color:var(--white);
+  font-family:'JetBrains Mono',monospace; font-size:13px; outline:none;
+  transition:border-color 200ms ease;
+}
+.command-panel .command-search:focus{ border-color:var(--gold); }
+.command-panel .command-search::placeholder{ color:var(--muted); font-family:'Outfit',sans-serif; }
+.command-loading{ padding:10px 12px; color:var(--muted); font-size:12px; }
+
+/* ── Menu items inside a panel ─────────────────────────────────── */
+.command-item{
+  position:relative;
+  display:flex; align-items:center;
+  height:38px; padding:0 14px 0 18px;
+  border:none; border-radius:12px;
+  background:transparent;
+  color:var(--muted);
+  font-family:'Outfit',sans-serif; font-size:13px; font-weight:500;
+  text-align:left; cursor:pointer;
+  transition:background 180ms ease, color 180ms ease, padding-left 180ms ease;
+}
+.command-item::before{
+  content:''; position:absolute; left:4px; top:8px; bottom:8px; width:3px;
+  border-radius:3px; background:var(--gold);
+  transform:scaleY(0); transform-origin:center;
+  transition:transform 180ms ease;
+}
+.command-item:hover{
+  background:rgba(255,255,255,0.05);
+  color:var(--white);
+  padding-left:22px;
+}
+.light-mode .command-item:hover{ background:rgba(10,41,71,0.05); }
+.command-item:hover::before{ transform:scaleY(1); }
+.command-item.active-tool{
+  background:var(--gold-dim);
+  color:var(--white);
+}
+.command-item.active-tool::before{ transform:scaleY(1); }
+.command-item-danger{ color:var(--red); }
+.command-item-danger:hover{ background:var(--red-dim); color:var(--red); }
+.command-item-danger::before{ background:var(--red); }
+
+.command-list .command-item{ width:100%; }
+
+/* ── AI pill — subtle, not flashy ──────────────────────────────── */
+.ai-group{ margin-left:2px; }
+.ai-pill{
+  position:relative;
+  padding:0 20px;
+  color:var(--gold);
+  overflow:hidden;
+  isolation:isolate;
+}
+.ai-pill::before{
+  content:''; position:absolute; inset:-40%;
+  background:conic-gradient(from 0deg, transparent 0%, var(--gold-glow) 12%, transparent 24%);
+  animation:aiPillSpin 5s linear infinite;
+  z-index:-2;
+  opacity:0.7;
+}
+.ai-pill::after{
+  content:''; position:absolute; inset:1px;
+  border-radius:999px;
+  background:var(--bg3);
+  z-index:-1;
+}
+.light-mode .ai-pill::after{ background:var(--bg2); }
+.ai-pill:hover{
+  box-shadow:0 0 16px var(--gold-glow);
+  transform:translateY(-2px);
+}
+@keyframes aiPillSpin{ to{ transform:rotate(360deg); } }
+
+/* ── Mobile ─────────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .chart-commandbar{
+    height:auto; min-height:56px;
+    margin:10px 10px 0 10px;
+    padding:6px 8px;
+  }
+  .command-pill{
+    min-height:48px;
+    padding:0 16px;
+  }
+  .command-panel{
+    min-width:170px;
+    left:auto; right:0;
+  }
+  .command-item{ min-height:44px; }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .command-pill, .chevron, .command-panel, .command-item, .command-item::before, .ai-pill::before{
+    transition-duration:0.01ms !important;
+    animation-duration:0.01ms !important;
+  }
+}

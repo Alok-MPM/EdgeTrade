@@ -308,76 +308,97 @@
               <!-- CHART WORKSPACE -->
               <section class="chart-workspace">
 
-                <!-- CHART COCKPIT (sticky toolbar, belongs to the chart) -->
-                <div class="chart-cockpit" id="chart-cockpit">
+                <!-- CHART COMMAND BAR (sticky toolbar, belongs to the chart) -->
+                <div class="chart-commandbar" id="chart-cockpit">
 
-                  <div class="cockpit-group cockpit-group-market">
-                    <span class="cockpit-lbl">Market</span>
-                    <div class="chart-wrap" style="width:150px;">
-                      <button class="chart-tool-btn" id="market-select-btn" onclick="toggleMarketDropdown()" style="width:100%;text-align:left;font-family:'JetBrains Mono',monospace;">BTC/USDT ▾</button>
-                      <div class="chart-dd" id="market-dd">
-                        <div class="chart-search-w"><input type="text" class="chart-search" id="market-search" placeholder="Search market..." oninput="filterMarketList(this.value)"></div>
-                        <div class="chart-list" id="market-list"><div style="padding:10px;color:var(--muted);font-size:12px;">Loading markets...</div></div>
-                      </div>
+                  <div class="command-group" data-menu="market">
+                    <button class="command-pill" id="market-select-btn" onclick="toggleMarketDropdown()">
+                      <span id="market-select-label">BTC/USDT</span>
+                      <i class="chevron"></i>
+                    </button>
+                    <div class="command-panel" id="market-dd">
+                      <div class="command-search-w"><input type="text" class="command-search" id="market-search" placeholder="Search market..." oninput="filterMarketList(this.value)"></div>
+                      <div class="command-list" id="market-list"><div class="command-loading">Loading markets...</div></div>
                     </div>
                   </div>
 
-                  <div class="cockpit-divider"></div>
-
-                  <div class="cockpit-group cockpit-group-tf">
-                    <span class="cockpit-lbl">TF</span>
-                    <button class="chart-tool-btn active-tool" id="tf-btn-1m" onclick="switchTimeframe('1m')">1m</button>
-                    <button class="chart-tool-btn" id="tf-btn-5m" onclick="switchTimeframe('5m')">5m</button>
-                    <button class="chart-tool-btn" id="tf-btn-15m" onclick="switchTimeframe('15m')">15m</button>
-                    <button class="chart-tool-btn" id="tf-btn-1h" onclick="switchTimeframe('1h')">1H</button>
-                    <button class="chart-tool-btn" id="tf-btn-4h" onclick="switchTimeframe('4h')">4H</button>
-                    <button class="chart-tool-btn" id="tf-btn-1d" onclick="switchTimeframe('1d')">1D</button>
+                  <div class="command-group" data-menu="time">
+                    <button class="command-pill">
+                      <span>Time</span>
+                      <i class="chevron"></i>
+                    </button>
+                    <div class="command-panel">
+                      <button class="command-item active-tool" id="tf-btn-1m" onclick="switchTimeframe('1m')">1m</button>
+                      <button class="command-item" id="tf-btn-5m" onclick="switchTimeframe('5m')">5m</button>
+                      <button class="command-item" id="tf-btn-15m" onclick="switchTimeframe('15m')">15m</button>
+                      <button class="command-item" id="tf-btn-1h" onclick="switchTimeframe('1h')">1H</button>
+                      <button class="command-item" id="tf-btn-4h" onclick="switchTimeframe('4h')">4H</button>
+                      <button class="command-item" id="tf-btn-1d" onclick="switchTimeframe('1d')">1D</button>
+                    </div>
                   </div>
 
-                  <div class="cockpit-divider"></div>
-
-                  <div class="cockpit-group cockpit-group-type">
-                    <span class="cockpit-lbl">Chart</span>
-                    <button class="chart-tool-btn active-tool" id="ct-btn-candle_solid" onclick="switchChartType('candle_solid')">Candle</button>
-                    <button class="chart-tool-btn" id="ct-btn-candle_stroke" onclick="switchChartType('candle_stroke')">Hollow</button>
-                    <button class="chart-tool-btn" id="ct-btn-ohlc" onclick="switchChartType('ohlc')">OHLC</button>
-                    <button class="chart-tool-btn" id="ct-btn-area" onclick="switchChartType('area')">Area</button>
+                  <div class="command-group" data-menu="chart">
+                    <button class="command-pill">
+                      <span>Chart</span>
+                      <i class="chevron"></i>
+                    </button>
+                    <div class="command-panel">
+                      <button class="command-item active-tool" id="ct-btn-candle_solid" onclick="switchChartType('candle_solid')">Candle</button>
+                      <button class="command-item" id="ct-btn-candle_stroke" onclick="switchChartType('candle_stroke')">Hollow</button>
+                      <button class="command-item" id="ct-btn-ohlc" onclick="switchChartType('ohlc')">OHLC</button>
+                      <button class="command-item" id="ct-btn-area" onclick="switchChartType('area')">Area</button>
+                    </div>
                   </div>
 
-                  <div class="cockpit-divider"></div>
-
-                  <div class="cockpit-group cockpit-group-ind">
-                    <span class="cockpit-lbl">Indicators</span>
-                    <button class="chart-tool-btn" id="ind-btn-MA" onclick="toggleIndicator('MA', true)">MA</button>
-                    <button class="chart-tool-btn" id="ind-btn-EMA" onclick="toggleIndicator('EMA', true)">EMA</button>
-                    <button class="chart-tool-btn" id="ind-btn-BOLL" onclick="toggleIndicator('BOLL', true)">BOLL</button>
-                    <button class="chart-tool-btn" id="ind-btn-VOL" onclick="toggleIndicator('VOL', false)">VOL</button>
-                    <button class="chart-tool-btn" id="ind-btn-MACD" onclick="toggleIndicator('MACD', false)">MACD</button>
-                    <button class="chart-tool-btn" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
-                    <button class="chart-tool-btn" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
+                  <div class="command-group" data-menu="indicator">
+                    <button class="command-pill">
+                      <span>Indicators</span>
+                      <i class="chevron"></i>
+                    </button>
+                    <div class="command-panel">
+                      <button class="command-item" id="ind-btn-MA" onclick="toggleIndicator('MA', true)">MA</button>
+                      <button class="command-item" id="ind-btn-EMA" onclick="toggleIndicator('EMA', true)">EMA</button>
+                      <button class="command-item" id="ind-btn-BOLL" onclick="toggleIndicator('BOLL', true)">BOLL</button>
+                      <button class="command-item" id="ind-btn-VOL" onclick="toggleIndicator('VOL', false)">VOL</button>
+                      <button class="command-item" id="ind-btn-MACD" onclick="toggleIndicator('MACD', false)">MACD</button>
+                      <button class="command-item" id="ind-btn-RSI" onclick="toggleIndicator('RSI', false)">RSI</button>
+                      <button class="command-item" id="ind-btn-KDJ" onclick="toggleIndicator('KDJ', false)">KDJ</button>
+                    </div>
                   </div>
 
-                  <div class="cockpit-divider"></div>
-
-                  <div class="cockpit-group cockpit-group-draw">
-                    <span class="cockpit-lbl">Draw</span>
-                    <button class="chart-tool-btn" onclick="useDrawTool('straightLine')">Trend</button>
-                    <button class="chart-tool-btn" onclick="useDrawTool('horizontalStraightLine')">Horizontal</button>
-                    <button class="chart-tool-btn" onclick="useDrawTool('rayLine')">Ray</button>
-                    <button class="chart-tool-btn" onclick="useDrawTool('segment')">Segment</button>
-                    <button class="chart-tool-btn" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
-                    <button class="chart-tool-btn" onclick="useDrawTool('priceLine')">Price Line</button>
-                    <button class="chart-tool-btn" onclick="clearDrawings()" style="color:var(--red);">Clear</button>
+                  <div class="command-group" data-menu="drawing">
+                    <button class="command-pill">
+                      <span>Drawing</span>
+                      <i class="chevron"></i>
+                    </button>
+                    <div class="command-panel">
+                      <button class="command-item" onclick="useDrawTool('straightLine')">Trend Line</button>
+                      <button class="command-item" onclick="useDrawTool('horizontalStraightLine')">Horizontal</button>
+                      <button class="command-item" onclick="useDrawTool('rayLine')">Ray</button>
+                      <button class="command-item" onclick="useDrawTool('segment')">Segment</button>
+                      <button class="command-item" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
+                      <button class="command-item" onclick="useDrawTool('priceLine')">Price Line</button>
+                      <button class="command-item command-item-danger" onclick="clearDrawings()">Clear</button>
+                    </div>
                   </div>
 
-                  <div class="cockpit-divider"></div>
-
-                  <div class="cockpit-group cockpit-group-workspace">
-                    <span class="cockpit-lbl">Workspace</span>
-                    <button class="chart-tool-btn" id="chart-maximize-btn-cockpit" onclick="toggleChartMaximize()" title="Fullscreen">⛶ Fullscreen</button>
+                  <div class="command-group" data-menu="layout">
+                    <button class="command-pill">
+                      <span>Layout</span>
+                      <i class="chevron"></i>
+                    </button>
+                    <div class="command-panel">
+                      <button class="command-item" id="chart-maximize-btn-cockpit" onclick="toggleChartMaximize()">⛶ Fullscreen</button>
+                    </div>
                   </div>
 
-                </div><!-- /chart-cockpit -->
+                  <div class="command-group ai-group">
+                    <button class="command-pill ai-pill">
+                      <span>AI</span>
+                    </button>
+                  </div>
+
+                </div><!-- /chart-commandbar -->
 
                 <!-- CHART VIEWPORT -->
                 <div class="chart-viewport">
