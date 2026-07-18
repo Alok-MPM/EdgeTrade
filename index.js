@@ -2215,18 +2215,43 @@ function attachChartZoomControls(chart, container, yAxisWidth, xAxisHeight){
     }
   }
 
+  // Price zoom now gets the SAME per-frame batching as time zoom (previously
+  // it called applyPriceZoomStep() once per raw wheel EVENT with no
+  // batching at all — on a fast scroll that's dozens of compounding calls
+  // in a single frame, which is exactly why price zoom was rocketing to its
+  // max in one scroll).
+  let priceAccum = 0;
+  let priceRaf = null;
+  function flushPriceZoom(){
+    priceRaf = null;
+    if(priceAccum === 0) return;
+    const direction = priceAccum > 0 ? 1 : -1;
+    const step = Math.min(Math.max(Math.abs(priceAccum) * 0.0015, MIN_STEP), MAX_STEP) * direction;
+    applyPriceZoomStep(step);
+    priceAccum = 0;
+  }
+
   container.addEventListener('wheel', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
-    const zone = zoneAt(event.offsetX, event.offsetY);
-    const zoomIn = event.deltaY < 0; // scroll up = zoom in, scroll down = zoom out
-    const rawDelta = -event.deltaY;
+    // Use container-relative coords from getBoundingClientRect(), NOT
+    // event.offsetX/offsetY. klinecharts renders the price axis as its own
+    // inner canvas — when the wheel fires over that canvas, offsetX/offsetY
+    // are relative to THAT small canvas (0..~70px), not the full chart
+    // container, so the old "x >= w - yAxisWidth" check against the full
+    // container width could never be true. That's why scrolling on the
+    // price axis was always misclassified as the time zone.
+    const rect = container.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const zone = zoneAt(localX, localY);
+    const rawDelta = -event.deltaY; // scroll up = positive = zoom in
 
     if(zone === 'price'){
-      const step = Math.min(Math.max(Math.abs(rawDelta) * 0.0015, MIN_STEP), MAX_STEP) * (zoomIn ? 1 : -1);
-      applyPriceZoomStep(step);
+      priceAccum += rawDelta;
+      if(priceRaf === null) priceRaf = requestAnimationFrame(flushPriceZoom);
     } else {
-      timeCoordinate = { x: event.offsetX, y: event.offsetY };
+      timeCoordinate = { x: localX, y: localY };
       timeAccum += rawDelta;
       if(timeRaf === null) timeRaf = requestAnimationFrame(flushTimeZoom);
     }
@@ -2254,6 +2279,34 @@ function attachChartZoomControls(chart, container, yAxisWidth, xAxisHeight){
     touchLastY = t.clientY;
   }, { passive:true });
 
+  // Touch swipes are batched the same way as wheel: accumulate raw finger
+  // movement, apply exactly ONE bounded step per animation frame. Same
+  // MAX_STEP ceiling and same 0.006 sensitivity as before — only the
+  // "call once per touchmove event" part is gone, which is what caused
+  // one direction to blow past max zoom almost instantly while the other
+  // direction (zoom-out) never got a fair, visible step in.
+  let touchTimeAccum = 0;
+  let touchTimeRaf = null;
+  let touchPriceAccum = 0;
+  let touchPriceRaf = null;
+
+  function flushTouchTimeZoom(){
+    touchTimeRaf = null;
+    if(touchTimeAccum === 0) return;
+    const direction = touchTimeAccum > 0 ? 1 : -1;
+    const step = Math.min(Math.abs(touchTimeAccum) * 0.006, MAX_STEP) * direction;
+    chart.zoomAtCoordinate(1 + step, timeCoordinate, 0);
+    touchTimeAccum = 0;
+  }
+  function flushTouchPriceZoom(){
+    touchPriceRaf = null;
+    if(touchPriceAccum === 0) return;
+    const direction = touchPriceAccum > 0 ? 1 : -1;
+    const step = Math.min(Math.abs(touchPriceAccum) * 0.006, MAX_STEP) * direction;
+    applyPriceZoomStep(step);
+    touchPriceAccum = 0;
+  }
+
   container.addEventListener('touchmove', (event) => {
     if(touchId === null) return;
     const t = Array.from(event.touches).find(x => x.identifier === touchId);
@@ -2262,19 +2315,22 @@ function attachChartZoomControls(chart, container, yAxisWidth, xAxisHeight){
     if(touchZone === 'price'){
       const deltaY = touchLastY - t.clientY; // swipe up = positive = zoom in
       touchLastY = t.clientY;
-      const step = Math.min(Math.abs(deltaY) * 0.006, MAX_STEP) * (deltaY > 0 ? 1 : -1);
-      applyPriceZoomStep(step);
+      touchPriceAccum += deltaY;
+      if(touchPriceRaf === null) touchPriceRaf = requestAnimationFrame(flushTouchPriceZoom);
     } else {
       const deltaX = touchLastX - t.clientX; // swipe left = positive = zoom in
       touchLastX = t.clientX;
       const rect = container.getBoundingClientRect();
-      const coordinate = { x: t.clientX - rect.left, y: t.clientY - rect.top };
-      const step = Math.min(Math.abs(deltaX) * 0.006, MAX_STEP) * (deltaX > 0 ? 1 : -1);
-      chart.zoomAtCoordinate(1 + step, coordinate, 0); // 0ms — direct 1:1 drag feel, no lag
+      timeCoordinate = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      touchTimeAccum += deltaX;
+      if(touchTimeRaf === null) touchTimeRaf = requestAnimationFrame(flushTouchTimeZoom);
     }
   }, { passive:false });
 
-  function endTouch(){ touchId = null; touchZone = null; touchLastX = null; touchLastY = null; }
+  function endTouch(){
+    touchId = null; touchZone = null; touchLastX = null; touchLastY = null;
+    touchTimeAccum = 0; touchPriceAccum = 0;
+  }
   container.addEventListener('touchend', endTouch);
   container.addEventListener('touchcancel', endTouch);
 }
@@ -2300,8 +2356,8 @@ function attachChartZoomControls(chart, container, yAxisWidth, xAxisHeight){
 // ----------------------------------------------------------------------------
 function attachPriceAxisZoom(chart){
   let priceZoomFactor = 1;
-  const MIN_FACTOR = 0.15;
-  const MAX_FACTOR = 6;
+  const MIN_FACTOR = 0.4;
+  const MAX_FACTOR = 3;
 
   window.__edgeTradeSetPriceZoomStep = function(step){
     priceZoomFactor = Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, priceZoomFactor * (1 + step)));
