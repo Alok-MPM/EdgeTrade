@@ -2145,6 +2145,57 @@ let currentInterval = '1m';
 let currentSymbol = 'BTCUSDT';
 let binanceMarkets = null;
 
+// Reads a live CSS custom property from style.css (falls back to the given
+// value if the var isn't set). Used so chart colors always match the
+// current theme instead of being hardcoded hex that can drift out of sync.
+function cssVar(name, fallback){
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return val || fallback;
+}
+
+// Replaces klinecharts' native, jumpy, one-tick-per-scroll wheel zoom with
+// an eased version. WHY capture-phase + stopImmediatePropagation: klinecharts
+// attaches its own wheel listener on the container div (bubble phase). If we
+// just add a second bubble-phase listener, both fire and you get double-zoom.
+// By listening on the CAPTURE phase and calling stopImmediatePropagation(),
+// our handler runs first and the library's own handler never sees the event.
+// We then drive the zoom ourselves via the public, documented
+// zoomAtCoordinate(scale, coordinate) instance method — this is overriding
+// the interaction via a supported API, not touching library internals.
+// Native drag-pan and touch pinch/pan are left untouched — klinecharts 9.8.x
+// already handles those reasonably smoothly on its own.
+function attachSmoothWheelZoom(chart, container){
+  if(!chart || !container || container.dataset.smoothZoomAttached) return;
+  container.dataset.smoothZoomAttached = 'true';
+
+  let rafId = null;
+  let anchorCoordinate = null;
+  // Remaining zoom delta still owed to the chart for the current gesture
+  // (e.g. 0.08 = "still need to zoom in 8% more"). Each frame we apply a
+  // fraction of what's left (exponential decay) — that's what gives the
+  // eased, decelerating feel instead of one instant jump.
+  let pending = 0;
+  const DECAY_PER_FRAME = 0.3;
+
+  function step(){
+    if(Math.abs(pending) < 0.001){ pending = 0; rafId = null; return; }
+    const applyNow = pending * DECAY_PER_FRAME;
+    chart.zoomAtCoordinate(1 + applyNow, anchorCoordinate);
+    pending -= applyNow;
+    rafId = requestAnimationFrame(step);
+  }
+
+  container.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    anchorCoordinate = { x: event.offsetX, y: event.offsetY };
+    const zoomIn = event.deltaY < 0;
+    const tickAmount = 0.08; // tune 0.06-0.12 for sensitivity
+    pending += zoomIn ? tickAmount : -tickAmount;
+    if(rafId === null) rafId = requestAnimationFrame(step);
+  }, { capture:true, passive:false });
+}
+
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
   try {
@@ -2157,11 +2208,13 @@ async function initMainChart(){
     if(mainChartInstance) return;
     mainChartInstance = klinecharts.init('klineMainChart');
     if (!mainChartInstance) throw new Error('klinecharts.init() returned null — check container id');
+    window.EdgeTradeChart = mainChartInstance; // stable external handle for future tools/buttons
 
     mainChartInstance.setStyles({
-      grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
-      candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
+      grid: { show:true, horizontal:{color:cssVar('--border','#2a2a2a')}, vertical:{color:cssVar('--border','#2a2a2a')} },
+      candle: { bar: { upColor:cssVar('--green','#4CAF7D'), downColor:cssVar('--red','#E05252'), noChangeColor:'#888888' } }
     });
+    attachSmoothWheelZoom(mainChartInstance, container);
 
     await loadChartInterval(currentInterval);
   } catch(err) {
