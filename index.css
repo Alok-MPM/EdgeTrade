@@ -1167,6 +1167,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
    override only relaxes overflow while a panel is actually open, so
    the original clipping behavior is unaffected the rest of the time. */
 .chart-workspace:has(.command-group.open){ overflow:visible; }
+.chart-commandbar:has(.command-group.open){ overflow:visible; }
 
 .chart-commandbar{
   position:sticky; top:0; z-index:70;
