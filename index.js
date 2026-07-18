@@ -2188,6 +2188,21 @@ function attachChartZoomControls(chart){
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
+
+  // Block the browser's own page-scroll when the pointer/finger is over the
+  // chart. Needed because our previous hand-rolled zoom listeners (removed
+  // when we switched to klinecharts' native zoom) used to call
+  // preventDefault() as a side effect — losing them also lost this
+  // protection, so the page itself started scrolling on wheel/swipe.
+  // { passive:false } is required or the browser silently ignores
+  // preventDefault() on these event types. Guarded so re-entering the chart
+  // section doesn't attach this twice on the same DOM node.
+  if(container && !container.dataset.scrollBlockAttached){
+    container.dataset.scrollBlockAttached = 'true';
+    container.addEventListener('wheel', (e) => { e.preventDefault(); }, { passive:false });
+    container.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive:false });
+  }
+
   try {
     container.innerHTML = '<div style="padding:20px;color:var(--muted);">Loading chart library...</div>';
     if (typeof klinecharts === 'undefined') {
