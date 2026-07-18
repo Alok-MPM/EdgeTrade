@@ -2188,21 +2188,6 @@ function attachChartZoomControls(chart){
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
-
-  // Block the browser's own page-scroll when the pointer/finger is over the
-  // chart. Needed because our previous hand-rolled zoom listeners (removed
-  // when we switched to klinecharts' native zoom) used to call
-  // preventDefault() as a side effect — losing them also lost this
-  // protection, so the page itself started scrolling on wheel/swipe.
-  // { passive:false } is required or the browser silently ignores
-  // preventDefault() on these event types. Guarded so re-entering the chart
-  // section doesn't attach this twice on the same DOM node.
-  if(container && !container.dataset.scrollBlockAttached){
-    container.dataset.scrollBlockAttached = 'true';
-    container.addEventListener('wheel', (e) => { e.preventDefault(); }, { passive:false });
-    container.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive:false });
-  }
-
   try {
     container.innerHTML = '<div style="padding:20px;color:var(--muted);">Loading chart library...</div>';
     if (typeof klinecharts === 'undefined') {
@@ -2217,68 +2202,12 @@ async function initMainChart(){
 
     const Y_AXIS_WIDTH = 70;
     const X_AXIS_HEIGHT = 28;
-    const gold = cssVar('--gold', '#D4B886');
-    const muted = cssVar('--muted', '#8B949E');
-    const cardBg = cssVar('--card', '#1A1D24');
-
     mainChartInstance.setStyles({
-      // Floating-candle look: grid basically invisible instead of the old
-      // solid --border-colored lines.
-      grid: {
-        show: true,
-        horizontal: { show: true, size: 1, color: 'rgba(255,255,255,0.03)' },
-        vertical: { show: true, size: 1, color: 'rgba(255,255,255,0.03)' }
-      },
-      candle: {
-        bar: { upColor:cssVar('--green','#4CAF7D'), downColor:cssVar('--red','#E05252'), noChangeColor:'#888888' },
-        // showType stays 'standard' (klinecharts' default) — that's the
-        // no-background-box tooltip variant; 'rect' is the boxed one.
-        tooltip: {
-          showRule: 'always',
-          showType: 'standard',
-          title: { show:false },
-          legend: {
-            size: 11,
-            weight: 'normal',
-            color: muted,
-            marginLeft: 0,
-            marginTop: 2,
-            marginRight: 8,
-            marginBottom: 2
-          }
-        }
-      },
-      // Axis lines/ticks removed entirely — labels float straight on the
-      // background instead of sitting inside a bordered strip.
-      xAxis: {
-        size: X_AXIS_HEIGHT,
-        axisLine: { show:false },
-        tickLine: { show:false },
-        tickText: { color: muted }
-      },
-      yAxis: {
-        size: Y_AXIS_WIDTH,
-        axisLine: { show:false },
-        tickLine: { show:false },
-        tickText: { color: muted }
-      },
-      // Thin dashed gold crosshair, no boxy background behind the labels —
-      // just a small, sharp, low-contrast chip so the text stays legible.
-      crosshair: {
-        horizontal: {
-          line: { style:'dashed', dashedValue:[4,4], size:1, color: gold },
-          text: { color: gold, backgroundColor: cardBg, borderSize: 0, paddingLeft:4, paddingRight:4, paddingTop:2, paddingBottom:2, borderRadius:2 }
-        },
-        vertical: {
-          line: { style:'dashed', dashedValue:[4,4], size:1, color: gold },
-          text: { color: gold, backgroundColor: cardBg, borderSize: 0, paddingLeft:4, paddingRight:4, paddingTop:2, paddingBottom:2, borderRadius:2 }
-        }
-      }
+      grid: { show:true, horizontal:{color:cssVar('--border','#2a2a2a')}, vertical:{color:cssVar('--border','#2a2a2a')} },
+      candle: { bar: { upColor:cssVar('--green','#4CAF7D'), downColor:cssVar('--red','#E05252'), noChangeColor:'#888888' } },
+      yAxis: { size: Y_AXIS_WIDTH },
+      xAxis: { size: X_AXIS_HEIGHT }
     });
-
-    // No right-click context menu on the chart canvas.
-    container.addEventListener('contextmenu', (e) => e.preventDefault());
-
     attachChartZoomControls(mainChartInstance);
 
     await loadChartInterval(currentInterval);
