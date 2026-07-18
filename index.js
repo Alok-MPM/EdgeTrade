@@ -2154,36 +2154,60 @@ function cssVar(name, fallback){
 }
 
 // ============================================================================
-// CHART ZOOM — using klinecharts' own NATIVE zoom/scroll, not hand-rolled.
-//
-// klinecharts already ships built-in, library-tested gesture handling for
-// exactly this:
-//   - chart.setZoomEnabled(true)  -> wheel/pinch zoom on the main candle
-//     area + time axis (this is what handles TIME zoom).
-//   - chart.setScrollEnabled(true) -> drag/swipe to pan left-right.
-//   - setPaneOptions({ id:'candle_pane', axisOptions:{ scrollZoomEnabled:true } })
-//     -> scroll/swipe zoom on the PRICE (y) axis specifically. Added in
-//     klinecharts ^9.3.0, so it's available in the 9.8.5 build already
-//     loaded here.
-//
-// All 3 of the earlier bugs (price axis scroll triggering horizontal zoom,
-// price zoom rocketing to an extreme, touch swipe being way too aggressive)
-// came from a hand-rolled wheel/touch listener that had to guess pixel
-// boundaries for "is the pointer over the price strip" from the outside —
-// and that listener used capture:true + stopImmediatePropagation(), which
-// blocked klinecharts' own internal handlers from ever seeing the event in
-// the first place, so the native option below could never have worked
-// while that code was attached. Removing the hand-rolled layer and turning
-// on the library's own native flags is both simpler and more correct: the
-// hit-testing for "which axis is the pointer over" now happens inside
-// klinecharts itself, against its own real pixel geometry, instead of our
-// external estimate of it.
+// CHART ZOOM/PAN — native klinecharts engine as the baseline, plus two things
+// the library doesn't do out of the box:
+//   1. Block the browser's own page-scroll on wheel/touch over the chart
+//      (klinecharts' own gesture handling doesn't call preventDefault for
+//      you, so without this the page scrolls right along with the chart).
+//   2. Translate horizontal wheel/trackpad swipes into panning —
+//      klinecharts only pans via click-and-drag natively; a horizontal
+//      wheel gesture does nothing on its own, which feels wrong coming
+//      from TradingView-style trackpad habits.
+// Vertical wheel (deltaY) and ctrl+wheel (trackpad pinch) are left alone so
+// they still hit klinecharts' own native zoom.
 // ============================================================================
 function attachChartZoomControls(chart){
   if(!chart) return;
+
+  // Keep native enabled as the baseline engine
   chart.setZoomEnabled(true);
   chart.setScrollEnabled(true);
   chart.setPaneOptions({ id: 'candle_pane', axisOptions: { scrollZoomEnabled: true } });
+
+  const container = document.getElementById('klineMainChart');
+  if(!container) return;
+
+  // Cleanup any previously-attached copies of these two listeners first, so
+  // calling this function again (e.g. if init ever re-runs) can't stack
+  // duplicate handlers on the same node.
+  if(container._etWheel) container.removeEventListener('wheel', container._etWheel);
+  if(container._etTouch) container.removeEventListener('touchmove', container._etTouch);
+
+  container._etWheel = (e) => {
+    // Strict block: stop the webpage itself from scrolling on this gesture.
+    e.preventDefault();
+
+    if(e.ctrlKey){
+      // Trackpad pinch-to-zoom sends wheel+ctrlKey — let native klinecharts
+      // zoom handle it, we don't touch it here.
+      return;
+    }
+
+    if(Math.abs(e.deltaX) > Math.abs(e.deltaY)){
+      // Horizontal swipe -> pan the chart (x1.5 so it doesn't feel sluggish).
+      chart.scrollByDistance(e.deltaX * 1.5);
+      e.stopPropagation();
+    }
+    // Vertical wheel (deltaY dominant) intentionally falls through to
+    // klinecharts' own native zoom handling.
+  };
+  container.addEventListener('wheel', container._etWheel, { passive:false });
+
+  container._etTouch = (e) => {
+    if(e.touches.length > 1) return; // let native pinch-to-zoom through
+    e.preventDefault(); // block the page from scrolling on a single-finger drag
+  };
+  container.addEventListener('touchmove', container._etTouch, { passive:false });
 }
 
 async function initMainChart(){
@@ -2202,12 +2226,68 @@ async function initMainChart(){
 
     const Y_AXIS_WIDTH = 70;
     const X_AXIS_HEIGHT = 28;
+    const gold = cssVar('--gold', '#D4B886');
+    const muted = cssVar('--muted', '#8B949E');
+    const cardBg = cssVar('--card', '#1A1D24');
+
     mainChartInstance.setStyles({
-      grid: { show:true, horizontal:{color:cssVar('--border','#2a2a2a')}, vertical:{color:cssVar('--border','#2a2a2a')} },
-      candle: { bar: { upColor:cssVar('--green','#4CAF7D'), downColor:cssVar('--red','#E05252'), noChangeColor:'#888888' } },
-      yAxis: { size: Y_AXIS_WIDTH },
-      xAxis: { size: X_AXIS_HEIGHT }
+      // Floating-candle look: grid basically invisible instead of the old
+      // solid --border-colored lines.
+      grid: {
+        show: true,
+        horizontal: { show: true, size: 1, color: 'rgba(255,255,255,0.03)' },
+        vertical: { show: true, size: 1, color: 'rgba(255,255,255,0.03)' }
+      },
+      candle: {
+        bar: { upColor:cssVar('--green','#4CAF7D'), downColor:cssVar('--red','#E05252'), noChangeColor:'#888888' },
+        // showType stays 'standard' (klinecharts' default) — that's the
+        // no-background-box tooltip variant; 'rect' is the boxed one.
+        tooltip: {
+          showRule: 'always',
+          showType: 'standard',
+          title: { show:false },
+          legend: {
+            size: 11,
+            weight: 'normal',
+            color: muted,
+            marginLeft: 0,
+            marginTop: 2,
+            marginRight: 8,
+            marginBottom: 2
+          }
+        }
+      },
+      // Axis lines/ticks removed entirely — labels float straight on the
+      // background instead of sitting inside a bordered strip.
+      xAxis: {
+        size: X_AXIS_HEIGHT,
+        axisLine: { show:false },
+        tickLine: { show:false },
+        tickText: { color: muted }
+      },
+      yAxis: {
+        size: Y_AXIS_WIDTH,
+        axisLine: { show:false },
+        tickLine: { show:false },
+        tickText: { color: muted }
+      },
+      // Thin dashed gold crosshair, no boxy background behind the labels —
+      // just a small, sharp, low-contrast chip so the text stays legible.
+      crosshair: {
+        horizontal: {
+          line: { style:'dashed', dashedValue:[4,4], size:1, color: gold },
+          text: { color: gold, backgroundColor: cardBg, borderSize: 0, paddingLeft:4, paddingRight:4, paddingTop:2, paddingBottom:2, borderRadius:2 }
+        },
+        vertical: {
+          line: { style:'dashed', dashedValue:[4,4], size:1, color: gold },
+          text: { color: gold, backgroundColor: cardBg, borderSize: 0, paddingLeft:4, paddingRight:4, paddingTop:2, paddingBottom:2, borderRadius:2 }
+        }
+      }
     });
+
+    // No right-click context menu on the chart canvas.
+    container.addEventListener('contextmenu', (e) => e.preventDefault());
+
     attachChartZoomControls(mainChartInstance);
 
     await loadChartInterval(currentInterval);
