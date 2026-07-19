@@ -1171,7 +1171,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-commandbar:has(.command-group.open){ overflow:visible; }
 
 .chart-commandbar{
-  position:sticky; top:0; z-index:70;
+  position:sticky; top:0; z-index:300;
   display:flex; align-items:center; gap:6px;
   height:60px; margin:14px 14px 0 14px; padding:0 10px;
   background:var(--bg3);
@@ -1240,7 +1240,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* ── Dropdown panels ───────────────────────────────────────────── */
 .command-panel{
   position:absolute; top:calc(100% + 10px); left:0;
-  z-index:80;
+  z-index:400;
   min-width:190px;
   max-height:320px; overflow-y:auto;
   display:flex; flex-direction:column; gap:2px;

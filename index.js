@@ -2338,6 +2338,26 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Generic open/close toggle for chart-commandbar pills (Time, Chart, Indicators,
+// Drawing, Layout). These pills had no click handler at all before, so their
+// dropdown panels never opened. Market pill is excluded — it already has its
+// own toggleMarketDropdown() logic using a different (#market-dd) mechanism.
+document.addEventListener('click', (e) => {
+  const pill = e.target.closest('.command-pill');
+  if(pill && pill.id !== 'market-select-btn'){
+    const group = pill.closest('.command-group');
+    if(group){
+      const wasOpen = group.classList.contains('open');
+      document.querySelectorAll('.command-group.open').forEach(g => g.classList.remove('open'));
+      if(!wasOpen) group.classList.add('open');
+    }
+    return;
+  }
+  if(!e.target.closest('.command-group')){
+    document.querySelectorAll('.command-group.open').forEach(g => g.classList.remove('open'));
+  }
+});
+
 function toggleIndicator(name, overlayOnCandle){
   const btn = document.getElementById('ind-btn-'+name);
   if(activeIndicators[name]){
