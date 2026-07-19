@@ -417,7 +417,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .notif-dot{width:7px;height:7px;border-radius:50%;background:var(--red);position:absolute;top:5px;right:5px;}
 
 .content-area{flex:1;padding:24px;padding-bottom:120px;overflow-y:auto;}
+.content-area.no-scroll{overflow:hidden;padding:0;}
 .content-section{display:none;}.content-section.active{display:block;}
+#section-chart.content-section.active{height:100%;display:flex;flex-direction:column;}
+.chart-page-inner{flex:1;min-height:0;padding:16px;display:flex;flex-direction:column;}
 
 /* ════════════════════════════════
    HOME - BALANCE CARDS
@@ -1032,11 +1035,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
    Z-INDEX SCALE: modal 100, context-menu 90, dropdown 80, floating-cockpit 70,
    ai-overlay 60, chart-overlay 50, panels 40, chart 30, workspace 20, bg 10
    ═══════════════════════════════════════════════ */
-.workspace-shell{display:flex;gap:14px;align-items:flex-start;min-height:0;}
-.main-workspace{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:14px;}
+.workspace-shell{display:flex;gap:14px;align-items:stretch;min-height:0;flex:1;}
+.main-workspace{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;gap:14px;}
 
 /* — Chart Workspace + Cockpit — */
-.chart-workspace{position:relative;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.15);}
+.chart-workspace{position:relative;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.15);flex:1 1 auto;min-height:0;}
 .chart-cockpit{position:sticky;top:0;z-index:70;display:flex;align-items:center;gap:0;padding:10px 14px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;background:rgba(26,29,36,0.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
 .light-mode .chart-cockpit{background:rgba(255,253,248,0.72);}
 .chart-cockpit::-webkit-scrollbar{height:4px;}
@@ -1044,19 +1047,19 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cockpit-group:first-child{padding-left:0;}
 .cockpit-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0;}
 .cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
-.chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;}
-.chart-panel-wrap{flex:3 1 500px;}
+.chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:column;}
+.chart-panel-wrap{flex:1;min-height:0;display:flex;flex-direction:column;}
 .chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
 
 /* — Bottom Dock — */
-.bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
-.dock-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
+.bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;flex:0 0 auto;max-height:220px;display:flex;flex-direction:column;}
+.dock-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;flex:0 0 auto;}
 .dock-title{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);}
-.dock-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);padding:10px 16px 0;margin-bottom:0;overflow-x:auto;}
-.dock-content{padding:16px;max-height:280px;overflow-y:auto;}
+.dock-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);padding:10px 16px 0;margin-bottom:0;overflow-x:auto;flex:0 0 auto;}
+.dock-content{padding:16px;flex:1;min-height:0;overflow-y:auto;}
 
 /* — Trading Workspace (right column) — */
-.trading-workspace{flex:0 0 380px;width:380px;min-width:340px;max-width:420px;display:flex;flex-direction:column;gap:14px;}
+.trading-workspace{flex:0 0 380px;width:380px;min-width:340px;max-width:420px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow-y:auto;}
 .orderbook-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;}
 .execution-workspace{background:var(--bg2);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;}
 .execution-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);}
@@ -1078,7 +1081,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 @media(max-width:1024px){
   .workspace-shell{flex-direction:column;}
-  .trading-workspace{width:100%;max-width:100%;min-width:0;flex:1 1 auto;}
+  .main-workspace{flex:1 1 60%;min-height:0;}
+  .trading-workspace{width:100%;max-width:100%;min-width:0;flex:1 1 40%;overflow-y:auto;}
 }
 
 .ob-row{display:flex;justify-content:space-between;position:relative;padding:4px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;overflow:hidden;border-radius:3px;margin-bottom:1px;}

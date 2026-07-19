@@ -50,6 +50,8 @@ function showSection(key){
   document.querySelectorAll('.content-section').forEach(s=>s.classList.remove('active'));
   const el = document.getElementById('section-'+key);
   if(el) el.classList.add('active');
+  const contentArea = document.querySelector('.content-area');
+  if(contentArea) contentArea.classList.toggle('no-scroll', key === 'chart');
   closeSidebar();
   if(key==='home') refreshHome();
   if(key==='trade-list') refreshTradeList();
@@ -2231,7 +2233,7 @@ function toggleChartMaximize(){
   } else {
     wrap.classList.remove('chart-maximized');
     document.body.style.overflow = '';
-    chartDiv.style.height = '500px';
+    chartDiv.style.height = '100%';
     if(overlay) overlay.style.display = 'none';
     if(btn){ btn.innerHTML = '⛶'; btn.title = 'Maximize chart'; }
   }
