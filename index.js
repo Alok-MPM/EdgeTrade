@@ -2300,6 +2300,12 @@ async function toggleMarketDropdown(){
   const opening = !dd.classList.contains('open');
   dd.classList.toggle('open');
   if(opening){
+    const btn = document.getElementById('market-select-btn');
+    if(btn){
+      const rect = btn.getBoundingClientRect();
+      dd.style.top = (rect.bottom + 10) + 'px';
+      dd.style.left = rect.left + 'px';
+    }
     const list = await loadBinanceMarkets();
     renderMarketList(list);
     const s = document.getElementById('market-search');
@@ -2349,7 +2355,15 @@ document.addEventListener('click', (e) => {
     if(group){
       const wasOpen = group.classList.contains('open');
       document.querySelectorAll('.command-group.open').forEach(g => g.classList.remove('open'));
-      if(!wasOpen) group.classList.add('open');
+      if(!wasOpen){
+        group.classList.add('open');
+        const panel = group.querySelector('.command-panel');
+        if(panel){
+          const rect = pill.getBoundingClientRect();
+          panel.style.top = (rect.bottom + 10) + 'px';
+          panel.style.left = rect.left + 'px';
+        }
+      }
     }
     return;
   }

@@ -1212,12 +1212,9 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
    Animates transform / opacity / filter only.
    ══════════════════════════════════════════════════════════════════ */
 
-/* NOTE: .chart-workspace has overflow:hidden (existing rule, untouched)
-   which would clip an open dropdown panel. This single conditional
-   override only relaxes overflow while a panel is actually open, so
-   the original clipping behavior is unaffected the rest of the time. */
-.chart-workspace:has(.command-group.open){ overflow:visible; }
-.chart-commandbar:has(.command-group.open){ overflow:visible; }
+/* Dropdown panels are now position:fixed and positioned dynamically via JS
+   (see toggleMarketDropdown() / the generic pill click listener in index.js),
+   so the toolbar's own overflow never needs to change when a menu opens. */
 
 .chart-commandbar{
   position:sticky; top:0; z-index:300;
@@ -1228,7 +1225,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   border-radius:20px;
   backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
   box-shadow:0 1px 2px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.16);
-  overflow-x:auto; overflow-y:visible;
+  overflow-x:auto; overflow-y:hidden;
   scrollbar-width:none; -ms-overflow-style:none;
 }
 .chart-commandbar::-webkit-scrollbar{ display:none; }
@@ -1288,7 +1285,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 /* ── Dropdown panels ───────────────────────────────────────────── */
 .command-panel{
-  position:absolute; top:calc(100% + 10px); left:0;
+  position:fixed; /* was: absolute; JS now injects top/left via getBoundingClientRect */
   z-index:400;
   min-width:190px;
   max-height:320px; overflow-y:auto;
