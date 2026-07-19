@@ -2147,18 +2147,6 @@ let binanceMarkets = null;
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
-
-  // Scroll shield: stops the webpage from scrolling when the mouse wheel or
-  // a touch drag happens over the chart. Nothing else here — no zoom/pan
-  // logic touched.
-  if(container && !container.dataset.scrollShield){
-    container.dataset.scrollShield = 'true';
-    container.style.touchAction = 'none';
-    container.style.overscrollBehavior = 'none';
-    container.addEventListener('wheel', (e) => { e.preventDefault(); }, { passive:false });
-    container.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive:false });
-  }
-
   try {
     container.innerHTML = '<div style="padding:20px;color:var(--muted);">Loading chart library...</div>';
     if (typeof klinecharts === 'undefined') {
