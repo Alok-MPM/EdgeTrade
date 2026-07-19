@@ -397,7 +397,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .user-role{font-size:11px;color:var(--muted);}
 
 .main-content{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
-.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:13px 24px;background:rgba(17,19,23,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
+.topbar{position:sticky;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-left:0;padding:13px 24px;background:rgba(17,19,23,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
 .topbar-left{display:flex;align-items:center;gap:14px;}
 .mob-menu{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--white);cursor:pointer;font-size:18px;}
 .light-mode .mob-menu{background:var(--bg3);border-color:rgba(0,0,0,0.15);color:var(--white);}
@@ -829,7 +829,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* ════════════════════════════════
    MOBILE
 ════════════════════════════════ */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(17,19,23,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:7px 0 12px;}
+.mobile-nav{display:none !important;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(17,19,23,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:7px 0 12px;}
 .mn-items{display:flex;}
 .mn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 0;font-size:9px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted);transition:color 0.2s;border:none;background:none;font-family:'Outfit',sans-serif;}
 .mn-item .mni{font-size:19px;transition:transform 0.2s;}
@@ -862,9 +862,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .sbar-num{font-size:28px;}
 }
 /* Bottom nav: mobile phones only. Desktop/tablet-landscape/laptop stay on
-   the base .mobile-nav{display:none} rule above; HTML is untouched. */
+   the base .mobile-nav{display:none !important} rule above; HTML is untouched.
+   !important is required here because #mobile-nav carries an inline
+   style="display:none" in the markup — a plain CSS rule can never beat an
+   inline style, only an !important stylesheet rule can. */
 @media(max-width:768px){
-  .mobile-nav{display:block;}
+  .mobile-nav{display:block !important;}
 }
 @media(max-width:600px){
   .days-grid{grid-template-columns:1fr 1fr;}
