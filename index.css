@@ -1261,7 +1261,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .light-mode .chart-nav-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
 
 /* Right — broker selector + actions (reused .broker-sel / .tb-btn), sized to fit the slim bar */
-.chart-nav-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.chart-nav-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto; }
 .chart-nav-right .broker-sel{ padding:6px 12px; min-width:150px; }
 .chart-nav-right .tb-btn{ width:30px; height:30px; }
 
