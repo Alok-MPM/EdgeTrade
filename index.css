@@ -1152,3 +1152,129 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .tpsl-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;}
 .tpsl-input:focus{border-color:var(--gold);}
 .pos-close-btn:hover{border-color:var(--red);color:var(--red);}
+
+/* ═══════════════════════════════════════════════════════════════
+   STEP 2 — CHART PAGE COMPACT TRADING TERMINAL LAYOUT
+   Scoped strictly to the Chart page via #page-app:has(#section-chart.active)
+   and the .chart-terminal-layout / .chart-header-wrapper wrapper classes
+   added in Step 1. No colors, fonts, shadows, themes, chart styling,
+   or component designs are changed here — layout & spacing only.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* — Sidebar + global topbar disappear ONLY when Chart page is active;
+     every other page keeps them exactly as before — */
+#page-app:has(#section-chart.active) .sidebar{ display:none; }
+#page-app:has(#section-chart.active) .topbar{ display:none; }
+#page-app:has(#section-chart.active) .main-content{ margin-left:0; }
+
+/* — Chart wrapper bleeds to the content-area edges so its own header
+     can sit flush like a slim exchange navbar — */
+.chart-terminal-layout{ margin:-24px -24px 0 -24px; }
+
+/* — Chart page header: logo / horizontal nav / broker / actions, one slim row — */
+.chart-header-wrapper{
+  position:sticky;
+  top:0;
+  z-index:40;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  padding:8px 20px;
+  background:rgba(17,19,23,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+.light-mode .chart-header-wrapper{
+  background:rgba(10,41,71,0.94);
+  border-color:rgba(243,228,201,0.12);
+}
+
+/* Logo (reused .sidebar-logo) — strip the sidebar box padding/border, keep it inline */
+.chart-nav-left{ display:flex; align-items:center; flex-shrink:0; }
+.chart-nav-left .sidebar-logo{ padding:0; border-bottom:none; }
+
+/* Center — horizontal page navigation */
+.chart-nav-center{ flex:1; min-width:0; display:flex; justify-content:center; }
+.chart-top-navigation{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  max-width:100%;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+.chart-top-navigation::-webkit-scrollbar{ display:none; }
+
+.chart-nav-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-shrink:0;
+  padding:6px 13px;
+  border-radius:7px;
+  border:1px solid transparent;
+  background:none;
+  color:var(--muted);
+  font-family:'Outfit',sans-serif;
+  font-size:13px;
+  font-weight:500;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background 0.18s,color 0.18s,border-color 0.18s;
+}
+.chart-nav-item .nav-icon-svg{ width:15px; height:15px; }
+.chart-nav-item:hover{ background:var(--gold-dim); color:var(--white); }
+.chart-nav-item.active{
+  background:var(--gold-dim);
+  border-color:var(--gold);
+  color:var(--gold);
+}
+.light-mode .chart-nav-item{ color:rgba(243,228,201,0.6); }
+.light-mode .chart-nav-item:hover{ background:rgba(243,228,201,0.08); color:var(--cream); }
+.light-mode .chart-nav-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
+
+/* Right — broker selector + actions (reused .broker-sel / .tb-btn), sized to fit the slim bar */
+.chart-nav-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.chart-nav-right .broker-sel{ padding:6px 12px; min-width:150px; }
+.chart-nav-right .tb-btn{ width:30px; height:30px; }
+
+/* — Padding cleanup: the inline-padded content wrapper around workspace-shell.
+     HTML/inline styles are not touched anywhere else in this project; this is
+     the one necessary !important, since only an inline style already sets
+     this element's padding and it must shrink for a compact terminal feel — */
+.chart-terminal-layout > div:not(.chart-header-wrapper){ padding:14px !important; }
+
+/* — Chart workspace internals: tighter padding/gaps, chart canvas itself untouched — */
+.chart-terminal-layout .workspace-shell{ gap:10px; }
+.chart-terminal-layout .main-workspace{ gap:10px; }
+.chart-terminal-layout .chart-cockpit{ padding:8px 12px; }
+.chart-terminal-layout .chart-viewport{ padding:10px; }
+
+/* — Slightly tighter card radius, professional exchange feel — */
+.chart-terminal-layout .chart-workspace,
+.chart-terminal-layout .bottom-dock{ border-radius:12px; }
+.chart-terminal-layout .execution-workspace,
+.chart-terminal-layout .orderbook-panel,
+.chart-terminal-layout .ai-mentor-dock{ border-radius:10px; }
+
+/* — Bottom mobile nav gets slimmer ONLY while the Chart page is active,
+     freeing vertical room for the chart; every other page's bottom nav
+     is completely unaffected — */
+#page-app:has(#section-chart.active) + #mobile-nav{ padding:4px 0 8px; }
+#page-app:has(#section-chart.active) + #mobile-nav .mn-item{ padding:3px 0; font-size:8px; }
+#page-app:has(#section-chart.active) + #mobile-nav .mni{ font-size:17px; }
+#page-app:has(#section-chart.active) + #mobile-nav .mn-center-btn{ width:40px; height:40px; border-radius:11px; }
+
+/* — Responsive: tablet/mobile keep the same slim header, nav scrolls
+     horizontally instead of wrapping or overflowing the page — */
+@media(max-width:1024px){
+  .chart-terminal-layout{ margin:-16px -16px 0 -16px; }
+  .chart-terminal-layout > div:not(.chart-header-wrapper){ padding:10px !important; }
+  .chart-header-wrapper{ padding:8px 16px; }
+}
+@media(max-width:768px){
+  .chart-header-wrapper{ padding:8px 14px; gap:10px; }
+  .chart-nav-right .broker-sel{ min-width:120px; }
+}

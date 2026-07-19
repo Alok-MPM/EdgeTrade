@@ -51,6 +51,7 @@ function showSection(key){
   const el = document.getElementById('section-'+key);
   if(el) el.classList.add('active');
   closeSidebar();
+  updateNavigationLayout(key);
   if(key==='home') refreshHome();
   if(key==='trade-list') refreshTradeList();
   if(key==='stats') {renderStats();renderCapitalGrowth();}
@@ -69,6 +70,27 @@ function setMobNav(id){
   document.querySelectorAll('.mn-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById(id);
   if(el) el.classList.add('active');
+}
+
+// ══════════════════════════════════════
+// CHART PAGE — TOP NAVIGATION SYNC
+// Sidebar/topbar hide-show for the Chart page is already handled purely
+// in CSS (#page-app:has(#section-chart.active)), driven by the same
+// .content-section.active class showSection() already toggles above —
+// so no visibility logic is duplicated here in JS.
+// This helper only keeps the new horizontal .chart-nav-item buttons'
+// active state centralized and in sync with whatever section is open,
+// the same way setSideNav()/setMobNav() already do for their own navs.
+// ══════════════════════════════════════
+function setChartNav(key){
+  document.querySelectorAll('.chart-nav-item').forEach(btn=>{
+    const call = btn.getAttribute('onclick') || '';
+    const match = call.match(/showSection\('([^']+)'\)/);
+    btn.classList.toggle('active', !!match && match[1] === key);
+  });
+}
+function updateNavigationLayout(key){
+  setChartNav(key);
 }
 
 // ══════════════════════════════════════
