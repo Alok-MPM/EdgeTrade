@@ -2356,12 +2356,30 @@ function toggleIndicator(name, overlayOnCandle){
   }
 }
 
+function resetActiveDrawBtn(){
+  document.querySelectorAll('[id^="draw-btn-"]').forEach(b => b.classList.remove('active-tool'));
+}
+
 function useDrawTool(name){
-  mainChartInstance.createOverlay(name);
+  resetActiveDrawBtn();
+  const btn = document.getElementById('draw-btn-' + name);
+  if(btn) btn.classList.add('active-tool');
+
+  mainChartInstance.createOverlay({
+    name: name,
+    lock: false,
+    mode: 'weak_magnet',
+    groupId: 'edge_drawings',
+    onDrawEnd: () => {
+      resetActiveDrawBtn();
+      return true;
+    }
+  });
 }
 
 function clearDrawings(){
-  mainChartInstance.removeOverlay();
+  mainChartInstance.removeOverlay({ groupId: 'edge_drawings' });
+  resetActiveDrawBtn();
 }
 
 function connectOrderBook(symbol){

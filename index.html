@@ -372,13 +372,22 @@
                       <i class="chevron"></i>
                     </button>
                     <div class="command-panel">
-                      <button class="command-item" onclick="useDrawTool('straightLine')">Trend Line</button>
-                      <button class="command-item" onclick="useDrawTool('horizontalStraightLine')">Horizontal</button>
-                      <button class="command-item" onclick="useDrawTool('rayLine')">Ray</button>
-                      <button class="command-item" onclick="useDrawTool('segment')">Segment</button>
-                      <button class="command-item" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
-                      <button class="command-item" onclick="useDrawTool('priceLine')">Price Line</button>
-                      <button class="command-item command-item-danger" onclick="clearDrawings()">Clear</button>
+                      <button class="command-item" id="draw-btn-segment" onclick="useDrawTool('segment')">Trendline</button>
+                      <button class="command-item" id="draw-btn-straightLine" onclick="useDrawTool('straightLine')">Extended Line</button>
+                      <button class="command-item" id="draw-btn-rayLine" onclick="useDrawTool('rayLine')">Ray Line</button>
+                      <button class="command-item" id="draw-btn-horizontalStraightLine" onclick="useDrawTool('horizontalStraightLine')">Horizontal Line</button>
+                      <button class="command-item" id="draw-btn-horizontalRayLine" onclick="useDrawTool('horizontalRayLine')">Horizontal Ray</button>
+                      <button class="command-item" id="draw-btn-horizontalSegment" onclick="useDrawTool('horizontalSegment')">Horizontal Segment</button>
+                      <button class="command-item" id="draw-btn-verticalStraightLine" onclick="useDrawTool('verticalStraightLine')">Vertical Line</button>
+                      <button class="command-item" id="draw-btn-verticalRayLine" onclick="useDrawTool('verticalRayLine')">Vertical Ray</button>
+                      <button class="command-item" id="draw-btn-verticalSegment" onclick="useDrawTool('verticalSegment')">Vertical Segment</button>
+                      <button class="command-item" id="draw-btn-priceLine" onclick="useDrawTool('priceLine')">Price Line</button>
+                      <button class="command-item" id="draw-btn-priceChannelLine" onclick="useDrawTool('priceChannelLine')">Price Channel</button>
+                      <button class="command-item" id="draw-btn-parallelStraightLine" onclick="useDrawTool('parallelStraightLine')">Parallel Channel</button>
+                      <button class="command-item" id="draw-btn-fibonacciLine" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
+                      <button class="command-item" id="draw-btn-simpleAnnotation" onclick="useDrawTool('simpleAnnotation')">Annotation</button>
+                      <button class="command-item" id="draw-btn-simpleTag" onclick="useDrawTool('simpleTag')">Tag</button>
+                      <button class="command-item command-item-danger" onclick="clearDrawings()">Clear All</button>
                     </div>
                   </div>
 
