@@ -1167,11 +1167,18 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 #page-app:has(#section-chart.active) .topbar{ display:none; }
 #page-app:has(#section-chart.active) .main-content{ margin-left:0; }
 
-/* — Chart wrapper bleeds to the content-area edges so its own header
-     can sit flush like a slim exchange navbar — */
-.chart-terminal-layout{ margin:-24px -24px 0 -24px; }
+/* — Chart page's content-area loses its top/left/right padding so the
+     header can sit flush at pixel 0 with no gap above it. Bottom padding
+     is left untouched (still reserves clearance above the mobile nav). — */
+#page-app:has(#section-chart.active) .content-area{
+  padding-top:0;
+  padding-left:0;
+  padding-right:0;
+}
 
-/* — Chart page header: logo / horizontal nav / broker / actions, one slim row — */
+/* — Chart page header: logo / horizontal nav / broker / actions, one slim row.
+     Fixed min-height (not vertical padding) + align-items:center keeps every
+     child perfectly centered regardless of its own natural height. — */
 .chart-header-wrapper{
   position:sticky;
   top:0;
@@ -1179,7 +1186,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   display:flex;
   align-items:center;
   gap:18px;
-  padding:8px 20px;
+  min-height:60px;
+  padding:0 20px;
   background:rgba(17,19,23,0.92);
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
@@ -1195,7 +1203,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-nav-left .sidebar-logo{ padding:0; border-bottom:none; }
 
 /* Center — horizontal page navigation */
-.chart-nav-center{ flex:1; min-width:0; display:flex; justify-content:center; }
+.chart-nav-center{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; }
 .chart-top-navigation{
   display:flex;
   align-items:center;
@@ -1262,19 +1270,17 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* — Bottom mobile nav gets slimmer ONLY while the Chart page is active,
      freeing vertical room for the chart; every other page's bottom nav
      is completely unaffected — */
-#page-app:has(#section-chart.active) + #mobile-nav{ padding:4px 0 8px; }
-#page-app:has(#section-chart.active) + #mobile-nav .mn-item{ padding:3px 0; font-size:8px; }
-#page-app:has(#section-chart.active) + #mobile-nav .mni{ font-size:17px; }
-#page-app:has(#section-chart.active) + #mobile-nav .mn-center-btn{ width:40px; height:40px; border-radius:11px; }
+#page-app:has(#section-chart.active) + #mobile-nav{ padding:3px 0 6px; }
+#page-app:has(#section-chart.active) + #mobile-nav .mn-item{ padding:3px 0; }
+#page-app:has(#section-chart.active) + #mobile-nav .mn-center-btn{ width:42px; height:42px; margin-bottom:0; }
 
 /* — Responsive: tablet/mobile keep the same slim header, nav scrolls
      horizontally instead of wrapping or overflowing the page — */
 @media(max-width:1024px){
-  .chart-terminal-layout{ margin:-16px -16px 0 -16px; }
   .chart-terminal-layout > div:not(.chart-header-wrapper){ padding:10px !important; }
-  .chart-header-wrapper{ padding:8px 16px; }
+  .chart-header-wrapper{ padding:0 16px; }
 }
 @media(max-width:768px){
-  .chart-header-wrapper{ padding:8px 14px; gap:10px; }
+  .chart-header-wrapper{ padding:0 14px; gap:10px; }
   .chart-nav-right .broker-sel{ min-width:120px; }
 }
