@@ -1044,9 +1044,58 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cockpit-group:first-child{padding-left:0;}
 .cockpit-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0;}
 .cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
-.chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;}
+.chart-viewport{position:relative;flex:1;min-height:0;min-width:0;overflow:hidden;padding:14px;}
 .chart-panel-wrap{flex:3 1 500px;}
 .chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
+
+/* ═══ CHART BODY ROW : Left Drawing Toolbar + Chart Viewport ═══ */
+.chart-body-row{display:flex;flex:1;min-height:0;}
+
+#left-drawing-toolbar{
+  flex-shrink:0;
+  width:44px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:8px 0;
+  gap:0;
+  background:var(--bg3);
+  border-right:1px solid var(--border);
+}
+.ldt-group{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  width:100%;
+  padding-bottom:6px;
+  margin-bottom:6px;
+  border-bottom:1px solid var(--border2);
+}
+.ldt-btn{
+  width:32px;
+  height:32px;
+  margin:2px 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:transparent;
+  border:none;
+  border-radius:6px;
+  color:var(--muted);
+  cursor:pointer;
+  transition:background 0.15s ease, color 0.15s ease;
+}
+.ldt-btn svg{width:16px;height:16px;}
+.ldt-btn:hover{background:var(--gold-dim);color:var(--white);}
+.ldt-btn.active-tool{background:var(--gold-dim);color:var(--gold);box-shadow:inset 0 0 0 1.5px var(--gold);}
+.ldt-clear{color:var(--red);margin-top:auto;}
+.ldt-clear:hover{background:var(--red-dim);color:var(--red);}
+
+@media (max-width:900px){
+  #left-drawing-toolbar{width:38px;}
+  .ldt-btn{width:28px;height:28px;}
+  .ldt-btn svg{width:14px;height:14px;}
+}
 
 /* — Bottom Dock — */
 .bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}

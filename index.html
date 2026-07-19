@@ -366,31 +366,6 @@
                     </div>
                   </div>
 
-                  <div class="command-group" data-menu="drawing">
-                    <button class="command-pill">
-                      <span>Drawing</span>
-                      <i class="chevron"></i>
-                    </button>
-                    <div class="command-panel">
-                      <button class="command-item" id="draw-btn-segment" onclick="useDrawTool('segment')">Trendline</button>
-                      <button class="command-item" id="draw-btn-straightLine" onclick="useDrawTool('straightLine')">Extended Line</button>
-                      <button class="command-item" id="draw-btn-rayLine" onclick="useDrawTool('rayLine')">Ray Line</button>
-                      <button class="command-item" id="draw-btn-horizontalStraightLine" onclick="useDrawTool('horizontalStraightLine')">Horizontal Line</button>
-                      <button class="command-item" id="draw-btn-horizontalRayLine" onclick="useDrawTool('horizontalRayLine')">Horizontal Ray</button>
-                      <button class="command-item" id="draw-btn-horizontalSegment" onclick="useDrawTool('horizontalSegment')">Horizontal Segment</button>
-                      <button class="command-item" id="draw-btn-verticalStraightLine" onclick="useDrawTool('verticalStraightLine')">Vertical Line</button>
-                      <button class="command-item" id="draw-btn-verticalRayLine" onclick="useDrawTool('verticalRayLine')">Vertical Ray</button>
-                      <button class="command-item" id="draw-btn-verticalSegment" onclick="useDrawTool('verticalSegment')">Vertical Segment</button>
-                      <button class="command-item" id="draw-btn-priceLine" onclick="useDrawTool('priceLine')">Price Line</button>
-                      <button class="command-item" id="draw-btn-priceChannelLine" onclick="useDrawTool('priceChannelLine')">Price Channel</button>
-                      <button class="command-item" id="draw-btn-parallelStraightLine" onclick="useDrawTool('parallelStraightLine')">Parallel Channel</button>
-                      <button class="command-item" id="draw-btn-fibonacciLine" onclick="useDrawTool('fibonacciLine')">Fibonacci</button>
-                      <button class="command-item" id="draw-btn-simpleAnnotation" onclick="useDrawTool('simpleAnnotation')">Annotation</button>
-                      <button class="command-item" id="draw-btn-simpleTag" onclick="useDrawTool('simpleTag')">Tag</button>
-                      <button class="command-item command-item-danger" onclick="clearDrawings()">Clear All</button>
-                    </div>
-                  </div>
-
                   <div class="command-group" data-menu="layout">
                     <button class="command-pill">
                       <span>Layout</span>
@@ -409,19 +384,90 @@
 
                 </div><!-- /chart-commandbar -->
 
-                <!-- CHART VIEWPORT -->
-                <div class="chart-viewport">
-                  <div class="chart-panel-wrap">
-                    <div class="chart-symbol-overlay" id="chart-symbol-overlay">
-                      <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
-                      <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
+                <!-- CHART BODY : Left Drawing Toolbar + Chart Viewport -->
+                <div class="chart-body-row">
+
+                  <!-- LEFT DRAWING TOOLBAR -->
+                  <aside id="left-drawing-toolbar">
+
+                    <div class="ldt-group">
+                      <button class="ldt-btn" id="draw-btn-segment" title="Trendline" onclick="useDrawTool('segment')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20L20 4"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-straightLine" title="Extended Line" onclick="useDrawTool('straightLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 22L22 2"/><circle cx="7" cy="17" r="1.6" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.6" fill="currentColor" stroke="none"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-rayLine" title="Ray" onclick="useDrawTool('rayLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="19" r="1.8" fill="currentColor" stroke="none"/><path d="M6 18L21 3"/></svg>
+                      </button>
                     </div>
-                    <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
-                    <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
+
+                    <div class="ldt-group">
+                      <button class="ldt-btn" id="draw-btn-horizontalStraightLine" title="Horizontal Line" onclick="useDrawTool('horizontalStraightLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12h18"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-horizontalRayLine" title="Horizontal Ray" onclick="useDrawTool('horizontalRayLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.8" fill="currentColor" stroke="none"/><path d="M8 12h13"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-horizontalSegment" title="Horizontal Segment" onclick="useDrawTool('horizontalSegment')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14"/><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-verticalStraightLine" title="Vertical Line" onclick="useDrawTool('verticalStraightLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-verticalRayLine" title="Vertical Ray" onclick="useDrawTool('verticalRayLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="5" r="1.8" fill="currentColor" stroke="none"/><path d="M12 8v13"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-verticalSegment" title="Vertical Segment" onclick="useDrawTool('verticalSegment')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14"/><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg>
+                      </button>
+                    </div>
+
+                    <div class="ldt-group">
+                      <button class="ldt-btn" id="draw-btn-priceLine" title="Price Line" onclick="useDrawTool('priceLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9h18M3 15h12"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-priceChannelLine" title="Price Channel" onclick="useDrawTool('priceChannelLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h18M3 16h18"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-parallelStraightLine" title="Parallel Channel" onclick="useDrawTool('parallelStraightLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17L17 3M7 21L21 7"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-fibonacciLine" title="Fibonacci" onclick="useDrawTool('fibonacciLine')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>
+                      </button>
+                    </div>
+
+                    <div class="ldt-group">
+                      <button class="ldt-btn" id="draw-btn-simpleAnnotation" title="Annotation" onclick="useDrawTool('simpleAnnotation')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v13M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+                      </button>
+                      <button class="ldt-btn" id="draw-btn-simpleTag" title="Tag" onclick="useDrawTool('simpleTag')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6a2 2 0 0 1 1.42.59l6.79 6.79a2 2 0 0 1 0 2.82l-7.6 7.6a2 2 0 0 1-2.82 0L3.6 13.6a2 2 0 0 1-.6-1.42V4.6a2 2 0 0 1 2-2z"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+                      </button>
+                    </div>
+
+                    <button class="ldt-btn ldt-clear" title="Clear All" onclick="clearDrawings()">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                    </button>
+
+                  </aside>
+
+                  <!-- CHART VIEWPORT -->
+                  <div class="chart-viewport">
+                    <div class="chart-panel-wrap">
+                      <div class="chart-symbol-overlay" id="chart-symbol-overlay">
+                        <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
+                        <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
+                      </div>
+                      <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
+                      <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
+                    </div>
+                    <!-- Reserved overlay layer — future AI badges, trade markers, replay controls -->
+                    <div class="chart-future-overlay" aria-hidden="true"></div>
                   </div>
-                  <!-- Reserved overlay layer — future AI badges, trade markers, replay controls -->
-                  <div class="chart-future-overlay" aria-hidden="true"></div>
-                </div>
+
+                </div><!-- /chart-body-row -->
 
               </section><!-- /chart-workspace -->
 
