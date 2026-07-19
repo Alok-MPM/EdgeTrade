@@ -846,7 +846,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .entry-grid{grid-template-columns:1fr;}
   .stats-big-grid{grid-template-columns:1fr 1fr;}
   .stats-grid2{grid-template-columns:1fr;}
-  .mobile-nav{display:block;}
   .content-area{padding:16px 16px 140px;overflow-y:auto;}
   .nav{padding:12px 16px;}
   .nav-links{display:none;}
@@ -861,6 +860,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   footer{padding:28px 24px;}
   .sbar-item{padding:18px 10px;}
   .sbar-num{font-size:28px;}
+}
+/* Bottom nav: mobile phones only. Desktop/tablet-landscape/laptop stay on
+   the base .mobile-nav{display:none} rule above; HTML is untouched. */
+@media(max-width:768px){
+  .mobile-nav{display:block;}
 }
 @media(max-width:600px){
   .days-grid{grid-template-columns:1fr 1fr;}
@@ -1029,7 +1033,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 /* ═══════════════════════════════════════════════
    WORKSPACE ARCHITECTURE — Chart Cockpit / Trading Workspace / Bottom Dock
-   Z-INDEX SCALE: modal 100, context-menu 90, dropdown 80, floating-cockpit 70,
+   Z-INDEX SCALE: modal 100, context-menu 90, dropdown 80, chart-header 75, floating-cockpit 70,
    ai-overlay 60, chart-overlay 50, panels 40, chart 30, workspace 20, bg 10
    ═══════════════════════════════════════════════ */
 .workspace-shell{display:flex;gap:14px;align-items:flex-start;min-height:0;}
@@ -1174,6 +1178,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   padding-top:0;
   padding-left:0;
   padding-right:0;
+  width:100%;
+  box-sizing:border-box;
+}
+.chart-terminal-layout{
+  width:100%;
+  box-sizing:border-box;
 }
 
 /* — Chart page header: logo / horizontal nav / broker / actions, one slim row.
@@ -1182,11 +1192,15 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-header-wrapper{
   position:sticky;
   top:0;
-  z-index:40;
+  left:0;
+  right:0;
+  z-index:75; /* above .chart-cockpit's 70 so the toolbar can never render over the header; stays below dropdowns/modals (80+) */
   display:flex;
   align-items:center;
   gap:18px;
   min-height:60px;
+  width:100%;
+  box-sizing:border-box;
   padding:0 20px;
   background:rgba(17,19,23,0.92);
   backdrop-filter:blur(16px);
