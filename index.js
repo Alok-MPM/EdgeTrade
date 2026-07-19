@@ -2145,73 +2145,20 @@ let currentInterval = '1m';
 let currentSymbol = 'BTCUSDT';
 let binanceMarkets = null;
 
-// Reads a live CSS custom property from style.css (falls back to the given
-// value if the var isn't set). Used so chart colors always match the
-// current theme instead of being hardcoded hex that can drift out of sync.
-function cssVar(name, fallback){
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return val || fallback;
-}
-
-// ============================================================================
-// CHART ZOOM/PAN — native klinecharts engine as the baseline, plus two things
-// the library doesn't do out of the box:
-//   1. Block the browser's own page-scroll on wheel/touch over the chart
-//      (klinecharts' own gesture handling doesn't call preventDefault for
-//      you, so without this the page scrolls right along with the chart).
-//   2. Translate horizontal wheel/trackpad swipes into panning —
-//      klinecharts only pans via click-and-drag natively; a horizontal
-//      wheel gesture does nothing on its own, which feels wrong coming
-//      from TradingView-style trackpad habits.
-// Vertical wheel (deltaY) and ctrl+wheel (trackpad pinch) are left alone so
-// they still hit klinecharts' own native zoom.
-// ============================================================================
-function attachChartZoomControls(chart){
-  if(!chart) return;
-
-  // Keep native enabled as the baseline engine
-  chart.setZoomEnabled(true);
-  chart.setScrollEnabled(true);
-  chart.setPaneOptions({ id: 'candle_pane', axisOptions: { scrollZoomEnabled: true } });
-
-  const container = document.getElementById('klineMainChart');
-  if(!container) return;
-
-  // Cleanup any previously-attached copies of these two listeners first, so
-  // calling this function again (e.g. if init ever re-runs) can't stack
-  // duplicate handlers on the same node.
-  if(container._etWheel) container.removeEventListener('wheel', container._etWheel);
-  if(container._etTouch) container.removeEventListener('touchmove', container._etTouch);
-
-  container._etWheel = (e) => {
-    // Strict block: stop the webpage itself from scrolling on this gesture.
-    e.preventDefault();
-
-    if(e.ctrlKey){
-      // Trackpad pinch-to-zoom sends wheel+ctrlKey — let native klinecharts
-      // zoom handle it, we don't touch it here.
-      return;
-    }
-
-    if(Math.abs(e.deltaX) > Math.abs(e.deltaY)){
-      // Horizontal swipe -> pan the chart (x1.5 so it doesn't feel sluggish).
-      chart.scrollByDistance(e.deltaX * 1.5);
-      e.stopPropagation();
-    }
-    // Vertical wheel (deltaY dominant) intentionally falls through to
-    // klinecharts' own native zoom handling.
-  };
-  container.addEventListener('wheel', container._etWheel, { passive:false });
-
-  container._etTouch = (e) => {
-    if(e.touches.length > 1) return; // let native pinch-to-zoom through
-    e.preventDefault(); // block the page from scrolling on a single-finger drag
-  };
-  container.addEventListener('touchmove', container._etTouch, { passive:false });
-}
-
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
+
+  // Scroll shield: stops the webpage from scrolling when the mouse wheel or
+  // a touch drag happens over the chart. Nothing else here — no zoom/pan
+  // logic touched.
+  if(container && !container.dataset.scrollShield){
+    container.dataset.scrollShield = 'true';
+    container.style.touchAction = 'none';
+    container.style.overscrollBehavior = 'none';
+    container.addEventListener('wheel', (e) => { e.preventDefault(); }, { passive:false });
+    container.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive:false });
+  }
+
   try {
     container.innerHTML = '<div style="padding:20px;color:var(--muted);">Loading chart library...</div>';
     if (typeof klinecharts === 'undefined') {
@@ -2222,73 +2169,11 @@ async function initMainChart(){
     if(mainChartInstance) return;
     mainChartInstance = klinecharts.init('klineMainChart');
     if (!mainChartInstance) throw new Error('klinecharts.init() returned null — check container id');
-    window.EdgeTradeChart = mainChartInstance; // stable external handle for future tools/buttons
-
-    const Y_AXIS_WIDTH = 70;
-    const X_AXIS_HEIGHT = 28;
-    const gold = cssVar('--gold', '#D4B886');
-    const muted = cssVar('--muted', '#8B949E');
-    const cardBg = cssVar('--card', '#1A1D24');
 
     mainChartInstance.setStyles({
-      // Floating-candle look: grid basically invisible instead of the old
-      // solid --border-colored lines.
-      grid: {
-        show: true,
-        horizontal: { show: true, size: 1, color: 'rgba(255,255,255,0.03)' },
-        vertical: { show: true, size: 1, color: 'rgba(255,255,255,0.03)' }
-      },
-      candle: {
-        bar: { upColor:cssVar('--green','#4CAF7D'), downColor:cssVar('--red','#E05252'), noChangeColor:'#888888' },
-        // showType stays 'standard' (klinecharts' default) — that's the
-        // no-background-box tooltip variant; 'rect' is the boxed one.
-        tooltip: {
-          showRule: 'always',
-          showType: 'standard',
-          title: { show:false },
-          legend: {
-            size: 11,
-            weight: 'normal',
-            color: muted,
-            marginLeft: 0,
-            marginTop: 2,
-            marginRight: 8,
-            marginBottom: 2
-          }
-        }
-      },
-      // Axis lines/ticks removed entirely — labels float straight on the
-      // background instead of sitting inside a bordered strip.
-      xAxis: {
-        size: X_AXIS_HEIGHT,
-        axisLine: { show:false },
-        tickLine: { show:false },
-        tickText: { color: muted }
-      },
-      yAxis: {
-        size: Y_AXIS_WIDTH,
-        axisLine: { show:false },
-        tickLine: { show:false },
-        tickText: { color: muted }
-      },
-      // Thin dashed gold crosshair, no boxy background behind the labels —
-      // just a small, sharp, low-contrast chip so the text stays legible.
-      crosshair: {
-        horizontal: {
-          line: { style:'dashed', dashedValue:[4,4], size:1, color: gold },
-          text: { color: gold, backgroundColor: cardBg, borderSize: 0, paddingLeft:4, paddingRight:4, paddingTop:2, paddingBottom:2, borderRadius:2 }
-        },
-        vertical: {
-          line: { style:'dashed', dashedValue:[4,4], size:1, color: gold },
-          text: { color: gold, backgroundColor: cardBg, borderSize: 0, paddingLeft:4, paddingRight:4, paddingTop:2, paddingBottom:2, borderRadius:2 }
-        }
-      }
+      grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
+      candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
     });
-
-    // No right-click context menu on the chart canvas.
-    container.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    attachChartZoomControls(mainChartInstance);
 
     await loadChartInterval(currentInterval);
   } catch(err) {
@@ -2446,8 +2331,8 @@ async function selectMarket(symbol){
   if(symbol === currentSymbol || !mainChartInstance) return;
   currentSymbol = symbol;
   const label = formatSymbolLabel(symbol);
-  const labelEl = document.getElementById('market-select-label');
-  if(labelEl) labelEl.textContent = label;
+  const btn = document.getElementById('market-select-btn');
+  if(btn) btn.textContent = label + ' ▾';
   const nameEl = document.querySelector('#chart-symbol-overlay .csym-name');
   if(nameEl) nameEl.innerHTML = label + ' <span class="csym-sub">· Binance</span>';
   prevMaxOverlayPrice = null;
@@ -3507,267 +3392,4 @@ document.addEventListener("DOMContentLoaded", () => {
     const card = e.target.closest('.trade-card');
     if(card) handleReset(card);
   });
-})();
-
-// ══════════════════════════════════════════════════════════════════
-// COMMAND BAR — Chart Toolbar Interaction (Part 3 / standalone module)
-// Reads/enhances the DOM from Part 1 (.chart-commandbar) and the
-// classes from Part 2 CSS (.command-pill, .command-panel, .command-item).
-// Does not modify or duplicate existing toolbar logic (switchTimeframe,
-// switchChartType, toggleIndicator, useDrawTool, clearDrawings,
-// toggleMarketDropdown, filterMarketList, selectMarket) — it only
-// layers open/close, keyboard, label, hover and AI-cockpit behaviour
-// on top via DOM observation and event delegation.
-// ══════════════════════════════════════════════════════════════════
-(function(){
-
-  const BAR_ID = 'chart-cockpit'; // kept from Part 1 (element now has class="chart-commandbar")
-  let activeGroup = null; // the currently open .command-group, if any
-
-  function bar(){ return document.getElementById(BAR_ID); }
-
-  function isMarketGroup(group){
-    return !!(group && group.querySelector('#market-dd'));
-  }
-
-  // ── Open / close primitives ─────────────────────────────────────
-  function openCommandMenu(group){
-    if(!group || group === activeGroup) return;
-    if(isMarketGroup(group)){
-      const dd = group.querySelector('#market-dd');
-      if(dd && !dd.classList.contains('open')) toggleMarketDropdown(); // reuse existing loader/focus logic
-      return; // group's own 'open' class is kept in sync by the MutationObserver below
-    }
-    group.classList.add('open','is-active');
-    const pill = group.querySelector('.command-pill');
-    if(pill) pill.setAttribute('aria-expanded','true');
-    activeGroup = group;
-    // Move focus to the first menu item for keyboard users
-    requestAnimationFrame(() => {
-      const first = group.querySelector('.command-panel .command-item, .command-panel .command-search');
-      if(first) first.focus({preventScroll:true});
-    });
-  }
-
-  function closeCommandMenu(group){
-    if(!group) return;
-    if(isMarketGroup(group)){
-      const dd = group.querySelector('#market-dd');
-      if(dd) dd.classList.remove('open'); // MutationObserver syncs the group's classes
-      if(activeGroup === group) activeGroup = null;
-      return;
-    }
-    group.classList.remove('open','is-active');
-    const pill = group.querySelector('.command-pill');
-    if(pill) pill.setAttribute('aria-expanded','false');
-    if(activeGroup === group) activeGroup = null;
-  }
-
-  function closeAllMenus(exceptGroup){
-    const root = bar();
-    if(!root) return;
-    root.querySelectorAll('.command-group.open').forEach(g => {
-      if(g !== exceptGroup) closeCommandMenu(g);
-    });
-    const dd = document.getElementById('market-dd');
-    if(dd && dd.classList.contains('open') && dd.closest('.command-group') !== exceptGroup){
-      dd.classList.remove('open');
-    }
-  }
-
-  // ── Keep the Market group's classes/ARIA in sync with #market-dd,
-  //    whose 'open' class is toggled by the existing toggleMarketDropdown()
-  //    / selectMarket() / outside-click logic already in this file. ──
-  function initMarketGroupSync(){
-    const dd = document.getElementById('market-dd');
-    const group = dd ? dd.closest('.command-group') : null;
-    if(!dd || !group) return;
-    const sync = () => {
-      const isOpen = dd.classList.contains('open');
-      group.classList.toggle('open', isOpen);
-      group.classList.toggle('is-active', isOpen);
-      dd.setAttribute('aria-hidden', String(!isOpen));
-      const pill = group.querySelector('.command-pill');
-      if(pill) pill.setAttribute('aria-expanded', String(isOpen));
-      activeGroup = isOpen ? group : (activeGroup === group ? null : activeGroup);
-    };
-    sync();
-    new MutationObserver(sync).observe(dd, {attributes:true, attributeFilter:['class']});
-  }
-
-  // ── Pill click delegation (single source of truth for "only one open") ──
-  function initPillClicks(){
-    const root = bar();
-    if(!root) return;
-    root.addEventListener('click', (e) => {
-      const pill = e.target.closest('.command-pill');
-      if(!pill || !root.contains(pill)) return;
-      const group = pill.closest('.command-group');
-      if(!group) return;
-
-      if(isMarketGroup(group)){
-        // toggleMarketDropdown() already ran via the button's own onclick
-        // (fires before this delegated listener); just close everyone else.
-        closeAllMenus(group);
-        return;
-      }
-      const willOpen = !group.classList.contains('open');
-      closeAllMenus(group);
-      if(willOpen) openCommandMenu(group); else closeCommandMenu(group);
-    });
-
-    // Selecting a menu item closes that item's menu (existing onclick,
-    // e.g. switchTimeframe/toggleIndicator, still fires first as normal).
-    root.addEventListener('click', (e) => {
-      const item = e.target.closest('.command-item');
-      if(!item || !root.contains(item)) return;
-      const group = item.closest('.command-group');
-      closeCommandMenu(group);
-    });
-  }
-
-  // ── Outside click / Escape ────────────────────────────────────────
-  function initGlobalClose(){
-    document.addEventListener('click', (e) => {
-      const root = bar();
-      if(!root) return;
-      if(!root.contains(e.target)) closeAllMenus();
-    });
-    document.addEventListener('keydown', (e) => {
-      if(e.key !== 'Escape' || !activeGroup) return;
-      const group = activeGroup;
-      closeCommandMenu(group);
-      const pill = group.querySelector('.command-pill');
-      if(pill) pill.focus({preventScroll:true});
-    });
-  }
-
-  // ── Keyboard navigation inside an open panel ──────────────────────
-  function initKeyboardNavigation(){
-    document.addEventListener('keydown', (e) => {
-      if(!activeGroup || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
-      const panel = activeGroup.querySelector('.command-panel');
-      if(!panel) return;
-      const focusables = Array.from(panel.querySelectorAll('.command-item, .command-search'));
-      if(!focusables.length) return;
-      e.preventDefault();
-      const idx = focusables.indexOf(document.activeElement);
-      let next;
-      if(e.key === 'ArrowDown') next = idx < 0 ? 0 : (idx + 1) % focusables.length;
-      else next = idx < 0 ? focusables.length - 1 : (idx - 1 + focusables.length) % focusables.length;
-      focusables[next].focus({preventScroll:true});
-    });
-  }
-
-  // ── Magnetic hover (desktop pointer only, capped at 3px, rAF-throttled) ──
-  function initMagneticHover(){
-    const canHover = window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches;
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-    const root = bar();
-    if(!root || !canHover || reduced) return;
-
-    const MAX = 3;
-    let ticking = false;
-    let pending = null;
-
-    root.querySelectorAll('.command-pill').forEach(pill => {
-      pill.addEventListener('mousemove', (e) => {
-        const rect = pill.getBoundingClientRect();
-        const dx = ((e.clientX - rect.left) / rect.width - 0.5) * 2 * MAX;
-        const dy = ((e.clientY - rect.top) / rect.height - 0.5) * 2 * MAX;
-        pending = { pill, dx, dy };
-        if(!ticking){
-          ticking = true;
-          requestAnimationFrame(() => {
-            if(pending){
-              pending.pill.style.transform = `translateY(-2px) translate(${pending.dx}px, ${pending.dy}px)`;
-            }
-            ticking = false;
-          });
-        }
-      });
-      pill.addEventListener('mouseleave', () => {
-        pending = null;
-        pill.style.transform = '';
-      });
-    });
-  }
-
-  // ── Label sync: pill text reflects the current single-select state ──
-  // Watches .command-item's active-tool class (set by the existing
-  // switchTimeframe / switchChartType / toggleIndicator functions) and
-  // updates the pill label — without touching those functions.
-  function initLabelSync(){
-    const root = bar();
-    if(!root) return;
-    root.querySelectorAll('.command-group').forEach(group => {
-      if(isMarketGroup(group)) return; // market label already handled in selectMarket()
-      const panel = group.querySelector('.command-panel');
-      const pill = group.querySelector('.command-pill');
-      const labelSpan = pill ? pill.querySelector('span') : null;
-      if(!panel || !labelSpan) return;
-      const defaultLabel = labelSpan.textContent;
-
-      const refresh = () => {
-        const active = panel.querySelectorAll('.command-item.active-tool');
-        if(active.length === 1) labelSpan.textContent = active[0].textContent.trim();
-        else if(active.length > 1) labelSpan.textContent = defaultLabel + ' \u00b7 ' + active.length;
-        else labelSpan.textContent = defaultLabel;
-      };
-      new MutationObserver(refresh).observe(panel, {subtree:true, attributes:true, attributeFilter:['class']});
-      refresh();
-    });
-  }
-
-  // ── AI Cockpit — placeholder only, no backend ─────────────────────
-  function buildAICockpitPanel(aiGroup){
-    const panel = document.createElement('div');
-    panel.className = 'command-panel';
-    panel.id = 'ai-cockpit-panel';
-    panel.style.minWidth = '260px';
-    panel.innerHTML = `
-      <div style="padding:4px 10px 10px;font-size:10.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">AI Cockpit</div>
-      ${[
-        ['Market Status','Standby'],
-        ['Bias','Neutral'],
-        ['Confidence','—'],
-        ['Risk Meter','—'],
-        ['Smart Suggestions','Coming soon']
-      ].map(([label,value]) => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:12px;">
-          <span style="font-size:13px;color:var(--muted);">${label}</span>
-          <span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold);">${value}</span>
-        </div>
-      `).join('')}
-    `;
-    aiGroup.appendChild(panel);
-    return panel;
-  }
-
-  function initAICockpit(){
-    const root = bar();
-    const aiGroup = root ? root.querySelector('.ai-group') : null;
-    if(!aiGroup) return;
-    buildAICockpitPanel(aiGroup); // .ai-group now behaves like any other command-group
-  }
-
-  // ── Entry point ────────────────────────────────────────────────────
-  function initCommandBar(){
-    const root = bar();
-    if(!root) return;
-    initAICockpit();          // build the AI panel before wiring generic pill clicks
-    initMarketGroupSync();
-    initPillClicks();
-    initGlobalClose();
-    initKeyboardNavigation();
-    initMagneticHover();
-    initLabelSync();
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initCommandBar);
-  } else {
-    initCommandBar();
-  }
-
 })();
