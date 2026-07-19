@@ -2999,6 +2999,14 @@ function openTpSlModal(posId){
   document.getElementById('tpsl-modal-overlay').classList.add('open');
 }
 
+function openAiMentorPopup(){
+  document.getElementById('ai-mentor-overlay').classList.add('open');
+}
+
+function closeAiMentorPopup(){
+  document.getElementById('ai-mentor-overlay').classList.remove('open');
+}
+
 function closeTpSlModal(){
   document.getElementById('tpsl-modal-overlay').classList.remove('open');
   tpSlModalPosId = null;
