@@ -895,6 +895,39 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(201,168,76,0.15);border-radius:2px;}
 
+/* ════════ CHART PAGE NAV MENU (bottom sheet) ════════ */
+.chart-nav-popup-overlay{
+  position:fixed;inset:0;z-index:500; /* well above chart-cockpit(70) and chart-header(75) so it always opens in front */
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
+  display:none;align-items:flex-end;justify-content:center;
+  overscroll-behavior:contain;
+}
+.chart-nav-popup-overlay.open{display:flex;animation:fadeIn 0.2s ease;}
+.chart-nav-popup-panel{
+  background:var(--bg2);border:1px solid var(--border);
+  border-top:1px solid rgba(201,168,76,0.15);
+  border-radius:20px 20px 0 0;
+  width:100%;max-width:480px;
+  padding-bottom:18px;
+  box-shadow:0 -20px 60px rgba(0,0,0,0.8);
+  animation:slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+}
+.chart-nav-popup-handle{
+  width:44px;height:5px;background:rgba(255,255,255,0.18);
+  border-radius:3px;margin:10px auto 14px;cursor:grab;
+}
+.chart-nav-popup-title{
+  padding:0 18px 10px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);
+}
+.chart-nav-popup-list{display:flex;flex-direction:column;padding:0 10px;}
+.chart-nav-popup-item{
+  display:flex;align-items:center;gap:14px;padding:13px 12px;border-radius:10px;
+  background:none;border:none;color:var(--white);font-size:16px;font-family:'Outfit',sans-serif;
+  cursor:pointer;transition:background 0.15s;width:100%;text-align:left;
+}
+.chart-nav-popup-item:hover,.chart-nav-popup-item:active{background:var(--gold-dim);color:var(--gold);}
+.chart-nav-popup-item .nav-icon-svg{width:20px;height:20px;flex-shrink:0;}
+
 /* ════════ STRATEGY AUTOCOMPLETE ════════ */
 .strategy-wrap{position:relative;}
 /* Strategy Modal — broker popup style */

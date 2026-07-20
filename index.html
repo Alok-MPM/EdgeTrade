@@ -313,14 +313,7 @@
 
             <div class="chart-nav-center">
               <div class="chart-top-navigation">
-                <button class="chart-nav-item active" onclick="showSection('chart');setSideNav('snav-chart')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>Chart</button>
-                <button class="chart-nav-item" onclick="showSection('home');setSideNav('snav-home')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>Journal</button>
-                <button class="chart-nav-item" onclick="showSection('stats');setSideNav('snav-stats')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Statistics</button>
-                <button class="chart-nav-item" onclick="showSection('bot');setSideNav('snav-bot')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>Assistant</button>
-                <button class="chart-nav-item" onclick="showSection('calculator');setSideNav('snav-calc')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 10v.01M12 10v.01M8 10v.01"/></svg>Calculator</button>
-                <button class="chart-nav-item" onclick="openBrokerPopup()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Brokers</button>
-                <button class="chart-nav-item" onclick="showSection('profile');setSideNav('snav-profile')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
-                <button class="chart-nav-item" onclick="showSection('settings');setSideNav('snav-settings')"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Settings</button>
+                <button class="chart-nav-item active" id="chart-nav-menu-btn" onclick="toggleChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>Chart<svg class="nav-icon-svg" viewBox="0 0 24 24" style="width:14px;height:14px;margin-left:2px;"><path d="M6 9l6 6 6-6"/></svg></button>
               </div>
             </div>
 
@@ -1260,6 +1253,32 @@
 
 <script src="index.js"></script>
 
+<!-- CHART PAGE NAV MENU (bottom sheet, opened from the "Chart" button in the chart topbar) -->
+<div class="chart-nav-popup-overlay" id="chart-nav-popup-overlay" onclick="if(event.target===this) closeChartNavMenu()">
+  <div class="chart-nav-popup-panel">
+    <div class="chart-nav-popup-handle" onclick="closeChartNavMenu()"></div>
+    <div class="chart-nav-popup-title">Go to</div>
+    <div class="chart-nav-popup-list">
+      <button class="chart-nav-popup-item" onclick="showSection('home');setSideNav('snav-home');closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>Journal</button>
+      <button class="chart-nav-popup-item" onclick="showSection('stats');setSideNav('snav-stats');closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Statistics</button>
+      <button class="chart-nav-popup-item" onclick="showSection('bot');setSideNav('snav-bot');closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>Assistant</button>
+      <button class="chart-nav-popup-item" onclick="showSection('calculator');setSideNav('snav-calc');closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 10v.01M12 10v.01M8 10v.01"/></svg>Calculator</button>
+      <button class="chart-nav-popup-item" onclick="openBrokerPopup();closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Brokers</button>
+      <button class="chart-nav-popup-item" onclick="showSection('profile');setSideNav('snav-profile');closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
+      <button class="chart-nav-popup-item" onclick="showSection('settings');setSideNav('snav-settings');closeChartNavMenu()"><svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Settings</button>
+    </div>
+  </div>
+</div>
+<script>
+function toggleChartNavMenu(){
+  var el=document.getElementById('chart-nav-popup-overlay');
+  if(el) el.classList.add('open');
+}
+function closeChartNavMenu(){
+  var el=document.getElementById('chart-nav-popup-overlay');
+  if(el) el.classList.remove('open');
+}
+</script>
 
 <!-- TP / SL SET MODAL -->
 <div class="popup-overlay" id="tpsl-modal-overlay" onclick="if(event.target===this) closeTpSlModal()">
