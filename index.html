@@ -410,6 +410,29 @@
 
                   <div class="cockpit-divider"></div>
 
+                  <div class="cockpit-group cockpit-group-layout">
+                    <div class="chart-wrap">
+                      <button class="cmd-pill" id="layout-select-btn" onclick="toggleLayoutDropdown()" title="Layout / Split screen">
+                        <svg class="nav-icon-svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                      </button>
+
+                      <!-- SYNC popup: separate card, portaled above the grid popup when layout button is clicked -->
+                      <div class="chart-dd layout-dd layout-sync-dd" id="layout-sync-dd" data-min-width="300">
+                        <div class="layout-sync-title">SYNC IN LAYOUT</div>
+                        <div class="layout-sync-row"><span>Symbol</span><label class="toggle"><input type="checkbox" id="sync-toggle-symbol" onchange="toggleLayoutSync('symbol',this.checked)"><span class="toggle-slider"></span></label></div>
+                        <div class="layout-sync-row"><span>Interval</span><label class="toggle"><input type="checkbox" id="sync-toggle-interval" onchange="toggleLayoutSync('interval',this.checked)"><span class="toggle-slider"></span></label></div>
+                        <div class="layout-sync-row"><span>Crosshair</span><label class="toggle"><input type="checkbox" id="sync-toggle-crosshair" onchange="toggleLayoutSync('crosshair',this.checked)"><span class="toggle-slider"></span></label></div>
+                        <div class="layout-sync-row"><span>Time</span><label class="toggle"><input type="checkbox" id="sync-toggle-time" onchange="toggleLayoutSync('time',this.checked)"><span class="toggle-slider"></span></label></div>
+                        <div class="layout-sync-row"><span>Date range</span><label class="toggle"><input type="checkbox" id="sync-toggle-daterange" onchange="toggleLayoutSync('dateRange',this.checked)"><span class="toggle-slider"></span></label></div>
+                      </div>
+
+                      <!-- GRID popup: separate card, portaled below the sync popup -->
+                      <div class="chart-dd layout-dd layout-grid-dd" id="layout-grid-dd" data-min-width="300">
+                        <div class="layout-grid-list" id="layout-grid-list"><!-- filled by renderLayoutPicker() --></div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="cockpit-group cockpit-group-workspace">
                     <button class="cmd-pill" id="chart-maximize-btn-cockpit" onclick="toggleChartMaximize()" title="Fullscreen">⛶</button>
                   </div>
@@ -443,13 +466,23 @@
                       <svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4.8A1.8 1.8 0 0 1 10.8 3h2.4A1.8 1.8 0 0 1 15 4.8V7"/><path d="M18 7l-.8 12.2A2 2 0 0 1 15.2 21H8.8a2 2 0 0 1-2-1.8L6 7"/><line x1="10" y1="11" x2="10" y2="16"/><line x1="14" y1="11" x2="14" y2="16"/></svg>
                     </button>
                   </div>
-                  <div class="chart-panel-wrap">
-                    <div class="chart-symbol-overlay" id="chart-symbol-overlay">
-                      <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
-                      <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
+                  <div class="chart-panes-stack" id="chart-panes-stack">
+                    <div class="chart-panel-wrap">
+                      <div class="chart-symbol-overlay" id="chart-symbol-overlay">
+                        <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
+                        <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
+                      </div>
+                      <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
+                      <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
                     </div>
-                    <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
-                    <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
+                    <!-- Pane 2: placeholder only for now — real independent chart instance lands in Phase 2 -->
+                    <div class="chart-pane-2" id="chart-pane-2">
+                      <div class="chart-pane-2-inner">
+                        <div class="cp2-icon">＋</div>
+                        <div class="cp2-title">Pane 2</div>
+                        <div class="cp2-sub">Independent chart — Phase 2 mein aayega</div>
+                      </div>
+                    </div>
                   </div>
                   <!-- Reserved overlay layer — future AI badges, trade markers, replay controls -->
                   <div class="chart-future-overlay" aria-hidden="true"></div>

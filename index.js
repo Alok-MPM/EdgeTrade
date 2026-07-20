@@ -2386,6 +2386,7 @@ function openCockpitDropdown(ddId, btnId){
   const btn = document.getElementById(btnId);
   if(!dd || !btn) return;
   closeAllCockpitDropdowns(ddId);
+  closeLayoutDropdowns();
   if(!dd._origParent){
     dd._origParent = dd.parentNode;
     dd._origNext = dd.nextSibling;
@@ -2471,6 +2472,213 @@ function toggleIndDropdown(){
   if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
   openCockpitDropdown('ind-dd', 'ind-select-btn');
 }
+
+/* ═══ Split Screen / Layout picker (Phase 1: UI + basic 1↔2 pane split) ═══
+   Two separate popups (per confirmed spec — sync card is NOT inside the grid
+   card): the sync card portals to document.body first, the grid card portals
+   right below it. Both share the .chart-dd visual style/z-index but are
+   opened/closed/positioned by their own logic here, independent of the
+   generic COCKPIT_DD_IDS system used for market/timeframe/type/indicators.
+   3+ pane layouts are selectable in the UI but real independent chart
+   instances per pane are Phase 2 — clicking them just shows a notice so
+   nothing half-works or breaks. */
+let currentLayoutGroup = 1;
+let currentLayoutVariant = 0;
+let layoutSyncSettings = { symbol:false, interval:false, crosshair:false, time:false, dateRange:false };
+
+// Leaf = 'S'. Counts per group intentionally match the TradingView reference
+// screenshot (1:1, 2:2, 3:6, 4:10, 5:10, 6:6, 7:3, 8:4).
+const LAYOUT_CONFIGS = {
+  1: [ 'S' ],
+  2: [
+    {dir:'row', c:['S','S']},
+    {dir:'col', c:['S','S']}
+  ],
+  3: [
+    {dir:'row', c:['S','S','S']},
+    {dir:'col', c:['S','S','S']},
+    {dir:'row', c:['S', {dir:'col', c:['S','S']}]},
+    {dir:'row', c:[{dir:'col', c:['S','S']}, 'S']},
+    {dir:'col', c:['S', {dir:'row', c:['S','S']}]},
+    {dir:'col', c:[{dir:'row', c:['S','S']}, 'S']}
+  ],
+  4: [
+    {dir:'row', c:[{dir:'col',c:['S','S']},{dir:'col',c:['S','S']}]},
+    {dir:'col', c:['S','S','S','S']},
+    {dir:'row', c:['S','S','S','S']},
+    {dir:'row', c:['S', {dir:'col', c:['S','S','S']}]},
+    {dir:'row', c:[{dir:'col', c:['S','S','S']}, 'S']},
+    {dir:'col', c:['S', {dir:'row', c:['S','S','S']}]},
+    {dir:'col', c:[{dir:'row', c:['S','S','S']}, 'S']},
+    {dir:'row', c:['S','S',{dir:'col',c:['S','S']}]},
+    {dir:'row', c:[{dir:'col',c:['S','S']},'S','S']},
+    {dir:'col', c:['S','S',{dir:'row',c:['S','S']}]}
+  ],
+  5: [
+    {dir:'row', c:['S',{dir:'col',c:['S','S','S','S']}]},
+    {dir:'col', c:['S','S','S','S','S']},
+    {dir:'row', c:['S','S','S','S','S']},
+    {dir:'row', c:[{dir:'col',c:['S','S']},{dir:'col',c:['S','S','S']}]},
+    {dir:'row', c:[{dir:'col',c:['S','S','S']},{dir:'col',c:['S','S']}]},
+    {dir:'col', c:[{dir:'row',c:['S','S']},{dir:'row',c:['S','S','S']}]},
+    {dir:'col', c:[{dir:'row',c:['S','S','S']},{dir:'row',c:['S','S']}]},
+    {dir:'row', c:['S','S',{dir:'col',c:['S','S','S']}]},
+    {dir:'row', c:[{dir:'col',c:['S','S','S']},'S','S']},
+    {dir:'col', c:['S','S',{dir:'row',c:['S','S','S']}]}
+  ],
+  6: [
+    {dir:'row', c:[{dir:'col',c:['S','S','S']},{dir:'col',c:['S','S','S']}]},
+    {dir:'col', c:['S','S','S','S','S','S']},
+    {dir:'row', c:['S','S','S','S','S','S']},
+    {dir:'row', c:[{dir:'col',c:['S','S']},{dir:'col',c:['S','S']},{dir:'col',c:['S','S']}]},
+    {dir:'col', c:[{dir:'row',c:['S','S']},{dir:'row',c:['S','S']},{dir:'row',c:['S','S']}]},
+    {dir:'row', c:[{dir:'col',c:['S','S','S']},'S','S','S']}
+  ],
+  7: [
+    {dir:'row', c:[{dir:'col',c:['S','S','S']},{dir:'col',c:['S','S','S']},'S']},
+    {dir:'row', c:['S','S','S','S','S','S','S']},
+    {dir:'col', c:[{dir:'row',c:['S','S','S']},{dir:'row',c:['S','S','S']},'S']}
+  ],
+  8: [
+    {dir:'row', c:[{dir:'col',c:['S','S','S','S']},{dir:'col',c:['S','S','S','S']}]},
+    {dir:'col', c:['S','S','S','S','S','S','S','S']},
+    {dir:'row', c:['S','S','S','S','S','S','S','S']},
+    {dir:'row', c:[{dir:'col',c:['S','S']},{dir:'col',c:['S','S']},{dir:'col',c:['S','S']},{dir:'col',c:['S','S']}]}
+  ]
+};
+
+function renderLayoutIconNode(node){
+  if(node === 'S') return '<div class="li-leaf"></div>';
+  const dirClass = node.dir === 'row' ? 'li-row' : 'li-col';
+  return '<div class="li-split ' + dirClass + '">' + node.c.map(renderLayoutIconNode).join('') + '</div>';
+}
+function renderLayoutIconHTML(node){
+  if(node === 'S') return '<div class="li-icon"><div class="li-leaf"></div></div>';
+  const dirClass = node.dir === 'row' ? 'li-row' : 'li-col';
+  return '<div class="li-icon ' + dirClass + '">' + node.c.map(renderLayoutIconNode).join('') + '</div>';
+}
+
+function renderLayoutPicker(){
+  const wrap = document.getElementById('layout-grid-list');
+  if(!wrap) return;
+  let html = '';
+  Object.keys(LAYOUT_CONFIGS).forEach(function(groupKey){
+    html += '<div class="layout-grid-row"><span class="layout-grid-num">' + groupKey + '</span><div class="layout-grid-icons">';
+    LAYOUT_CONFIGS[groupKey].forEach(function(variant, vIdx){
+      const isActive = (String(currentLayoutGroup) === groupKey && currentLayoutVariant === vIdx);
+      html += '<div class="li-btn' + (isActive ? ' active-tool' : '') + '" onclick="applyLayout(' + groupKey + ',' + vIdx + ')" title="' + groupKey + ' pane">' + renderLayoutIconHTML(variant) + '</div>';
+    });
+    html += '</div></div>';
+  });
+  wrap.innerHTML = html;
+}
+
+function toggleLayoutSync(key, checked){
+  layoutSyncSettings[key] = checked;
+  // Store-only for now — the actual cross-pane sync engine is Phase 3.
+}
+
+function applyLayout(group, variantIdx){
+  const config = LAYOUT_CONFIGS[group] && LAYOUT_CONFIGS[group][variantIdx];
+  if(!config) return;
+  if(group >= 3){
+    showToast('3+ pane layouts Phase 2 mein aayenge — abhi 1 ya 2 pane try karo');
+    return;
+  }
+  currentLayoutGroup = group;
+  currentLayoutVariant = variantIdx;
+  const stack = document.getElementById('chart-panes-stack');
+  const pane2 = document.getElementById('chart-pane-2');
+  const layoutBtn = document.getElementById('layout-select-btn');
+  if(!stack || !pane2) return;
+  stack.classList.remove('split-col');
+  if(group === 1){
+    pane2.style.display = 'none';
+  } else {
+    pane2.style.display = 'flex';
+    if(config.dir === 'col') stack.classList.add('split-col');
+  }
+  if(layoutBtn) layoutBtn.classList.toggle('active-tool', group > 1);
+  renderLayoutPicker();
+  closeLayoutDropdowns();
+  setTimeout(() => {
+    if(mainChartInstance && mainChartInstance.resize) mainChartInstance.resize();
+    window.dispatchEvent(new Event('resize'));
+  }, 60);
+}
+
+function positionLayoutDropdowns(){
+  const btn = document.getElementById('layout-select-btn');
+  const syncDd = document.getElementById('layout-sync-dd');
+  const gridDd = document.getElementById('layout-grid-dd');
+  if(!btn || !syncDd || !gridDd) return;
+  const r = btn.getBoundingClientRect();
+  const width = Math.max(r.width, 300);
+  let left = r.left;
+  if(left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+  if(left < 8) left = 8;
+  syncDd.style.left = left + 'px';
+  syncDd.style.width = width + 'px';
+  syncDd.style.top = (r.bottom + 6) + 'px';
+  const syncHeight = syncDd.offsetHeight;
+  gridDd.style.left = left + 'px';
+  gridDd.style.width = width + 'px';
+  gridDd.style.top = (r.bottom + 6 + syncHeight + 8) + 'px';
+}
+
+function openLayoutDropdowns(){
+  const btn = document.getElementById('layout-select-btn');
+  const syncDd = document.getElementById('layout-sync-dd');
+  const gridDd = document.getElementById('layout-grid-dd');
+  if(!btn || !syncDd || !gridDd) return;
+  closeAllCockpitDropdowns();
+  [syncDd, gridDd].forEach(dd => {
+    if(!dd._origParent){ dd._origParent = dd.parentNode; dd._origNext = dd.nextSibling; }
+    document.body.appendChild(dd);
+    dd.style.position = 'fixed';
+    dd.style.right = 'auto';
+    dd.classList.add('open');
+  });
+  positionLayoutDropdowns();
+}
+
+function closeLayoutDropdowns(){
+  ['layout-sync-dd','layout-grid-dd'].forEach(id => {
+    const dd = document.getElementById(id);
+    if(!dd || !dd.classList.contains('open')) return;
+    dd.classList.remove('open');
+    if(dd._origParent){
+      if(dd._origNext && dd._origNext.parentNode === dd._origParent) dd._origParent.insertBefore(dd, dd._origNext);
+      else dd._origParent.appendChild(dd);
+    }
+    dd.style.position = ''; dd.style.top = ''; dd.style.left = ''; dd.style.width = ''; dd.style.right = '';
+  });
+}
+
+function toggleLayoutDropdown(){
+  const syncDd = document.getElementById('layout-sync-dd');
+  if(syncDd && syncDd.classList.contains('open')){ closeLayoutDropdowns(); return; }
+  openLayoutDropdowns();
+  renderLayoutPicker();
+}
+
+document.addEventListener('click', (e) => {
+  const syncDd = document.getElementById('layout-sync-dd');
+  const gridDd = document.getElementById('layout-grid-dd');
+  const btn = document.getElementById('layout-select-btn');
+  if(!syncDd || !syncDd.classList.contains('open')) return;
+  if(syncDd.contains(e.target) || (gridDd && gridDd.contains(e.target))) return;
+  if(btn && (btn === e.target || btn.contains(e.target))) return;
+  closeLayoutDropdowns();
+});
+window.addEventListener('scroll', () => {
+  const syncDd = document.getElementById('layout-sync-dd');
+  if(syncDd && syncDd.classList.contains('open')) positionLayoutDropdowns();
+}, true);
+window.addEventListener('resize', () => {
+  const syncDd = document.getElementById('layout-sync-dd');
+  if(syncDd && syncDd.classList.contains('open')) positionLayoutDropdowns();
+});
 
 function toggleIndicator(name, overlayOnCandle){
   const btn = document.getElementById('ind-btn-'+name);

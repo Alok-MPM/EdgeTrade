@@ -1113,6 +1113,34 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
 .chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:row;align-items:stretch;}
 .chart-viewport .chart-panel-wrap{flex:1 1 auto;min-width:0;}
+
+/* ── Split screen: panes-stack wrapper + pane 2 placeholder (Phase 1) ── */
+.chart-panes-stack{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:row;gap:10px;}
+.chart-panes-stack.split-col{flex-direction:column;}
+.chart-panes-stack .chart-panel-wrap{flex:1 1 0;min-width:0;min-height:0;}
+.chart-pane-2{flex:1 1 0;min-width:0;min-height:0;display:none;align-items:center;justify-content:center;background:var(--bg2);border:1px dashed var(--border2);border-radius:12px;}
+.chart-pane-2-inner{text-align:center;color:var(--muted);padding:20px;}
+.chart-pane-2-inner .cp2-icon{font-size:22px;color:var(--muted);margin-bottom:6px;}
+.chart-pane-2-inner .cp2-title{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:14px;margin-bottom:4px;}
+.chart-pane-2-inner .cp2-sub{font-size:12px;font-family:'Outfit',sans-serif;}
+
+/* ── Layout picker: sync card + grid card (two separate popups, sync renders above) ── */
+.layout-dd{padding:12px;}
+.layout-sync-title{font-size:11px;letter-spacing:0.06em;color:var(--muted);font-family:'Outfit',sans-serif;font-weight:600;margin-bottom:8px;}
+.layout-sync-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;font-family:'Outfit',sans-serif;color:var(--white);}
+.layout-grid-list{max-height:340px;overflow-y:auto;}
+.layout-grid-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.layout-grid-row:last-child{border-bottom:none;}
+.layout-grid-num{width:16px;flex-shrink:0;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px;}
+.layout-grid-icons{display:flex;flex-wrap:wrap;gap:6px;}
+.li-btn{padding:3px;border-radius:5px;cursor:pointer;border:1.5px solid transparent;}
+.li-btn:hover{background:var(--gold-dim);}
+.li-btn.active-tool{border-color:var(--gold);background:var(--gold-dim);}
+.li-icon{width:32px;height:24px;display:flex;gap:2px;padding:2px;box-sizing:border-box;border:1.4px solid var(--muted);border-radius:3px;}
+.li-split{display:flex;flex:1 1 auto;gap:2px;}
+.li-row{flex-direction:row;}
+.li-col{flex-direction:column;}
+.li-leaf{flex:1 1 auto;background:var(--muted);opacity:0.4;border-radius:1px;}
 .chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
 
 /* — Bottom Dock — */
