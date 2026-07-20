@@ -1249,11 +1249,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 }
 
 /* Logo (reused .sidebar-logo) — strip the sidebar box padding/border, keep it inline */
-.chart-nav-left{ display:flex; align-items:center; flex-shrink:0; }
+.chart-nav-left{ display:flex; align-items:center; gap:22px; flex-shrink:0; }
 .chart-nav-left .sidebar-logo{ padding:0; border-bottom:none; }
+.chart-nav-left .chart-top-navigation{ padding-left:22px; border-left:1px solid var(--border); }
 
-/* Center — horizontal page navigation */
-.chart-nav-center{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; }
 .chart-top-navigation{
   display:flex;
   align-items:center;
@@ -1289,6 +1288,14 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   border-color:var(--gold);
   color:var(--gold);
 }
+/* The chart-page menu trigger — bigger and bolder since it's now the sole nav control */
+#chart-nav-menu-btn{
+  padding:9px 18px;
+  font-size:16px;
+  font-weight:600;
+}
+#chart-nav-menu-btn .nav-icon-svg{ width:19px; height:19px; }
+#chart-nav-menu-btn svg[style*="14px"]{ width:16px !important; height:16px !important; }
 .light-mode .chart-nav-item{ color:rgba(243,228,201,0.6); }
 .light-mode .chart-nav-item:hover{ background:rgba(243,228,201,0.08); color:var(--cream); }
 .light-mode .chart-nav-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
