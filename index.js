@@ -2394,8 +2394,17 @@ document.addEventListener('click', (e) => {
     closeCockpitDropdown(dd);
   });
 });
-window.addEventListener('scroll', () => closeAllCockpitDropdowns(), true);
-window.addEventListener('resize', () => closeAllCockpitDropdowns());
+function repositionOpenCockpitDropdowns(){
+  COCKPIT_DD_IDS.forEach(id => {
+    const dd = document.getElementById(id);
+    if(!dd || !dd.classList.contains('open')) return;
+    const btnId = id.replace(/-dd$/, '-select-btn');
+    const btn = document.getElementById(btnId);
+    if(btn) positionCockpitDropdown(dd, btn);
+  });
+}
+window.addEventListener('scroll', repositionOpenCockpitDropdowns, true);
+window.addEventListener('resize', repositionOpenCockpitDropdowns);
 
 async function toggleMarketDropdown(){
   const dd = document.getElementById('market-dd');
@@ -2467,9 +2476,6 @@ function toggleIndicator(name, overlayOnCandle){
     activeIndicators[name] = paneId;
     if(btn) btn.classList.add('active-tool');
   }
-  const anyActive = Object.keys(activeIndicators).length > 0;
-  const indBtn = document.getElementById('ind-select-btn');
-  if(indBtn) indBtn.classList.toggle('active-tool', anyActive);
 }
 
 function useDrawTool(name){
