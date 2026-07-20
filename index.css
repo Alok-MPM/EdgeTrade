@@ -565,6 +565,27 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-item{padding:9px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:background 0.15s;font-family:'JetBrains Mono',monospace;}
 .chart-item:hover{background:var(--gold-dim);color:var(--gold);}
 .chart-item-cat{font-size:10px;color:var(--muted);font-family:'Outfit',sans-serif;}
+.chart-item.active-tool{background:var(--gold-dim);color:var(--gold);font-weight:700;}
+
+/* — Command pill (icon-only cockpit trigger buttons: Timeframe / Chart type / Indicators) — */
+.cmd-pill{display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;flex-shrink:0;}
+.cmd-pill:hover{background:var(--gold-dim);color:var(--white);}
+.cmd-pill.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);}
+.cmd-pill .nav-icon-svg{width:18px;height:18px;stroke-width:1.8;}
+
+/* — Drawing tools left sidebar (chart-workspace) — */
+.chart-draw-sidebar{display:flex;flex-direction:column;align-items:center;gap:4px;padding:2px 6px 2px 0;margin-right:10px;flex-shrink:0;border-right:1px solid var(--border);}
+.draw-tool-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;padding:0;flex-shrink:0;}
+.draw-tool-btn:hover{background:var(--gold-dim);color:var(--white);}
+.draw-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);}
+.draw-tool-btn .nav-icon-svg{width:17px;height:17px;stroke-width:1.8;}
+.draw-tool-divider{width:20px;height:1px;background:var(--border);margin:3px 0;flex-shrink:0;}
+.draw-tool-clear:hover{background:rgba(224,82,82,0.12);color:var(--red);}
+@media(max-width:480px){
+  .chart-draw-sidebar{gap:3px;margin-right:6px;}
+  .draw-tool-btn{width:28px;height:28px;}
+  .draw-tool-btn .nav-icon-svg{width:15px;height:15px;}
+}
 
 .dir-group{display:flex;gap:8px;}
 .dir-btn{flex:1;padding:10px;border-radius:8px;border:1px solid;cursor:pointer;font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.2s;}
@@ -1084,8 +1105,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cockpit-group:first-child{padding-left:0;}
 .cockpit-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0;}
 .cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
-.chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;}
-.chart-panel-wrap{flex:3 1 500px;}
+.chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:row;align-items:stretch;}
+.chart-viewport .chart-panel-wrap{flex:1 1 auto;min-width:0;}
 .chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
 
 /* — Bottom Dock — */

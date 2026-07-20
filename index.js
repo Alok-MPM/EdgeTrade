@@ -2265,10 +2265,13 @@ function toggleChartMaximize(){
 document.addEventListener('keydown', (e) => { if(e.key === 'Escape' && chartMaximized) toggleChartMaximize(); });
 
 async function switchTimeframe(tf){
+  closeCockpitDropdown(document.getElementById('tf-dd'));
   if(tf === currentInterval || !mainChartInstance) return;
-  document.querySelectorAll('.chart-tool-btn[id^="tf-btn-"]').forEach(b => b.classList.remove('active-tool'));
-  const activeBtn = document.getElementById('tf-btn-' + tf);
-  if(activeBtn) activeBtn.classList.add('active-tool');
+  document.querySelectorAll('.chart-item[id^="tf-item-"]').forEach(b => b.classList.remove('active-tool'));
+  const activeItem = document.getElementById('tf-item-' + tf);
+  if(activeItem) activeItem.classList.add('active-tool');
+  const selectBtn = document.getElementById('tf-select-btn');
+  if(selectBtn) selectBtn.title = 'Timeframe: ' + (activeItem ? activeItem.textContent : tf);
   try {
     await loadChartInterval(tf);
   } catch(err) {
@@ -2278,11 +2281,14 @@ async function switchTimeframe(tf){
 
 let currentChartType = 'candle_solid';
 function switchChartType(type){
+  closeCockpitDropdown(document.getElementById('ct-dd'));
   if(!mainChartInstance || type === currentChartType) return;
   mainChartInstance.setStyles({ candle: { type } });
-  document.querySelectorAll('.chart-tool-btn[id^="ct-btn-"]').forEach(b => b.classList.remove('active-tool'));
-  const activeBtn = document.getElementById('ct-btn-' + type);
-  if(activeBtn) activeBtn.classList.add('active-tool');
+  document.querySelectorAll('.chart-item[id^="ct-item-"]').forEach(b => b.classList.remove('active-tool'));
+  const activeItem = document.getElementById('ct-item-' + type);
+  if(activeItem) activeItem.classList.add('active-tool');
+  const selectBtn = document.getElementById('ct-select-btn');
+  if(selectBtn) selectBtn.title = 'Chart type: ' + (activeItem ? activeItem.textContent : type);
   currentChartType = type;
 }
 
@@ -2316,17 +2322,90 @@ function renderMarketList(list){
   ).join('');
 }
 
+/* ═══ Cockpit dropdown system ═══
+   Every .chart-dd panel gets moved ("portaled") to document.body the moment
+   it opens, then repositioned with position:fixed under its trigger button.
+   This is what actually fixes the old "dropdown renders behind/clipped by
+   the chart" bug: .chart-cockpit needs overflow-x:auto for its horizontal
+   scroll, and that clips ANY absolutely/fixed positioned descendant that
+   stays inside it (backdrop-filter on the cockpit makes this worse, since it
+   also creates a containing block for fixed children). Moving the dropdown
+   out of that DOM subtree entirely sidesteps the problem completely,
+   regardless of any ancestor's overflow/backdrop-filter. */
+const COCKPIT_DD_IDS = ['market-dd','tf-dd','ct-dd','ind-dd'];
+
+function positionCockpitDropdown(dd, btn){
+  const r = btn.getBoundingClientRect();
+  const minWidth = parseInt(dd.getAttribute('data-min-width') || '150', 10);
+  const width = Math.max(r.width, minWidth);
+  let left = r.left;
+  if(left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+  if(left < 8) left = 8;
+  dd.style.position = 'fixed';
+  dd.style.top = (r.bottom + 6) + 'px';
+  dd.style.left = left + 'px';
+  dd.style.width = width + 'px';
+  dd.style.right = 'auto';
+}
+
+function closeCockpitDropdown(dd){
+  if(!dd || !dd.classList.contains('open')) return;
+  dd.classList.remove('open');
+  if(dd._origParent){
+    if(dd._origNext && dd._origNext.parentNode === dd._origParent) dd._origParent.insertBefore(dd, dd._origNext);
+    else dd._origParent.appendChild(dd);
+  }
+  dd.style.position = '';
+  dd.style.top = '';
+  dd.style.left = '';
+  dd.style.width = '';
+  dd.style.right = '';
+}
+
+function closeAllCockpitDropdowns(exceptId){
+  COCKPIT_DD_IDS.forEach(id => {
+    if(id === exceptId) return;
+    closeCockpitDropdown(document.getElementById(id));
+  });
+}
+
+function openCockpitDropdown(ddId, btnId){
+  const dd = document.getElementById(ddId);
+  const btn = document.getElementById(btnId);
+  if(!dd || !btn) return;
+  closeAllCockpitDropdowns(ddId);
+  if(!dd._origParent){
+    dd._origParent = dd.parentNode;
+    dd._origNext = dd.nextSibling;
+  }
+  document.body.appendChild(dd);
+  positionCockpitDropdown(dd, btn);
+  dd.classList.add('open');
+}
+
+document.addEventListener('click', (e) => {
+  COCKPIT_DD_IDS.forEach(id => {
+    const dd = document.getElementById(id);
+    if(!dd || !dd.classList.contains('open')) return;
+    const btnId = id.replace(/-dd$/, '-select-btn');
+    const btn = document.getElementById(btnId);
+    if(dd.contains(e.target)) return;
+    if(btn && (btn === e.target || btn.contains(e.target))) return;
+    closeCockpitDropdown(dd);
+  });
+});
+window.addEventListener('scroll', () => closeAllCockpitDropdowns(), true);
+window.addEventListener('resize', () => closeAllCockpitDropdowns());
+
 async function toggleMarketDropdown(){
   const dd = document.getElementById('market-dd');
   if(!dd) return;
-  const opening = !dd.classList.contains('open');
-  dd.classList.toggle('open');
-  if(opening){
-    const list = await loadBinanceMarkets();
-    renderMarketList(list);
-    const s = document.getElementById('market-search');
-    if(s) setTimeout(() => s.focus(), 50);
-  }
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openCockpitDropdown('market-dd', 'market-select-btn');
+  const list = await loadBinanceMarkets();
+  renderMarketList(list);
+  const s = document.getElementById('market-search');
+  if(s) setTimeout(() => s.focus(), 50);
 }
 
 function filterMarketList(val){
@@ -2336,8 +2415,7 @@ function filterMarketList(val){
 }
 
 async function selectMarket(symbol){
-  const dd = document.getElementById('market-dd');
-  if(dd) dd.classList.remove('open');
+  closeCockpitDropdown(document.getElementById('market-dd'));
   if(symbol === currentSymbol || !mainChartInstance) return;
   currentSymbol = symbol;
   const label = formatSymbolLabel(symbol);
@@ -2352,13 +2430,26 @@ async function selectMarket(symbol){
   }catch(err){ console.error('Symbol switch failed:', err); }
 }
 
-document.addEventListener('click', (e) => {
-  const dd = document.getElementById('market-dd');
-  const btn = document.getElementById('market-select-btn');
-  if(dd && dd.classList.contains('open') && !dd.contains(e.target) && e.target !== btn){
-    dd.classList.remove('open');
-  }
-});
+function toggleTfDropdown(){
+  const dd = document.getElementById('tf-dd');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openCockpitDropdown('tf-dd', 'tf-select-btn');
+}
+
+function toggleCtDropdown(){
+  const dd = document.getElementById('ct-dd');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openCockpitDropdown('ct-dd', 'ct-select-btn');
+}
+
+function toggleIndDropdown(){
+  const dd = document.getElementById('ind-dd');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openCockpitDropdown('ind-dd', 'ind-select-btn');
+}
 
 function toggleIndicator(name, overlayOnCandle){
   const btn = document.getElementById('ind-btn-'+name);
@@ -2376,6 +2467,9 @@ function toggleIndicator(name, overlayOnCandle){
     activeIndicators[name] = paneId;
     if(btn) btn.classList.add('active-tool');
   }
+  const anyActive = Object.keys(activeIndicators).length > 0;
+  const indBtn = document.getElementById('ind-select-btn');
+  if(indBtn) indBtn.classList.toggle('active-tool', anyActive);
 }
 
 function useDrawTool(name){
