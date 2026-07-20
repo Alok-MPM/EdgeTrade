@@ -1180,9 +1180,10 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 #page-app:has(#section-chart.active) .content-area{
   padding-top:0;
   padding-left:0;
-  padding-right:0;
+  padding-right:8px; /* gutter for the native mobile scrollbar so it doesn't sit on top of the header icons */
   width:100%;
   box-sizing:border-box;
+  scrollbar-gutter:stable;
 }
 .chart-terminal-layout{
   width:100%;
