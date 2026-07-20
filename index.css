@@ -573,6 +573,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cmd-pill.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);}
 .cmd-pill .nav-icon-svg{width:18px;height:18px;stroke-width:1.8;}
 .cmd-pill .fx-icon{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:700;font-size:16px;line-height:1;letter-spacing:-0.5px;}
+.cmd-pill-label{width:auto;padding:0 10px;gap:6px;}
+.cmd-pill-label #tf-current-label{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;letter-spacing:0.2px;line-height:1;white-space:nowrap;}
+.cmd-pill-label .pill-chevron{width:11px;height:11px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;opacity:0.65;}
+.ct-icon-wrap{display:flex;align-items:center;justify-content:center;line-height:0;}
+.ct-icon-wrap .nav-icon-svg{width:18px;height:18px;stroke-width:1.8;}
 
 /* — Drawing tools left sidebar (chart-workspace) — */
 .chart-draw-sidebar{display:flex;flex-direction:column;align-items:center;gap:4px;padding:2px 6px 2px 0;margin-right:10px;flex-shrink:0;border-right:1px solid var(--border);}
@@ -1185,8 +1190,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-symbol-overlay .csym-name{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:13px;}
 .chart-symbol-overlay .csym-sub{color:var(--muted);font-weight:400;}
 .chart-symbol-overlay .csym-price{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;}
-.chart-panel-wrap.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);padding:10px;border-radius:0;display:flex;flex-direction:column;}
-.chart-panel-wrap.chart-maximized #klineMainChart{border-radius:8px;}
+.chart-workspace.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);border-radius:0;border:none;box-shadow:none;}
+.chart-workspace.chart-maximized .chart-cockpit{flex-shrink:0;}
+.chart-workspace.chart-maximized .chart-viewport{flex:1 1 auto;min-height:0;}
+.chart-workspace.chart-maximized .chart-panel-wrap{height:100%;display:flex;flex-direction:column;}
+.chart-workspace.chart-maximized #klineMainChart{flex:1 1 auto !important;height:auto !important;border-radius:8px;}
 .cw-badge{position:absolute;right:76px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
 .cw-seg{padding:2px 6px;}
 .cw-seg-main{background:var(--bg4);color:var(--white);border:1px solid var(--border2);border-right:none;}

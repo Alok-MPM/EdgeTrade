@@ -2238,24 +2238,25 @@ function updateMaxPriceOverlay(price){
 }
 
 function toggleChartMaximize(){
-  const wrap = document.querySelector('.chart-panel-wrap');
+  const workspace = document.querySelector('.chart-workspace');
   const chartDiv = document.getElementById('klineMainChart');
   const overlay = document.getElementById('chart-symbol-overlay');
   const btn = document.getElementById('chart-maximize-btn');
-  if(!wrap || !chartDiv) return;
+  const cockpitBtn = document.getElementById('chart-maximize-btn-cockpit');
+  if(!workspace || !chartDiv) return;
   chartMaximized = !chartMaximized;
   if(chartMaximized){
-    wrap.classList.add('chart-maximized');
+    workspace.classList.add('chart-maximized');
     document.body.style.overflow = 'hidden';
-    chartDiv.style.height = 'calc(100vh - 20px)';
     if(overlay) overlay.style.display = 'flex';
     if(btn){ btn.innerHTML = '✕'; btn.title = 'Exit fullscreen'; }
+    if(cockpitBtn){ cockpitBtn.innerHTML = '✕'; cockpitBtn.title = 'Exit fullscreen'; }
   } else {
-    wrap.classList.remove('chart-maximized');
+    workspace.classList.remove('chart-maximized');
     document.body.style.overflow = '';
-    chartDiv.style.height = '500px';
     if(overlay) overlay.style.display = 'none';
     if(btn){ btn.innerHTML = '⛶'; btn.title = 'Maximize chart'; }
+    if(cockpitBtn){ cockpitBtn.innerHTML = '⛶'; cockpitBtn.title = 'Fullscreen'; }
   }
   setTimeout(() => {
     if(mainChartInstance && mainChartInstance.resize) mainChartInstance.resize();
@@ -2271,7 +2272,10 @@ async function switchTimeframe(tf){
   const activeItem = document.getElementById('tf-item-' + tf);
   if(activeItem) activeItem.classList.add('active-tool');
   const selectBtn = document.getElementById('tf-select-btn');
-  if(selectBtn) selectBtn.title = 'Timeframe: ' + (activeItem ? activeItem.textContent : tf);
+  const labelText = activeItem ? activeItem.textContent : tf;
+  if(selectBtn) selectBtn.title = 'Timeframe: ' + labelText;
+  const labelEl = document.getElementById('tf-current-label');
+  if(labelEl) labelEl.textContent = labelText;
   try {
     await loadChartInterval(tf);
   } catch(err) {
@@ -2280,6 +2284,12 @@ async function switchTimeframe(tf){
 }
 
 let currentChartType = 'candle_solid';
+const CHART_TYPE_ICONS = {
+  candle_solid: '<svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="6" y1="2" x2="6" y2="7"/><rect x="4" y="7" width="4" height="8" rx="1" fill="currentColor"/><line x1="6" y1="15" x2="6" y2="22"/><line x1="14" y1="4" x2="14" y2="9"/><rect x="12" y="9" width="4" height="7" rx="1" fill="currentColor"/><line x1="14" y1="16" x2="14" y2="20"/></svg>',
+  candle_stroke: '<svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="6" y1="2" x2="6" y2="7"/><rect x="4" y="7" width="4" height="8" rx="1"/><line x1="6" y1="15" x2="6" y2="22"/><line x1="14" y1="4" x2="14" y2="9"/><rect x="12" y="9" width="4" height="7" rx="1"/><line x1="14" y1="16" x2="14" y2="20"/></svg>',
+  ohlc: '<svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="7" y1="4" x2="7" y2="20"/><line x1="3" y1="8" x2="7" y2="8"/><line x1="7" y1="15" x2="11" y2="15"/><line x1="17" y1="2" x2="17" y2="18"/><line x1="13" y1="6" x2="17" y2="6"/><line x1="17" y1="13" x2="21" y2="13"/></svg>',
+  area: '<svg class="nav-icon-svg" viewBox="0 0 24 24"><path d="M3 17 L8 11 L12 14 L16 7 L21 10 L21 21 L3 21 Z" fill="currentColor" fill-opacity="0.18" stroke="none"/><polyline points="3,17 8,11 12,14 16,7 21,10"/></svg>'
+};
 function switchChartType(type){
   closeCockpitDropdown(document.getElementById('ct-dd'));
   if(!mainChartInstance || type === currentChartType) return;
@@ -2289,6 +2299,8 @@ function switchChartType(type){
   if(activeItem) activeItem.classList.add('active-tool');
   const selectBtn = document.getElementById('ct-select-btn');
   if(selectBtn) selectBtn.title = 'Chart type: ' + (activeItem ? activeItem.textContent : type);
+  const iconEl = document.getElementById('ct-current-icon');
+  if(iconEl) iconEl.innerHTML = CHART_TYPE_ICONS[type] || CHART_TYPE_ICONS.candle_solid;
   currentChartType = type;
 }
 
