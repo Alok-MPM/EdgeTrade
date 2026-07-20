@@ -1190,11 +1190,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-symbol-overlay .csym-name{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:13px;}
 .chart-symbol-overlay .csym-sub{color:var(--muted);font-weight:400;}
 .chart-symbol-overlay .csym-price{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;}
-.chart-workspace.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);border-radius:0;border:none;box-shadow:none;}
-.chart-workspace.chart-maximized .chart-cockpit{flex-shrink:0;}
-.chart-workspace.chart-maximized .chart-viewport{flex:1 1 auto;min-height:0;}
-.chart-workspace.chart-maximized .chart-panel-wrap{height:100%;display:flex;flex-direction:column;}
-.chart-workspace.chart-maximized #klineMainChart{flex:1 1 auto !important;height:auto !important;border-radius:8px;}
+.chart-workspace.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);border-radius:0;border:none;box-shadow:none;isolation:isolate;}
+.chart-workspace.chart-maximized .chart-cockpit{position:relative;top:auto;flex-shrink:0;z-index:100;}
+.chart-workspace.chart-maximized .chart-dd{z-index:150;}
+.chart-workspace.chart-maximized .chart-viewport{flex:1 1 auto;min-height:0;position:relative;z-index:1;}
+.chart-workspace.chart-maximized .chart-panel-wrap{height:100%;display:flex;flex-direction:column;position:relative;z-index:1;}
+.chart-workspace.chart-maximized #klineMainChart{flex:1 1 auto !important;height:auto !important;border-radius:8px;position:relative;z-index:1;}
 .cw-badge{position:absolute;right:76px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
 .cw-seg{padding:2px 6px;}
 .cw-seg-main{background:var(--bg4);color:var(--white);border:1px solid var(--border2);border-right:none;}
