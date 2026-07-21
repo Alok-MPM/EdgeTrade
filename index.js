@@ -2598,8 +2598,8 @@ function updateLayoutBtnIcon(group, variantIdx){
    Only the toggles turned ON in the SYNC IN LAYOUT popup are ever propagated
    between panes — everything else about a pane (symbol, interval, chart
    type, indicators, drawings) stays fully independent, exactly as spec'd.
-   Symbol/interval sync re-uses each pane's own selectMarket*/switchTimeframe*
-   function, which already has an "already this value → return" guard at the
+   Symbol/interval sync re-uses each pane's own selectMarket / switchTimeframe
+   function, which already has an "already this value -> return" guard at the
    top, so a broadcast can never loop back into itself. Crosshair/time/date-
    range sync use a synchronous re-entrancy flag for the same reason. */
 
