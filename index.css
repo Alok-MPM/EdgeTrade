@@ -1266,6 +1266,17 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-symbol-overlay .csym-price{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;}
 .chart-workspace.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);border-radius:0;border:none;box-shadow:none;isolation:isolate;}
 .chart-workspace.chart-maximized .chart-cockpit{position:relative;top:auto;flex-shrink:0;z-index:100;}
+/* Tabs bar is moved inside .chart-workspace for fullscreen (see toggleChartMaximize
+   in index.js), since the maximized workspace is position:fixed on top of everything
+   and would otherwise hide it. Neutralize the sticky/top offset meant for normal
+   page scroll and give it the same flex/z-index treatment as the cockpit above. */
+.chart-tabs-bar.chart-tabs-bar-fullscreen{
+  position:relative;
+  top:auto;
+  flex-shrink:0;
+  z-index:100;
+  border-radius:0;
+}
 .chart-workspace.chart-maximized .chart-viewport{flex:1 1 auto;height:auto;min-height:0;position:relative;z-index:1;}
 .chart-workspace.chart-maximized .chart-panel-wrap{height:100%;display:flex;flex-direction:column;position:relative;z-index:1;}
 .chart-workspace.chart-maximized #klineMainChart{flex:1 1 auto !important;height:auto !important;border-radius:8px;position:relative;z-index:1;}

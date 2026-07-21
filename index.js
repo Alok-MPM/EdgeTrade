@@ -2250,6 +2250,11 @@ async function loadChartInterval(interval){
 
 let chartMaximized = false;
 let prevMaxOverlayPrice = null;
+// Remembers where #chart-tabs-bar normally lives, so it can be moved inside
+// .chart-workspace for fullscreen (see toggleChartMaximize) and put back exactly
+// where it was afterwards.
+let chartTabsBarOriginalParent = null;
+let chartTabsBarOriginalNext = null;
 function formatPriceDisplay(price){
   if(price >= 1) return price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
   return price.toPrecision(4);
@@ -2270,9 +2275,22 @@ function toggleChartMaximize(){
   const overlay = document.getElementById('chart-symbol-overlay');
   const btn = document.getElementById('chart-maximize-btn');
   const cockpitBtn = document.getElementById('chart-maximize-btn-cockpit');
+  const tabsBar = document.getElementById('chart-tabs-bar');
+  const cockpit = document.getElementById('chart-cockpit');
   if(!workspace || !chartDiv) return;
   chartMaximized = !chartMaximized;
   if(chartMaximized){
+    // #chart-tabs-bar normally sits OUTSIDE .chart-workspace. Maximized workspace
+    // becomes position:fixed + inset:0 + very high z-index, covering the whole
+    // viewport on top of the tabs bar and hiding it. Move the tabs bar inside the
+    // workspace (as the first child, above the cockpit) for the duration of
+    // fullscreen so it stays visible and usable; restored on exit below.
+    if(tabsBar && tabsBar.parentElement !== workspace){
+      chartTabsBarOriginalParent = tabsBar.parentElement;
+      chartTabsBarOriginalNext = tabsBar.nextSibling;
+      workspace.insertBefore(tabsBar, cockpit || workspace.firstChild);
+      tabsBar.classList.add('chart-tabs-bar-fullscreen');
+    }
     workspace.classList.add('chart-maximized');
     document.body.style.overflow = 'hidden';
     if(overlay) overlay.style.display = 'flex';
@@ -2284,6 +2302,17 @@ function toggleChartMaximize(){
     if(overlay) overlay.style.display = 'none';
     if(btn){ btn.innerHTML = '⛶'; btn.title = 'Maximize chart'; }
     if(cockpitBtn){ cockpitBtn.innerHTML = '⛶'; cockpitBtn.title = 'Fullscreen'; }
+    // Restore the tabs bar to exactly where it lived before maximizing.
+    if(tabsBar && chartTabsBarOriginalParent){
+      tabsBar.classList.remove('chart-tabs-bar-fullscreen');
+      if(chartTabsBarOriginalNext && chartTabsBarOriginalNext.parentElement === chartTabsBarOriginalParent){
+        chartTabsBarOriginalParent.insertBefore(tabsBar, chartTabsBarOriginalNext);
+      } else {
+        chartTabsBarOriginalParent.appendChild(tabsBar);
+      }
+      chartTabsBarOriginalParent = null;
+      chartTabsBarOriginalNext = null;
+    }
   }
   setTimeout(() => {
     if(mainChartInstance && mainChartInstance.resize) mainChartInstance.resize();
@@ -2474,6 +2503,11 @@ async function selectMarket(symbol){
   const nameEl = document.querySelector('#chart-symbol-overlay .csym-name');
   if(nameEl) nameEl.innerHTML = label + ' <span class="csym-sub">· Binance</span>';
   prevMaxOverlayPrice = null;
+  // Keep the active tab pill + Order Book/Trade Terminal labels in sync the moment
+  // the symbol changes — previously these only refreshed on the next tab switch.
+  const idx = getChartTabIndex(activeChartTabId);
+  if(idx !== -1){ chartTabs[idx].symbol = symbol; renderChartTabs(); }
+  updateTradingWorkspaceLabel(currentSymbol);
   try{
     await loadChartInterval(currentInterval);
     connectOrderBook(currentSymbol);
