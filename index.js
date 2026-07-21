@@ -58,7 +58,7 @@ function showSection(key){
   if(key==='calculator') {
     initCalcBrokers();
   }
-  if(key==='chart') { initMainChart(); initOrderBook(); }
+  if(key==='chart') { initMainChart(); initOrderBook(); initMarketOverview(); }
 }
 
 function setSideNav(id){
@@ -2163,6 +2163,7 @@ let mainChartInstance = null;
 let activeIndicators = {};
 let klineSocket = null;
 let obSocket = null;
+let moSocket = null;
 let currentInterval = '1m';
 let currentSymbol = 'BTCUSDT';
 let binanceMarkets = null;
@@ -3440,6 +3441,38 @@ function initOrderBook(){
   updateTradingWorkspaceLabel(currentSymbol);
 }
 
+// ══════════════════════════════════════
+// MARKET OVERVIEW — live Binance prices (fixed watchlist, independent of chart symbol)
+// ══════════════════════════════════════
+const MARKET_OVERVIEW_SYMBOLS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT'];
+function initMarketOverview(){
+  if(moSocket) return; // already connected — persists across chart tab switches
+  const streams = MARKET_OVERVIEW_SYMBOLS.map(s => s.toLowerCase()+'@miniTicker').join('/');
+  moSocket = new WebSocket('wss://stream.binance.com:9443/stream?streams=' + streams);
+  moSocket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const d = msg.data;
+    if(!d || !d.s) return;
+    updateMarketOverviewRow(d.s, parseFloat(d.c), parseFloat(d.o));
+  };
+  moSocket.onerror = () => {
+    MARKET_OVERVIEW_SYMBOLS.forEach(sym => {
+      const priceEl = document.getElementById('mo-price-'+sym);
+      if(priceEl) priceEl.textContent = '--';
+    });
+  };
+}
+function updateMarketOverviewRow(symbol, closePrice, openPrice){
+  const priceEl = document.getElementById('mo-price-'+symbol);
+  const chgEl = document.getElementById('mo-chg-'+symbol);
+  if(!priceEl || !chgEl) return;
+  priceEl.textContent = closePrice.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits: closePrice < 10 ? 4 : 2});
+  const pct = openPrice > 0 ? ((closePrice-openPrice)/openPrice*100) : 0;
+  chgEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+  chgEl.classList.remove('up','down');
+  chgEl.classList.add(pct >= 0 ? 'up' : 'down');
+}
+
 function renderOrderBook(bids, asks){
   const container = document.getElementById('orderBookBody');
   if(!container) return;
@@ -3460,6 +3493,21 @@ function renderOrderBook(bids, asks){
     html += '<div class="ob-row bid"><div class="ob-bar" style="width:'+pct+'%"></div><span class="ob-price bid">'+parseFloat(price).toFixed(1)+'</span><span>'+parseFloat(qty).toFixed(4)+'</span></div>';
   });
   container.innerHTML = html;
+
+  // Buy/Sell pressure bar — cumulative bid vs ask size across the same visible depth
+  const totalBidQty = topBids.reduce((sum, [,qty]) => sum + parseFloat(qty), 0);
+  const totalAskQty = topAsks.reduce((sum, [,qty]) => sum + parseFloat(qty), 0);
+  const totalQty = totalBidQty + totalAskQty;
+  const buyPct = totalQty > 0 ? (totalBidQty/totalQty*100) : 50;
+  const sellPct = 100 - buyPct;
+  const buyBar = document.getElementById('ob-pressure-buy');
+  const sellBar = document.getElementById('ob-pressure-sell');
+  const buyPctLbl = document.getElementById('ob-pressure-buy-pct');
+  const sellPctLbl = document.getElementById('ob-pressure-sell-pct');
+  if(buyBar) buyBar.style.width = buyPct.toFixed(0) + '%';
+  if(sellBar) sellBar.style.width = sellPct.toFixed(0) + '%';
+  if(buyPctLbl) buyPctLbl.textContent = buyPct.toFixed(0) + '%';
+  if(sellPctLbl) sellPctLbl.textContent = sellPct.toFixed(0) + '%';
 }
 
 // ══════════════════════════════════════

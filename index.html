@@ -332,11 +332,8 @@
         <div style="padding:20px;">
           <div class="workspace-shell">
 
-            <!-- ═══ MAIN WORKSPACE : Chart + Order Book + Bottom Dock ═══ -->
-            <div class="main-workspace">
-
-              <!-- CHART + ORDER BOOK ROW -->
-              <div class="chart-orderbook-row">
+            <!-- ═══ TOP ROW : Chart + Order Book + Trade Terminal (equal-height column) ═══ -->
+            <div class="top-row">
 
               <!-- CHART WORKSPACE -->
               <section class="chart-workspace">
@@ -554,36 +551,19 @@
               <div class="orderbook-panel">
                 <div style="color:var(--white);font-weight:600;margin-bottom:10px;font-family:'Outfit',sans-serif;">Order Book<span class="ob-active-symbol" id="ob-active-symbol"></span></div>
                 <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
-              </div>
-
-              </div><!-- /chart-orderbook-row -->
-
-              <!-- BOTTOM DOCK -->
-              <div class="bottom-dock" id="bottom-dock">
-                <div class="dock-header">
-                  <span class="dock-title">Trade Information</span>
-                </div>
-                <div class="dock-tabs">
-                  <div class="bottom-tab-nav">
-                    <div class="bottom-tab-item active" id="btab-positions" onclick="switchBottomTab('positions')">Open Positions</div>
-                    <div class="bottom-tab-item" id="btab-history" onclick="switchBottomTab('history')">Trade History</div>
+                <div class="ob-pressure" id="ob-pressure">
+                  <div class="ob-pressure-labels">
+                    <span class="ob-pressure-buy-lbl">Buy <span id="ob-pressure-buy-pct">50%</span></span>
+                    <span class="ob-pressure-sell-lbl"><span id="ob-pressure-sell-pct">50%</span> Sell</span>
                   </div>
-                </div>
-                <div class="dock-content">
-                  <div class="bottom-tab-content" id="btab-content-positions">
-                    <div class="bottom-tab-empty">No open positions — place a demo trade to see it here.</div>
-                  </div>
-                  <div class="bottom-tab-content" id="btab-content-history" style="display:none;">
-                    <div class="bottom-tab-empty">No trades yet — demo trading terminal coming in the next update.</div>
+                  <div class="ob-pressure-bar">
+                    <div class="ob-pressure-buy" id="ob-pressure-buy" style="width:50%;"></div>
+                    <div class="ob-pressure-sell" id="ob-pressure-sell" style="width:50%;"></div>
                   </div>
                 </div>
               </div>
 
-            </div><!-- /main-workspace -->
-
-            <!-- ═══ TRADING WORKSPACE : Execution + AI Mentor ═══ -->
-            <aside class="trading-workspace">
-
+              <!-- TRADE TERMINAL -->
               <div class="execution-workspace">
                 <div class="execution-header">
                   <span>Demo Balance <span class="term-active-symbol" id="term-active-symbol"></span></span>
@@ -633,19 +613,44 @@
                 </div>
               </div><!-- /execution-workspace -->
 
-              <!-- AI MENTOR DOCK — reserved architecture, placeholder only -->
-              <div class="ai-mentor-dock" id="ai-mentor-dock">
-                <div class="mentor-header">
-                  <span class="mentor-status-dot"></span>
-                  <span class="mentor-header-text">AI Mentor</span>
+            </div><!-- /top-row -->
+
+            <!-- ═══ BOTTOM ROW : Trade Information + Market Overview ═══ -->
+            <div class="bottom-row">
+
+              <!-- BOTTOM DOCK -->
+              <div class="bottom-dock" id="bottom-dock">
+                <div class="dock-header">
+                  <span class="dock-title">Trade Information</span>
                 </div>
-                <div class="mentor-insight">
-                  <div class="mentor-state">Ready</div>
-                  <div class="mentor-sub">Waiting for market analysis...</div>
+                <div class="dock-tabs">
+                  <div class="bottom-tab-nav">
+                    <div class="bottom-tab-item active" id="btab-positions" onclick="switchBottomTab('positions')">Open Positions</div>
+                    <div class="bottom-tab-item" id="btab-history" onclick="switchBottomTab('history')">Trade History</div>
+                  </div>
+                </div>
+                <div class="dock-content">
+                  <div class="bottom-tab-content" id="btab-content-positions">
+                    <div class="bottom-tab-empty">No open positions — place a demo trade to see it here.</div>
+                  </div>
+                  <div class="bottom-tab-content" id="btab-content-history" style="display:none;">
+                    <div class="bottom-tab-empty">No trades yet — demo trading terminal coming in the next update.</div>
+                  </div>
                 </div>
               </div>
 
-            </aside><!-- /trading-workspace -->
+              <!-- MARKET OVERVIEW — live Binance prices -->
+              <div class="market-overview-panel" id="market-overview-panel">
+                <div class="mo-header">Market Overview</div>
+                <div class="mo-list" id="mo-list">
+                  <div class="mo-row"><span class="mo-sym">BTC/USDT</span><span class="mo-price" id="mo-price-BTCUSDT">—</span><span class="mo-chg" id="mo-chg-BTCUSDT">—</span></div>
+                  <div class="mo-row"><span class="mo-sym">ETH/USDT</span><span class="mo-price" id="mo-price-ETHUSDT">—</span><span class="mo-chg" id="mo-chg-ETHUSDT">—</span></div>
+                  <div class="mo-row"><span class="mo-sym">SOL/USDT</span><span class="mo-price" id="mo-price-SOLUSDT">—</span><span class="mo-chg" id="mo-chg-SOLUSDT">—</span></div>
+                  <div class="mo-row"><span class="mo-sym">BNB/USDT</span><span class="mo-price" id="mo-price-BNBUSDT">—</span><span class="mo-chg" id="mo-chg-BNBUSDT">—</span></div>
+                </div>
+              </div>
+
+            </div><!-- /bottom-row -->
 
           </div><!-- /workspace-shell -->
         </div>

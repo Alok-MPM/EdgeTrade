@@ -1102,13 +1102,18 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
    Z-INDEX SCALE: modal 100, context-menu 90, dropdown 80, chart-header 75, floating-cockpit 70,
    ai-overlay 60, chart-overlay 50, panels 40, chart 30, workspace 20, bg 10
    ═══════════════════════════════════════════════ */
-.workspace-shell{display:flex;gap:14px;align-items:flex-start;min-height:0;}
-.main-workspace{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:14px;}
+.workspace-shell{display:flex;flex-direction:column;gap:14px;min-height:0;}
 
-/* — Chart + Order Book row (chart flexes wide, order book stays a fixed-ish column beside it) — */
-.chart-orderbook-row{display:flex;gap:14px;align-items:stretch;min-height:0;}
-.chart-orderbook-row .chart-workspace{flex:1 1 auto;min-width:0;}
-.chart-orderbook-row .orderbook-panel{flex:0 0 300px;width:300px;min-width:260px;max-width:340px;}
+/* — Top row: Chart (wide) + Order Book (compact) + Trade Terminal (compact), all equal height — */
+.top-row{display:flex;gap:14px;align-items:stretch;min-height:0;}
+.top-row .chart-workspace{flex:1 1 auto;min-width:0;}
+.top-row .orderbook-panel{flex:0 0 260px;width:260px;min-width:220px;max-width:280px;}
+.top-row .execution-workspace{flex:0 0 320px;width:320px;min-width:280px;max-width:360px;}
+
+/* — Bottom row: Trade Information (wide, matches chart+orderbook) + Market Overview (matches terminal width) — */
+.bottom-row{display:flex;gap:14px;align-items:stretch;min-height:0;}
+.bottom-row .bottom-dock{flex:1 1 auto;min-width:0;}
+.bottom-row .market-overview-panel{flex:0 0 320px;width:320px;min-width:280px;max-width:360px;}
 
 /* — Chart Workspace + Cockpit — */
 .chart-workspace{position:relative;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.15);}
@@ -1119,7 +1124,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .cockpit-group:first-child{padding-left:0;}
 .cockpit-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0;}
 .cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
-.chart-viewport{position:relative;height:640px;flex-shrink:0;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:row;align-items:stretch;}
+.chart-viewport{position:relative;height:600px;flex-shrink:0;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:row;align-items:stretch;}
 .chart-viewport .chart-panel-wrap{flex:1 1 auto;min-width:0;}
 
 /* ── Split screen: panes-stack wrapper + pane 2 (Phase 1 shell + Phase 2 independent chart) ── */
@@ -1167,15 +1172,14 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .li-leaf{flex:1 1 auto;background:var(--muted);opacity:0.4;border-radius:1px;}
 .chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
 
-/* — Bottom Dock — */
+/* — Bottom Dock (Trade Information) — */
 .bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
 .dock-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
 .dock-title{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);}
 .dock-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);padding:10px 16px 0;margin-bottom:0;overflow-x:auto;}
-.dock-content{padding:16px;max-height:280px;overflow-y:auto;}
+.dock-content{padding:16px;min-height:170px;max-height:280px;overflow-y:auto;}
 
-/* — Trading Workspace (right column) — */
-.trading-workspace{flex:0 0 380px;width:380px;min-width:340px;max-width:420px;display:flex;flex-direction:column;gap:14px;}
+/* — Order Book + Trade Terminal panels — */
 .orderbook-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .orderbook-panel > div:first-child{flex-shrink:0;}
 #orderBookBody{flex:1 1 auto;min-height:0;overflow-y:auto;}
@@ -1188,20 +1192,33 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .ts-row span:first-child{color:var(--muted);}
 .ts-row span:last-child{font-family:'JetBrains Mono',monospace;color:var(--white);font-weight:500;}
 
-/* — AI Mentor Dock (placeholder architecture) — */
-.ai-mentor-dock{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;}
-.mentor-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
-.mentor-header-text{font-size:12.5px;font-weight:600;color:var(--white);font-family:'Outfit',sans-serif;}
-.mentor-status-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0;}
-.mentor-insight{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;text-align:center;}
-.mentor-state{font-size:13px;font-weight:600;color:var(--gold);font-family:'Outfit',sans-serif;margin-bottom:4px;}
-.mentor-sub{font-size:11.5px;color:var(--muted);}
+/* — Order Book buy/sell pressure bar — */
+.ob-pressure{flex-shrink:0;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.ob-pressure-labels{display:flex;justify-content:space-between;font-size:11px;font-family:'Outfit',sans-serif;margin-bottom:6px;}
+.ob-pressure-buy-lbl{color:var(--green);font-weight:600;}
+.ob-pressure-sell-lbl{color:var(--red);font-weight:600;}
+.ob-pressure-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--bg3);}
+.ob-pressure-buy{background:var(--green);height:100%;transition:width 0.3s ease;}
+.ob-pressure-sell{background:var(--red);height:100%;transition:width 0.3s ease;}
+
+/* — Market Overview panel (live Binance prices) — */
+.market-overview-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.mo-header{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;flex-shrink:0;}
+.mo-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;}
+.mo-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;font-family:'JetBrains Mono',monospace;padding:7px 0;border-bottom:1px solid var(--border);}
+.mo-row:last-child{border-bottom:none;}
+.mo-sym{color:var(--white);font-family:'Outfit',sans-serif;font-weight:500;font-size:12.5px;flex-shrink:0;}
+.mo-price{color:var(--white);}
+.mo-chg{min-width:52px;text-align:right;}
+.mo-chg.up{color:var(--green);}
+.mo-chg.down{color:var(--red);}
 
 @media(max-width:1024px){
-  .workspace-shell{flex-direction:column;}
-  .trading-workspace{width:100%;max-width:100%;min-width:0;flex:1 1 auto;}
-  .chart-orderbook-row{flex-direction:column;}
-  .chart-orderbook-row .orderbook-panel{width:100%;max-width:100%;min-width:0;flex:0 0 auto;}
+  .top-row{flex-direction:column;}
+  .top-row .orderbook-panel,
+  .top-row .execution-workspace{width:100%;max-width:100%;min-width:0;flex:0 0 auto;}
+  .bottom-row{flex-direction:column;}
+  .bottom-row .market-overview-panel{width:100%;max-width:100%;min-width:0;flex:0 0 auto;}
 }
 
 .ob-row{display:flex;justify-content:space-between;position:relative;padding:4px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;overflow:hidden;border-radius:3px;margin-bottom:1px;}
@@ -1400,8 +1417,8 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 /* — Chart workspace internals: tighter padding/gaps, chart canvas itself untouched — */
 .chart-terminal-layout .workspace-shell{ gap:10px; }
-.chart-terminal-layout .main-workspace{ gap:10px; }
-.chart-terminal-layout .chart-orderbook-row{ gap:10px; }
+.chart-terminal-layout .top-row{ gap:10px; }
+.chart-terminal-layout .bottom-row{ gap:10px; }
 .chart-terminal-layout .chart-cockpit{ padding:8px 12px; }
 .chart-terminal-layout .chart-viewport{ padding:10px; }
 
@@ -1410,7 +1427,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-terminal-layout .bottom-dock{ border-radius:12px; }
 .chart-terminal-layout .execution-workspace,
 .chart-terminal-layout .orderbook-panel,
-.chart-terminal-layout .ai-mentor-dock{ border-radius:10px; }
+.chart-terminal-layout .market-overview-panel{ border-radius:10px; }
 
 /* — Bottom mobile nav gets slimmer ONLY while the Chart page is active,
      freeing vertical room for the chart; every other page's bottom nav
