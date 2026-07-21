@@ -329,6 +329,19 @@
 
           </div><!-- /chart-header-wrapper -->
 
+          <!-- CHART TABS BAR — Chrome-style workspace tabs. Each tab is an independent
+               chart workspace (symbol + timeframe + chart type + indicators). A new tab
+               always inherits the symbol of whichever tab was active the moment "+" was
+               clicked. Managed entirely by renderChartTabs()/addChartTab()/switchChartTab()
+               /closeChartTab() in index.js — this markup only holds the empty list + add
+               button, the tab pills themselves are rendered dynamically. -->
+          <div class="chart-tabs-bar" id="chart-tabs-bar">
+            <div class="chart-tabs-list" id="chart-tabs-list"><!-- filled by renderChartTabs() --></div>
+            <button class="chart-tab-add" id="chart-tab-add-btn" onclick="addChartTab()" title="New chart tab">
+              <svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div><!-- /chart-tabs-bar -->
+
         <div style="padding:20px;">
           <div class="workspace-shell">
 

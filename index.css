@@ -1409,11 +1409,112 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-nav-right .broker-sel{ padding:6px 12px; min-width:150px; }
 .chart-nav-right .tb-btn{ width:30px; height:30px; }
 
+/* ═══ Chart Tabs Bar — Chrome-style workspace tabs, sits flush under the 60px header ═══ */
+.chart-tabs-bar{
+  position:sticky;
+  top:60px;
+  left:0;
+  right:0;
+  z-index:73; /* below header(75)/dropdowns, above cockpit(70) so it never gets covered */
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 20px;
+  width:100%;
+  box-sizing:border-box;
+  background:rgba(17,19,23,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+.light-mode .chart-tabs-bar{
+  background:rgba(10,41,71,0.94);
+  border-color:rgba(243,228,201,0.12);
+}
+.chart-tabs-list{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:1 1 auto;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+.chart-tabs-list::-webkit-scrollbar{ display:none; }
+
+.chart-tab-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+  padding:7px 10px 7px 12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:var(--bg3);
+  color:var(--muted);
+  font-family:'JetBrains Mono',monospace;
+  font-size:12.5px;
+  font-weight:600;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background 0.18s,color 0.18s,border-color 0.18s;
+}
+.chart-tab-item:hover{ background:var(--gold-dim); color:var(--white); }
+.chart-tab-item.active{
+  background:var(--gold-dim);
+  border-color:var(--gold);
+  color:var(--gold);
+}
+.ctab-dot{ width:6px; height:6px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+.chart-tab-item.active .ctab-dot{ background:var(--green); box-shadow:0 0 6px var(--green); }
+.ctab-close{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:16px;
+  height:16px;
+  border-radius:4px;
+  font-size:11px;
+  line-height:1;
+  color:inherit;
+  opacity:0.55;
+  transition:background 0.15s,color 0.15s,opacity 0.15s;
+}
+.ctab-close:hover{ background:var(--red-dim); color:var(--red); opacity:1; }
+
+.chart-tab-add{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:30px;
+  height:30px;
+  flex-shrink:0;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:var(--bg3);
+  color:var(--muted);
+  cursor:pointer;
+  transition:background 0.18s,color 0.18s,border-color 0.18s;
+}
+.chart-tab-add:hover{ background:var(--gold-dim); border-color:var(--gold); color:var(--gold); }
+.chart-tab-add .nav-icon-svg{ width:16px; height:16px; }
+
+.light-mode .chart-tab-item{ color:rgba(243,228,201,0.6); }
+.light-mode .chart-tab-item:hover{ background:rgba(243,228,201,0.08); color:var(--cream); }
+.light-mode .chart-tab-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
+.light-mode .chart-tab-add{ border-color:rgba(243,228,201,0.12); }
+.light-mode .chart-tab-add:hover{ background:rgba(243,228,201,0.08); border-color:var(--cream); color:var(--cream); }
+
+@media(max-width:768px){
+  .chart-tabs-bar{ padding:8px 14px; }
+}
+
 /* — Padding cleanup: the inline-padded content wrapper around workspace-shell.
      HTML/inline styles are not touched anywhere else in this project; this is
      the one necessary !important, since only an inline style already sets
      this element's padding and it must shrink for a compact terminal feel — */
-.chart-terminal-layout > div:not(.chart-header-wrapper){ padding:14px !important; }
+.chart-terminal-layout > div:not(.chart-header-wrapper):not(.chart-tabs-bar){ padding:14px !important; }
 
 /* — Chart workspace internals: tighter padding/gaps, chart canvas itself untouched — */
 .chart-terminal-layout .workspace-shell{ gap:10px; }
@@ -1439,7 +1540,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* — Responsive: tablet/mobile keep the same slim header, nav scrolls
      horizontally instead of wrapping or overflowing the page — */
 @media(max-width:1024px){
-  .chart-terminal-layout > div:not(.chart-header-wrapper){ padding:10px !important; }
+  .chart-terminal-layout > div:not(.chart-header-wrapper):not(.chart-tabs-bar){ padding:10px !important; }
   .chart-header-wrapper{ padding:0 16px; }
 }
 @media(max-width:768px){

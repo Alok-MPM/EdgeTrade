@@ -2168,6 +2168,18 @@ let currentInterval = '1m';
 let currentSymbol = 'BTCUSDT';
 let binanceMarkets = null;
 
+// ── Chart Tabs (Chrome-style workspace tabs, Pane 1 only) ──
+// Each tab remembers its own symbol/interval/chartType/indicators. Only ONE
+// klinecharts instance + one live WebSocket run at a time (whichever tab is
+// active) — switching tabs snapshots the outgoing tab's live state, then
+// restores the incoming tab's state into the same chart engine. This keeps
+// things smooth (no N parallel sockets/instances) while still feeling like
+// independent tabs, since every value is fully persisted per tab.
+let chartTabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', indicators: [] }];
+let activeChartTabId = 1;
+let nextChartTabId = 2;
+const CHART_TAB_INDICATOR_OVERLAY = { MA: true, EMA: true, BOLL: true, VOL: false, MACD: false, RSI: false, KDJ: false };
+
 // ── Pane 2 (Phase 2): fully independent state, mirrors Pane 1's globals above.
 // Order Book/Trading panel stay bound to Pane 1 only — active-pane binding is Phase 4.
 let mainChartInstance2 = null;
@@ -2180,6 +2192,7 @@ let pane2Initialized = false;
 let latestPrice2 = null;
 
 async function initMainChart(){
+  renderChartTabs();
   const container = document.getElementById('klineMainChart');
   try {
     container.innerHTML = '<div style="padding:20px;color:var(--muted);">Loading chart library...</div>';
@@ -3141,6 +3154,153 @@ function useDrawTool(name){
 
 function clearDrawings(){
   mainChartInstance.removeOverlay();
+}
+
+/* ═══ Chart Tabs — Chrome-style workspace tabs (Pane 1 only) ═══
+   A "tab" is a saved workspace config: {id, symbol, interval, chartType, indicators}.
+   Only the ACTIVE tab's config is ever live in mainChartInstance/klineSocket — this
+   is what keeps tab switching smooth (one chart engine, one socket, reused), while
+   still giving every tab its own independent, fully-remembered state. */
+
+function getChartTabIndex(tabId){
+  return chartTabs.findIndex(t => t.id === tabId);
+}
+
+// Pulls the live Pane-1 state (currentSymbol/currentInterval/currentChartType/
+// activeIndicators) back into the active tab's saved record. Called right before
+// switching away from a tab, so nothing the user changed via the cockpit dropdowns
+// is ever lost.
+function snapshotActiveChartTab(){
+  const idx = getChartTabIndex(activeChartTabId);
+  if(idx === -1) return;
+  chartTabs[idx].symbol = currentSymbol;
+  chartTabs[idx].interval = currentInterval;
+  chartTabs[idx].chartType = currentChartType;
+  chartTabs[idx].indicators = Object.keys(activeIndicators);
+}
+
+function renderChartTabs(){
+  const list = document.getElementById('chart-tabs-list');
+  if(!list) return;
+  const canClose = chartTabs.length > 1;
+  list.innerHTML = chartTabs.map(t => {
+    const label = formatSymbolLabel(t.symbol);
+    const isActive = t.id === activeChartTabId;
+    const closeBtn = canClose
+      ? '<span class="ctab-close" onclick="event.stopPropagation();closeChartTab(' + t.id + ')" title="Close tab">✕</span>'
+      : '';
+    return '<div class="chart-tab-item' + (isActive ? ' active' : '') + '" data-tab-id="' + t.id + '" onclick="switchChartTab(' + t.id + ')">'
+      + '<span class="ctab-dot"></span><span class="ctab-label">' + label + '</span>' + closeBtn
+      + '</div>';
+  }).join('');
+}
+
+// Restores a tab's saved config into the live Pane-1 chart engine: symbol, chart
+// type, timeframe, and indicators, plus every cockpit UI label/active-state that
+// goes with them — mirrors exactly what selectMarket()/switchTimeframe()/
+// switchChartType()/toggleIndicator() already do individually, just all at once.
+async function applyChartTabState(tab){
+  if(!mainChartInstance) return;
+
+  // Clear indicators from the outgoing tab before drawing the incoming tab's set.
+  Object.keys(activeIndicators).forEach(name => {
+    mainChartInstance.removeIndicator(activeIndicators[name], name);
+    const btn = document.getElementById('ind-btn-' + name);
+    if(btn) btn.classList.remove('active-tool');
+  });
+  activeIndicators = {};
+
+  // Symbol
+  currentSymbol = tab.symbol;
+  const label = formatSymbolLabel(currentSymbol);
+  const marketBtn = document.getElementById('market-select-btn');
+  if(marketBtn) marketBtn.textContent = label + ' ▾';
+  const nameEl = document.querySelector('#chart-symbol-overlay .csym-name');
+  if(nameEl) nameEl.innerHTML = label + ' <span class="csym-sub">· Binance</span>';
+  prevMaxOverlayPrice = null;
+
+  // Chart type
+  currentChartType = tab.chartType;
+  mainChartInstance.setStyles({ candle: { type: currentChartType } });
+  document.querySelectorAll('.chart-item[id^="ct-item-"]').forEach(b => b.classList.remove('active-tool'));
+  const ctItem = document.getElementById('ct-item-' + currentChartType);
+  if(ctItem) ctItem.classList.add('active-tool');
+  const ctSelectBtn = document.getElementById('ct-select-btn');
+  if(ctSelectBtn) ctSelectBtn.title = 'Chart type: ' + (ctItem ? ctItem.textContent : currentChartType);
+  const ctIconEl = document.getElementById('ct-current-icon');
+  if(ctIconEl) ctIconEl.innerHTML = CHART_TYPE_ICONS[currentChartType] || CHART_TYPE_ICONS.candle_solid;
+
+  // Timeframe label (loadChartInterval below does the actual data fetch + socket)
+  currentInterval = tab.interval;
+  document.querySelectorAll('.chart-item[id^="tf-item-"]').forEach(b => b.classList.remove('active-tool'));
+  const tfItem = document.getElementById('tf-item-' + currentInterval);
+  if(tfItem) tfItem.classList.add('active-tool');
+  const tfSelectBtn = document.getElementById('tf-select-btn');
+  const tfLabelText = tfItem ? tfItem.textContent : currentInterval;
+  if(tfSelectBtn) tfSelectBtn.title = 'Timeframe: ' + tfLabelText;
+  const tfLabelEl = document.getElementById('tf-current-label');
+  if(tfLabelEl) tfLabelEl.textContent = tfLabelText;
+
+  try{
+    await loadChartInterval(currentInterval);
+    connectOrderBook(currentSymbol);
+    updateTradingWorkspaceLabel(currentSymbol);
+  }catch(err){ console.error('Chart tab switch failed:', err); }
+
+  // Indicators
+  (tab.indicators || []).forEach(name => {
+    const overlay = CHART_TAB_INDICATOR_OVERLAY[name];
+    const paneId = overlay
+      ? mainChartInstance.createIndicator(name, true, {id:'candle_pane'})
+      : mainChartInstance.createIndicator(name);
+    activeIndicators[name] = paneId;
+    const btn = document.getElementById('ind-btn-' + name);
+    if(btn) btn.classList.add('active-tool');
+  });
+
+  // Keep split-screen sync (if the user has it toggled on) consistent with tab switches.
+  broadcastSymbolSync(1, currentSymbol);
+  broadcastIntervalSync(1, currentInterval);
+}
+
+// New tab always inherits the symbol of whichever tab is active right now —
+// i.e. the tab the user was looking at the moment they clicked "+".
+async function addChartTab(){
+  closeAllCockpitDropdowns();
+  const inheritedSymbol = currentSymbol; // symbol of whichever tab is active right now
+  const tab = { id: nextChartTabId++, symbol: inheritedSymbol, interval: '1m', chartType: 'candle_solid', indicators: [] };
+  chartTabs.push(tab);
+  snapshotActiveChartTab(); // persist the outgoing tab's live state before we move activeChartTabId
+  activeChartTabId = tab.id;
+  renderChartTabs();
+  await applyChartTabState(tab);
+}
+
+async function switchChartTab(tabId){
+  if(tabId === activeChartTabId) return;
+  const idx = getChartTabIndex(tabId);
+  if(idx === -1) return;
+  closeAllCockpitDropdowns();
+  snapshotActiveChartTab();
+  activeChartTabId = tabId;
+  renderChartTabs();
+  await applyChartTabState(chartTabs[idx]);
+}
+
+async function closeChartTab(tabId){
+  if(chartTabs.length <= 1) return; // always keep at least one tab open
+  const idx = getChartTabIndex(tabId);
+  if(idx === -1) return;
+  const wasActive = tabId === activeChartTabId;
+  chartTabs.splice(idx, 1);
+  if(wasActive){
+    const newIdx = Math.min(idx, chartTabs.length - 1);
+    activeChartTabId = chartTabs[newIdx].id;
+    renderChartTabs();
+    await applyChartTabState(chartTabs[newIdx]);
+  } else {
+    renderChartTabs();
+  }
 }
 
 /* ═══ Pane 2: independent chart instance (Phase 2) ═══
