@@ -3406,15 +3406,20 @@ function setActivePane(paneId){
 
 // Event delegation so newly-created panes (split screen) are covered automatically —
 // #chart-panes-stack itself is never replaced, only its children are re-parented.
+// Uses capture-phase pointerdown (not bubble-phase click) because klinecharts attaches
+// its own pointer handlers directly on the chart canvas for pan/zoom/drag, which stops
+// the event from bubbling back up to us — that's why tapping the chart body itself did
+// nothing while tapping toolbar buttons (outside the canvas) worked. Capture phase runs
+// top-down BEFORE the canvas ever sees the event, so nothing downstream can block it.
 document.addEventListener('DOMContentLoaded', () => {
   const stack = document.getElementById('chart-panes-stack');
   if(!stack) return;
-  stack.addEventListener('click', (e) => {
+  stack.addEventListener('pointerdown', (e) => {
     const paneEl = e.target.closest('#chart-panel-wrap-1, .chart-pane-2');
     if(!paneEl) return;
     const pid = paneEl.id === 'chart-panel-wrap-1' ? 1 : parseInt(paneEl.id.replace('chart-pane-',''), 10);
     if(pid) setActivePane(pid);
-  });
+  }, true);
 });
 
 function connectOrderBook(symbol){
