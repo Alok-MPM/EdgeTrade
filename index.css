@@ -1511,11 +1511,17 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-tab-add:hover{ background:var(--gold-dim); border-color:var(--gold); color:var(--gold); }
 .chart-tab-add .nav-icon-svg{ width:16px; height:16px; }
 
-.light-mode .chart-tab-item{ color:rgba(243,228,201,0.6); }
-.light-mode .chart-tab-item:hover{ background:rgba(243,228,201,0.08); color:var(--cream); }
+.light-mode .chart-tab-item{
+  background:rgba(243,228,201,0.06);
+  border-color:rgba(243,228,201,0.16);
+  color:rgba(243,228,201,0.6);
+}
+.light-mode .chart-tab-item:hover{ background:rgba(243,228,201,0.12); border-color:rgba(243,228,201,0.3); color:var(--cream); }
 .light-mode .chart-tab-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
-.light-mode .chart-tab-add{ border-color:rgba(243,228,201,0.12); }
-.light-mode .chart-tab-add:hover{ background:rgba(243,228,201,0.08); border-color:var(--cream); color:var(--cream); }
+.light-mode .chart-tab-item .ctab-dot{ background:rgba(243,228,201,0.5); }
+.light-mode .chart-tab-item.active .ctab-dot{ background:var(--green); box-shadow:0 0 6px var(--green); }
+.light-mode .chart-tab-add{ background:rgba(243,228,201,0.06); border-color:rgba(243,228,201,0.16); color:rgba(243,228,201,0.6); }
+.light-mode .chart-tab-add:hover{ background:rgba(243,228,201,0.12); border-color:var(--cream); color:var(--cream); }
 
 @media(max-width:768px){
   .chart-tabs-bar{ padding:8px 14px; }
