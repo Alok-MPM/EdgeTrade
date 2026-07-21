@@ -748,6 +748,9 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .toggle-slider::before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:white;left:3px;top:3px;transition:transform 0.3s;}
 .toggle input:checked+.toggle-slider{background:var(--gold);}
 .toggle input:checked+.toggle-slider::before{transform:translateX(18px);}
+.light-mode .toggle-slider{background:rgba(10,41,71,0.18);}
+.light-mode .toggle-slider::before{border:1px solid rgba(10,41,71,0.15);}
+.light-mode .toggle input:checked+.toggle-slider{background:var(--navy);}
 
 /* ════════════════════════════════
    PASSWORD CHANGE (G)

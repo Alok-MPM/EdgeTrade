@@ -2194,6 +2194,8 @@ async function initMainChart(){
       grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
       candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
     });
+    attachCrosshairSync(1, mainChartInstance);
+    attachViewportSync(1, mainChartInstance);
 
     await loadChartInterval(currentInterval);
   } catch(err) {
@@ -2291,6 +2293,7 @@ async function switchTimeframe(tf){
   } catch(err) {
     console.error('Timeframe switch failed:', err);
   }
+  broadcastIntervalSync(1, tf);
 }
 
 let currentChartType = 'candle_solid';
@@ -2460,6 +2463,7 @@ async function selectMarket(symbol){
     await loadChartInterval(currentInterval);
     connectOrderBook(currentSymbol);
   }catch(err){ console.error('Symbol switch failed:', err); }
+  broadcastSymbolSync(1, symbol);
 }
 
 function toggleTfDropdown(){
@@ -2590,9 +2594,106 @@ function updateLayoutBtnIcon(group, variantIdx){
   wrap.innerHTML = renderLayoutIconHTML(config);
 }
 
+/* ═══ Phase 3: Cross-pane Sync Engine ═══
+   Only the toggles turned ON in the SYNC IN LAYOUT popup are ever propagated
+   between panes — everything else about a pane (symbol, interval, chart
+   type, indicators, drawings) stays fully independent, exactly as spec'd.
+   Symbol/interval sync re-uses each pane's own selectMarket*/switchTimeframe*
+   function, which already has an "already this value → return" guard at the
+   top, so a broadcast can never loop back into itself. Crosshair/time/date-
+   range sync use a synchronous re-entrancy flag for the same reason. */
+
 function toggleLayoutSync(key, checked){
   layoutSyncSettings[key] = checked;
-  // Store-only for now — the actual cross-pane sync engine is Phase 3.
+  if(checked) attachAllPaneSyncSubscriptions();
+}
+
+// Live klinecharts instance for a given pane id (1, 2, or 3-8), or null if that pane hasn't been created yet.
+function getPaneChartInstance(paneId){
+  if(paneId === 1) return mainChartInstance || null;
+  if(paneId === 2) return mainChartInstance2 || null;
+  return (extraPanes[paneId] && extraPanes[paneId].chart) || null;
+}
+
+// Every OTHER pane that currently has a live chart instance — including ones parked in the
+// hidden pool, so they're already in sync by the time the user brings them back into a layout.
+function getSyncBroadcastTargets(sourcePaneId){
+  const targets = [];
+  for(let pid = 1; pid <= 8; pid++){
+    if(pid !== sourcePaneId && getPaneChartInstance(pid)) targets.push(pid);
+  }
+  return targets;
+}
+
+function broadcastSymbolSync(sourcePaneId, symbol){
+  if(!layoutSyncSettings.symbol) return;
+  getSyncBroadcastTargets(sourcePaneId).forEach(pid => {
+    if(pid === 1) selectMarket(symbol);
+    else if(pid === 2) selectMarket2(symbol);
+    else selectExtraMarket(pid, symbol);
+  });
+}
+
+function broadcastIntervalSync(sourcePaneId, interval){
+  if(!layoutSyncSettings.interval) return;
+  getSyncBroadcastTargets(sourcePaneId).forEach(pid => {
+    if(pid === 1) switchTimeframe(interval);
+    else if(pid === 2) switchTimeframe2(interval);
+    else switchExtraTimeframe(pid, interval);
+  });
+}
+
+// Crosshair sync: klinecharts' documented executeAction('onCrosshairChange', data) replay API
+// is purpose-built for mirroring one chart's crosshair onto another chart instance.
+let isBroadcastingCrosshair = false;
+function attachCrosshairSync(paneId, chart){
+  if(!chart || chart._crosshairSyncAttached) return;
+  chart._crosshairSyncAttached = true;
+  chart.subscribeAction('onCrosshairChange', (data) => {
+    if(!layoutSyncSettings.crosshair || isBroadcastingCrosshair) return;
+    isBroadcastingCrosshair = true;
+    getSyncBroadcastTargets(paneId).forEach(pid => {
+      const target = getPaneChartInstance(pid);
+      if(target && target.executeAction) target.executeAction('onCrosshairChange', data);
+    });
+    isBroadcastingCrosshair = false;
+  });
+}
+
+// Time sync = scroll position (which candles are visible) matches across panes.
+// Date range sync = zoom level (candle width) matches across panes.
+// Kept as two independent channels so either can be toggled on its own.
+let isBroadcastingViewport = false;
+function attachViewportSync(paneId, chart){
+  if(!chart || chart._viewportSyncAttached) return;
+  chart._viewportSyncAttached = true;
+  const handler = () => {
+    if(isBroadcastingViewport) return;
+    if(!layoutSyncSettings.time && !layoutSyncSettings.dateRange) return;
+    isBroadcastingViewport = true;
+    const range = chart.getVisibleRange();
+    const barSpace = chart.getBarSpace();
+    getSyncBroadcastTargets(paneId).forEach(pid => {
+      const target = getPaneChartInstance(pid);
+      if(!target) return;
+      if(layoutSyncSettings.dateRange && target.setBarSpace) target.setBarSpace(barSpace);
+      if(layoutSyncSettings.time && target.scrollToDataIndex) target.scrollToDataIndex(range.realFrom);
+    });
+    isBroadcastingViewport = false;
+  };
+  chart.subscribeAction('onScroll', handler);
+  chart.subscribeAction('onZoom', handler);
+}
+
+// Wires up crosshair + viewport sync for every pane chart that currently exists. Safe to call
+// repeatedly — each chart instance only gets attached once (tracked on the instance itself).
+function attachAllPaneSyncSubscriptions(){
+  for(let pid = 1; pid <= 8; pid++){
+    const chart = getPaneChartInstance(pid);
+    if(!chart) continue;
+    attachCrosshairSync(pid, chart);
+    attachViewportSync(pid, chart);
+  }
 }
 
 /* ═══ Generic N-pane tree renderer (Phase 2 extended: all 1–8 layouts) ═══
@@ -2674,6 +2775,8 @@ async function initExtraChart(paneId){
       grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
       candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
     });
+    attachCrosshairSync(paneId, st.chart);
+    attachViewportSync(paneId, st.chart);
     await loadExtraChartInterval(paneId, st.interval);
     const list = await loadBinanceMarkets();
     renderExtraMarketList(paneId, list);
@@ -2721,6 +2824,7 @@ async function switchExtraTimeframe(paneId, tf){
   if(labelEl) labelEl.textContent = labelText;
   try{ await loadExtraChartInterval(paneId, tf); }
   catch(err){ console.error('Pane ' + paneId + ' timeframe switch failed:', err); }
+  broadcastIntervalSync(paneId, tf);
 }
 
 function switchExtraChartType(paneId, type){
@@ -2763,6 +2867,7 @@ async function selectExtraMarket(paneId, symbol){
   if(btn) btn.textContent = label + ' ▾';
   try{ await loadExtraChartInterval(paneId, st.interval); }
   catch(err){ console.error('Pane ' + paneId + ' symbol switch failed:', err); }
+  broadcastSymbolSync(paneId, symbol);
 }
 
 function toggleExtraIndicator(paneId, name, overlayOnCandle){
@@ -3013,6 +3118,8 @@ async function initChart2(){
       grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
       candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
     });
+    attachCrosshairSync(2, mainChartInstance2);
+    attachViewportSync(2, mainChartInstance2);
     await loadChartInterval2(currentInterval2);
     // Order Book/Trading panel intentionally NOT connected here — stays bound to Pane 1 until Phase 4.
     const list = await loadBinanceMarkets();
@@ -3059,6 +3166,7 @@ async function switchTimeframe2(tf){
   if(labelEl) labelEl.textContent = labelText;
   try{ await loadChartInterval2(tf); }
   catch(err){ console.error('Pane 2 timeframe switch failed:', err); }
+  broadcastIntervalSync(2, tf);
 }
 
 function switchChartType2(type){
@@ -3099,6 +3207,7 @@ async function selectMarket2(symbol){
   if(btn) btn.textContent = label + ' ▾';
   try{ await loadChartInterval2(currentInterval2); }
   catch(err){ console.error('Pane 2 symbol switch failed:', err); }
+  broadcastSymbolSync(2, symbol);
 }
 
 function toggleIndicator2(name, overlayOnCandle){
