@@ -467,7 +467,7 @@
                     </button>
                   </div>
                   <div class="chart-panes-stack" id="chart-panes-stack">
-                    <div class="chart-panel-wrap">
+                    <div class="chart-panel-wrap" id="chart-panel-wrap-1">
                       <div class="chart-symbol-overlay" id="chart-symbol-overlay">
                         <span class="csym-name">BTC/USDT <span class="csym-sub">· Binance</span></span>
                         <span class="csym-price" id="chart-max-price" style="color:var(--green);">—</span>
@@ -539,6 +539,9 @@
                       </div>
                     </div>
                   </div>
+                  <!-- Parking pool: panes not in the current layout live here (hidden), keeping their
+                       chart instance + websocket alive so switching layouts never re-creates/leaks. -->
+                  <div id="extra-panes-pool" style="display:none;"></div>
                   <!-- Reserved overlay layer — future AI badges, trade markers, replay controls -->
                   <div class="chart-future-overlay" aria-hidden="true"></div>
                 </div>

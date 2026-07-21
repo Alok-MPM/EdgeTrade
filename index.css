@@ -1129,6 +1129,13 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .pane2-chart-holder{flex:1 1 auto;min-height:0;position:relative;}
 .pane2-chart-holder > div{border-radius:0;}
 
+/* Generic nested split containers for 3–8 pane layouts. Each 'S' leaf in a LAYOUT_CONFIGS
+   node becomes a real pane (chart-panel-wrap for #1, chart-pane-2 style for #2-8); each
+   {dir:'row'|'col'} node becomes one of these wrappers, nested to any depth. */
+.split-row{display:flex;flex-direction:row;gap:10px;flex:1 1 0;min-width:0;min-height:0;}
+.split-col{display:flex;flex-direction:column;gap:10px;flex:1 1 0;min-width:0;min-height:0;}
+.split-row > *, .split-col > *{flex:1 1 0;min-width:0;min-height:0;}
+
 /* ── Layout picker: sync card + grid card (two separate popups, sync renders above) ── */
 .layout-dd{padding:12px;}
 .layout-sync-title{font-size:11px;letter-spacing:0.06em;color:var(--muted);font-family:'Outfit',sans-serif;font-weight:600;margin-bottom:8px;}

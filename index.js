@@ -2588,33 +2588,300 @@ function toggleLayoutSync(key, checked){
   // Store-only for now — the actual cross-pane sync engine is Phase 3.
 }
 
+/* ═══ Generic N-pane tree renderer (Phase 2 extended: all 1–8 layouts) ═══
+   Pane 1 (#chart-panel-wrap-1) and Pane 2 (#chart-pane-2) keep their existing
+   dedicated, already-tested code untouched. Panes 3–8 use ONE generic
+   parametrized system below (extraPanes registry + functions taking paneId)
+   instead of duplicating code 6 times. Panes not used by the current layout
+   are moved into #extra-panes-pool (display:none) — never destroyed — so
+   their chart instance + websocket stay alive and switching layouts back
+   and forth is instant with zero re-init/leak risk. */
+
+/* ═══ Panes 3–8: generic system (Phase 2 extended) ═══
+   One registry + one set of paneId-parametrized functions instead of
+   duplicating Pane 2's code six more times. Each entry in extraPanes holds
+   its own chart instance, symbol, interval, chart-type and indicators —
+   fully independent, same as Pane 2. */
+const EXTRA_PANE_DEFAULT_SYMBOLS = { 3:'SOLUSDT', 4:'BNBUSDT', 5:'XRPUSDT', 6:'DOGEUSDT', 7:'ADAUSDT', 8:'LTCUSDT' };
+const TF_LABELS = { '1m':'1m', '5m':'5m', '15m':'15m', '1h':'1H', '4h':'4H', '1d':'1D' };
+const CT_LABELS = { candle_solid:'Candle', candle_stroke:'Hollow', ohlc:'OHLC', area:'Area' };
+const IND_OVERLAY = { MA:true, EMA:true, BOLL:true, VOL:false, MACD:false, RSI:false, KDJ:false };
+let extraPanes = {};
+
+function buildExtraPaneDOM(paneId){
+  const symbol = EXTRA_PANE_DEFAULT_SYMBOLS[paneId] || 'BTCUSDT';
+  extraPanes[paneId] = { chart:null, symbol, interval:'1m', chartType:'candle_solid', indicators:{}, socket:null, initialized:false };
+  const wrap = document.createElement('div');
+  wrap.className = 'chart-pane-2';
+  wrap.id = 'chart-pane-' + paneId;
+  const tfItems = Object.keys(TF_LABELS).map(tf =>
+    '<div class="chart-item' + (tf==='1m' ? ' active-tool' : '') + '" id="tf-item-' + tf + '-' + paneId + '" onclick="switchExtraTimeframe(' + paneId + ',\'' + tf + '\')">' + TF_LABELS[tf] + '</div>'
+  ).join('');
+  const ctItems = Object.keys(CT_LABELS).map(ct =>
+    '<div class="chart-item' + (ct==='candle_solid' ? ' active-tool' : '') + '" id="ct-item-' + ct + '-' + paneId + '" onclick="switchExtraChartType(' + paneId + ',\'' + ct + '\')">' + CT_LABELS[ct] + '</div>'
+  ).join('');
+  const indItems = Object.keys(IND_OVERLAY).map(name =>
+    '<div class="chart-item" id="ind-btn-' + name + '-' + paneId + '" onclick="toggleExtraIndicator(' + paneId + ',\'' + name + '\',' + IND_OVERLAY[name] + ')">' + name + '</div>'
+  ).join('');
+  wrap.innerHTML =
+    '<div class="pane2-toolbar">' +
+      '<div class="chart-wrap" style="width:120px;">' +
+        '<button class="chart-tool-btn" id="market-select-btn-' + paneId + '" onclick="toggleExtraDropdown(' + paneId + ',\'market\')" title="Market" style="width:100%;text-align:left;font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + formatSymbolLabel(symbol) + ' ▾</button>' +
+        '<div class="chart-dd" id="market-dd-' + paneId + '" data-min-width="200">' +
+          '<div class="chart-search-w"><input type="text" class="chart-search" id="market-search-' + paneId + '" placeholder="Search market..." oninput="filterExtraMarketList(' + paneId + ',this.value)"></div>' +
+          '<div class="chart-list" id="market-list-' + paneId + '"><div style="padding:10px;color:var(--muted);font-size:12px;">Loading markets...</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="chart-wrap">' +
+        '<button class="cmd-pill cmd-pill-label" id="tf-select-btn-' + paneId + '" onclick="toggleExtraDropdown(' + paneId + ',\'tf\')" title="Timeframe: 1m">' +
+          '<span id="tf-current-label-' + paneId + '">1m</span><svg class="pill-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>' +
+        '</button>' +
+        '<div class="chart-dd" id="tf-dd-' + paneId + '" data-min-width="140"><div class="chart-list">' + tfItems + '</div></div>' +
+      '</div>' +
+      '<div class="chart-wrap">' +
+        '<button class="cmd-pill cmd-pill-label" id="ct-select-btn-' + paneId + '" onclick="toggleExtraDropdown(' + paneId + ',\'ct\')" title="Chart type: Candle">' +
+          '<span class="ct-icon-wrap" id="ct-current-icon-' + paneId + '">' + CHART_TYPE_ICONS.candle_solid + '</span><svg class="pill-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>' +
+        '</button>' +
+        '<div class="chart-dd" id="ct-dd-' + paneId + '" data-min-width="150"><div class="chart-list">' + ctItems + '</div></div>' +
+      '</div>' +
+      '<div class="chart-wrap">' +
+        '<button class="cmd-pill" id="ind-select-btn-' + paneId + '" onclick="toggleExtraDropdown(' + paneId + ',\'ind\')" title="Indicators"><span class="fx-icon">ƒx</span></button>' +
+        '<div class="chart-dd" id="ind-dd-' + paneId + '" data-min-width="150"><div class="chart-list">' + indItems + '</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="pane2-chart-holder"><div id="klineChart' + paneId + '" style="width:100%;height:100%;background:var(--bg2);"></div></div>';
+  return wrap;
+}
+
+async function initExtraChart(paneId){
+  const st = extraPanes[paneId];
+  if(!st || st.initialized) return;
+  st.initialized = true;
+  const container = document.getElementById('klineChart' + paneId);
+  if(!container) return;
+  try{
+    if(typeof klinecharts === 'undefined') throw new Error('klinecharts library not loaded');
+    st.chart = klinecharts.init('klineChart' + paneId);
+    if(!st.chart) throw new Error('klinecharts.init() returned null for pane ' + paneId);
+    st.chart.setStyles({
+      grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
+      candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
+    });
+    await loadExtraChartInterval(paneId, st.interval);
+    const list = await loadBinanceMarkets();
+    renderExtraMarketList(paneId, list);
+  }catch(err){
+    container.innerHTML = '<div style="padding:20px;color:#E05252;font-family:monospace;font-size:13px;white-space:pre-wrap;">CHART ERROR:\n' + err.message + '</div>';
+    console.error('Pane ' + paneId + ' chart init failed:', err);
+  }
+}
+
+async function loadExtraChartInterval(paneId, interval){
+  const st = extraPanes[paneId];
+  if(!st || !st.chart) return;
+  const res = await fetch('https://api.binance.com/api/v3/klines?symbol=' + st.symbol + '&interval=' + interval + '&limit=300');
+  if(!res.ok) throw new Error('Binance API fetch failed: ' + res.status);
+  const raw = await res.json();
+  const data = raw.map(k => ({
+    timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]),
+    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+  }));
+  st.chart.applyNewData(data);
+  if(st.socket) st.socket.close();
+  st.socket = new WebSocket('wss://stream.binance.com:9443/ws/' + st.symbol.toLowerCase() + '@kline_' + interval);
+  st.socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const k = msg.k;
+    st.chart.updateData({
+      timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
+      low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+    });
+  };
+  st.interval = interval;
+}
+
+async function switchExtraTimeframe(paneId, tf){
+  closeCockpitDropdown(document.getElementById('tf-dd-' + paneId));
+  const st = extraPanes[paneId];
+  if(!st || !st.chart || tf === st.interval) return;
+  document.querySelectorAll('.chart-item[id^="tf-item-"][id$="-' + paneId + '"]').forEach(b => b.classList.remove('active-tool'));
+  const activeItem = document.getElementById('tf-item-' + tf + '-' + paneId);
+  if(activeItem) activeItem.classList.add('active-tool');
+  const selectBtn = document.getElementById('tf-select-btn-' + paneId);
+  const labelText = activeItem ? activeItem.textContent : tf;
+  if(selectBtn) selectBtn.title = 'Timeframe: ' + labelText;
+  const labelEl = document.getElementById('tf-current-label-' + paneId);
+  if(labelEl) labelEl.textContent = labelText;
+  try{ await loadExtraChartInterval(paneId, tf); }
+  catch(err){ console.error('Pane ' + paneId + ' timeframe switch failed:', err); }
+}
+
+function switchExtraChartType(paneId, type){
+  closeCockpitDropdown(document.getElementById('ct-dd-' + paneId));
+  const st = extraPanes[paneId];
+  if(!st || !st.chart || type === st.chartType) return;
+  st.chart.setStyles({ candle: { type } });
+  document.querySelectorAll('.chart-item[id^="ct-item-"][id$="-' + paneId + '"]').forEach(b => b.classList.remove('active-tool'));
+  const activeItem = document.getElementById('ct-item-' + type + '-' + paneId);
+  if(activeItem) activeItem.classList.add('active-tool');
+  const selectBtn = document.getElementById('ct-select-btn-' + paneId);
+  if(selectBtn) selectBtn.title = 'Chart type: ' + (activeItem ? activeItem.textContent : type);
+  const iconEl = document.getElementById('ct-current-icon-' + paneId);
+  if(iconEl) iconEl.innerHTML = CHART_TYPE_ICONS[type] || CHART_TYPE_ICONS.candle_solid;
+  st.chartType = type;
+}
+
+function renderExtraMarketList(paneId, list){
+  const el = document.getElementById('market-list-' + paneId);
+  if(!el) return;
+  if(!list.length){ el.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;">No match</div>'; return; }
+  el.innerHTML = list.map(sym =>
+    '<div class="chart-item" onclick="selectExtraMarket(' + paneId + ',\'' + sym + '\')"><span>' + formatSymbolLabel(sym) + '</span><span class="chart-item-cat">Binance</span></div>'
+  ).join('');
+}
+
+function filterExtraMarketList(paneId, val){
+  if(!binanceMarkets) return;
+  const v = val.trim().toUpperCase();
+  renderExtraMarketList(paneId, v ? binanceMarkets.filter(s => s.includes(v)) : binanceMarkets);
+}
+
+async function selectExtraMarket(paneId, symbol){
+  closeCockpitDropdown(document.getElementById('market-dd-' + paneId));
+  const st = extraPanes[paneId];
+  if(!st || !st.chart || symbol === st.symbol) return;
+  st.symbol = symbol;
+  const label = formatSymbolLabel(symbol);
+  const btn = document.getElementById('market-select-btn-' + paneId);
+  if(btn) btn.textContent = label + ' ▾';
+  try{ await loadExtraChartInterval(paneId, st.interval); }
+  catch(err){ console.error('Pane ' + paneId + ' symbol switch failed:', err); }
+}
+
+function toggleExtraIndicator(paneId, name, overlayOnCandle){
+  const st = extraPanes[paneId];
+  if(!st || !st.chart) return;
+  const btn = document.getElementById('ind-btn-' + name + '-' + paneId);
+  if(st.indicators[name]){
+    st.chart.removeIndicator(st.indicators[name], name);
+    delete st.indicators[name];
+    if(btn) btn.classList.remove('active-tool');
+  } else {
+    let pId;
+    if(overlayOnCandle) pId = st.chart.createIndicator(name, true, {id:'candle_pane'});
+    else pId = st.chart.createIndicator(name);
+    st.indicators[name] = pId;
+    if(btn) btn.classList.add('active-tool');
+  }
+}
+
+function toggleExtraDropdown(paneId, kind){
+  const ddId = kind + '-dd-' + paneId;
+  const btnId = kind + '-select-btn-' + paneId;
+  const dd = document.getElementById(ddId);
+  const btn = document.getElementById(btnId);
+  if(!dd || !btn) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  closeAllCockpitDropdowns();
+  closeAllPane2Dropdowns();
+  closeLayoutDropdowns();
+  document.querySelectorAll('.chart-dd.open').forEach(el => { if(el !== dd) closeCockpitDropdown(el); });
+  if(!dd._origParent){ dd._origParent = dd.parentNode; dd._origNext = dd.nextSibling; }
+  document.body.appendChild(dd);
+  positionCockpitDropdown(dd, btn);
+  dd.classList.add('open');
+  if(kind === 'market'){
+    const s = document.getElementById('market-search-' + paneId);
+    if(s) setTimeout(() => s.focus(), 50);
+  }
+}
+
+// Generic click-outside-to-close + reposition for ALL extra-pane dropdowns (id pattern
+// "{kind}-dd-{paneId}" where paneId >= 3 — panes 1/2 have their own dedicated listeners).
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('.chart-dd.open').forEach(dd => {
+    const m = dd.id.match(/^([a-z]+)-dd-(\d+)$/);
+    if(!m || parseInt(m[2], 10) < 3) return;
+    const btn = document.getElementById(m[1] + '-select-btn-' + m[2]);
+    if(dd.contains(e.target)) return;
+    if(btn && (btn === e.target || btn.contains(e.target))) return;
+    closeCockpitDropdown(dd);
+  });
+});
+function repositionOpenExtraDropdowns(){
+  document.querySelectorAll('.chart-dd.open').forEach(dd => {
+    const m = dd.id.match(/^([a-z]+)-dd-(\d+)$/);
+    if(!m || parseInt(m[2], 10) < 3) return;
+    const btn = document.getElementById(m[1] + '-select-btn-' + m[2]);
+    if(btn) positionCockpitDropdown(dd, btn);
+  });
+}
+window.addEventListener('scroll', repositionOpenExtraDropdowns, true);
+window.addEventListener('resize', repositionOpenExtraDropdowns);
+
+function assignLeaves(node, counter){
+  if(node === 'S'){
+    counter.n++;
+    return getPaneElement(counter.n);
+  }
+  const div = document.createElement('div');
+  div.className = 'split-' + (node.dir === 'row' ? 'row' : 'col');
+  node.c.forEach(child => div.appendChild(assignLeaves(child, counter)));
+  return div;
+}
+
+function getPaneElement(idx){
+  if(idx === 1) return document.getElementById('chart-panel-wrap-1');
+  if(idx === 2){
+    const el = document.getElementById('chart-pane-2');
+    if(el) el.style.display = 'flex';
+    return el;
+  }
+  let el = document.getElementById('chart-pane-' + idx);
+  if(!el) el = buildExtraPaneDOM(idx);
+  el.style.display = 'flex';
+  return el;
+}
+
 function applyLayout(group, variantIdx){
   const config = LAYOUT_CONFIGS[group] && LAYOUT_CONFIGS[group][variantIdx];
   if(!config) return;
-  if(group >= 3){
-    showToast('3+ pane layouts Phase 2 mein aayenge — abhi 1 ya 2 pane try karo');
-    return;
-  }
   currentLayoutGroup = group;
   currentLayoutVariant = variantIdx;
   const stack = document.getElementById('chart-panes-stack');
-  const pane2 = document.getElementById('chart-pane-2');
+  const pool = document.getElementById('extra-panes-pool');
   const layoutBtn = document.getElementById('layout-select-btn');
-  if(!stack || !pane2) return;
-  stack.classList.remove('split-col');
-  if(group === 1){
-    pane2.style.display = 'none';
-  } else {
-    pane2.style.display = 'flex';
-    if(config.dir === 'col') stack.classList.add('split-col');
-    if(!pane2Initialized) initChart2();
+  if(!stack || !pool) return;
+
+  // Park every pane beyond this layout's count into the hidden pool FIRST —
+  // before building the new tree — so nothing gets wiped by accident.
+  for(let pid = 2; pid <= 8; pid++){
+    if(pid > group){
+      const el = document.getElementById('chart-pane-' + pid);
+      if(el) pool.appendChild(el);
+    }
   }
+
+  const counter = { n: 0 };
+  const rootEl = assignLeaves(config, counter);
+  stack.innerHTML = '';
+  stack.appendChild(rootEl);
+
   if(layoutBtn) layoutBtn.classList.toggle('active-tool', group > 1);
   renderLayoutPicker();
   closeLayoutDropdowns();
+
+  if(group >= 2 && !pane2Initialized) initChart2();
+  for(let pid = 3; pid <= group; pid++){
+    if(extraPanes[pid] && !extraPanes[pid].initialized) initExtraChart(pid);
+  }
+
   setTimeout(() => {
     if(mainChartInstance && mainChartInstance.resize) mainChartInstance.resize();
     if(mainChartInstance2 && mainChartInstance2.resize) mainChartInstance2.resize();
+    for(let pid = 3; pid <= 8; pid++){
+      if(extraPanes[pid] && extraPanes[pid].chart && extraPanes[pid].chart.resize) extraPanes[pid].chart.resize();
+    }
     window.dispatchEvent(new Event('resize'));
   }, 60);
 }
