@@ -2679,7 +2679,12 @@ function attachViewportSync(paneId, chart){
       if(layoutSyncSettings.dateRange && target.setBarSpace) target.setBarSpace(barSpace);
       if(layoutSyncSettings.time && target.scrollToDataIndex) target.scrollToDataIndex(range.realFrom);
     });
-    isBroadcastingViewport = false;
+    // scrollToDataIndex/setBarSpace animate asynchronously in klinecharts, so the target's own
+    // onScroll/onZoom can still fire AFTER this flag would've already been cleared synchronously.
+    // Hold the guard open across a couple of animation frames so that echoed event is swallowed
+    // instead of being broadcast back out (which is what caused the runaway "goes way too far
+    // back" feedback loop between panes).
+    requestAnimationFrame(() => requestAnimationFrame(() => { isBroadcastingViewport = false; }));
   };
   chart.subscribeAction('onScroll', handler);
   chart.subscribeAction('onZoom', handler);
@@ -2767,6 +2772,13 @@ async function initExtraChart(paneId){
   st.initialized = true;
   const container = document.getElementById('klineChart' + paneId);
   if(!container) return;
+  // If symbol sync is ON, a newly created pane should mirror Pane 1's current symbol
+  // instead of falling back to its own hardcoded default.
+  if(layoutSyncSettings.symbol && st.symbol !== currentSymbol){
+    st.symbol = currentSymbol;
+    const btn = document.getElementById('market-select-btn-' + paneId);
+    if(btn) btn.textContent = formatSymbolLabel(currentSymbol) + ' ▾';
+  }
   try{
     if(typeof klinecharts === 'undefined') throw new Error('klinecharts library not loaded');
     st.chart = klinecharts.init('klineChart' + paneId);
@@ -3110,6 +3122,9 @@ async function initChart2(){
   pane2Initialized = true;
   const container = document.getElementById('klineChart2');
   if(!container) return;
+  // If symbol sync is ON, a newly created pane should mirror Pane 1's current symbol
+  // instead of falling back to its own hardcoded default (previously always ETHUSDT).
+  if(layoutSyncSettings.symbol) currentSymbol2 = currentSymbol;
   try{
     if(typeof klinecharts === 'undefined') throw new Error('klinecharts library not loaded');
     mainChartInstance2 = klinecharts.init('klineChart2');
