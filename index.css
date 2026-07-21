@@ -1419,3 +1419,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .chart-header-wrapper{ padding:0 14px; gap:10px; }
   .chart-nav-right .broker-sel{ min-width:120px; }
 }
+
+/* — Phase 4: Active pane binding — clicking a chart pane makes it the source for
+     Order Book + Trade Terminal. Subtle border highlight shows which pane is active. — */
+.chart-panel-wrap,
+.chart-pane-2{ border:1px solid transparent; border-radius:10px; transition:border-color 0.15s; }
+.chart-panel-wrap.active-pane,
+.chart-pane-2.active-pane{ border-color:var(--gold); }
+.ob-active-symbol{ color:var(--gold); font-weight:600; margin-left:6px; }
+.term-active-symbol{ color:var(--gold); font-weight:600; }

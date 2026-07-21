@@ -2176,6 +2176,7 @@ let currentInterval2 = '1m';
 let currentSymbol2 = 'ETHUSDT';
 let currentChartType2 = 'candle_solid';
 let pane2Initialized = false;
+let latestPrice2 = null;
 
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
@@ -2838,6 +2839,8 @@ async function loadExtraChartInterval(paneId, interval){
       timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
       low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
     });
+    st.latestPrice = parseFloat(k.c);
+    if(activePaneId === paneId) updateLiqPreview();
   };
   st.interval = interval;
 }
@@ -3006,6 +3009,10 @@ function applyLayout(group, variantIdx){
     }
   }
 
+  // If the layout just shrank and hid the currently-active pane, Order Book +
+  // Trade Terminal fall back to Pane 1 rather than staying bound to a hidden pane.
+  if(activePaneId > group) setActivePane(1);
+
   const counter = { n: 0 };
   const rootEl = assignLeaves(config, counter);
   stack.innerHTML = '';
@@ -3015,6 +3022,7 @@ function applyLayout(group, variantIdx){
   updateLayoutBtnIcon(group, variantIdx);
   renderLayoutPicker();
   closeLayoutDropdowns();
+  highlightActivePane();
 
   if(group >= 2){
     if(!pane2Initialized) initChart2();
@@ -3188,6 +3196,8 @@ async function loadChartInterval2(interval){
       timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
       low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
     });
+    latestPrice2 = parseFloat(k.c);
+    if(activePaneId === 2) updateLiqPreview();
   };
   currentInterval2 = interval;
 }
@@ -3344,6 +3354,69 @@ function repositionOpenPane2Dropdowns(){
 window.addEventListener('scroll', repositionOpenPane2Dropdowns, true);
 window.addEventListener('resize', repositionOpenPane2Dropdowns);
 
+// ══════════════════════════════════════
+// PHASE 4: Active-pane binding for Order Book + Trade Terminal
+// Whichever pane the user last tapped is the "active" one — its symbol/price
+// feeds the Order Book and Trade Terminal, so trades always go to the market
+// actually visible on screen. Defaults to Pane 1 and stays there until the
+// user taps a different pane (split screen or not).
+// ══════════════════════════════════════
+let activePaneId = 1;
+
+function getPaneSymbol(paneId){
+  if(paneId === 1) return currentSymbol;
+  if(paneId === 2) return currentSymbol2;
+  return (extraPanes[paneId] && extraPanes[paneId].symbol) || null;
+}
+
+function getPaneLivePrice(paneId){
+  if(paneId === 1) return latestPrice;
+  if(paneId === 2) return latestPrice2;
+  return (extraPanes[paneId] && extraPanes[paneId].latestPrice) || null;
+}
+
+function highlightActivePane(){
+  document.querySelectorAll('.chart-panel-wrap.active-pane, .chart-pane-2.active-pane')
+    .forEach(el => el.classList.remove('active-pane'));
+  const el = activePaneId === 1 ? document.getElementById('chart-panel-wrap-1') : document.getElementById('chart-pane-' + activePaneId);
+  if(el) el.classList.add('active-pane');
+}
+
+function updateTradingWorkspaceLabel(symbol){
+  const label = symbol ? formatSymbolLabel(symbol) : '';
+  const obLabel = document.getElementById('ob-active-symbol');
+  if(obLabel) obLabel.textContent = label;
+  const termLabel = document.getElementById('term-active-symbol');
+  if(termLabel) termLabel.textContent = label;
+}
+
+// Called on tapping any pane. Re-points Order Book + Trade Terminal at that
+// pane's market — no-op if the pane doesn't exist or is already active.
+function setActivePane(paneId){
+  if(paneId === activePaneId || !getPaneChartInstance(paneId)) return;
+  activePaneId = paneId;
+  highlightActivePane();
+  const symbol = getPaneSymbol(paneId);
+  if(symbol){
+    connectOrderBook(symbol);
+    updateTradingWorkspaceLabel(symbol);
+  }
+  updateLiqPreview();
+}
+
+// Event delegation so newly-created panes (split screen) are covered automatically —
+// #chart-panes-stack itself is never replaced, only its children are re-parented.
+document.addEventListener('DOMContentLoaded', () => {
+  const stack = document.getElementById('chart-panes-stack');
+  if(!stack) return;
+  stack.addEventListener('click', (e) => {
+    const paneEl = e.target.closest('#chart-panel-wrap-1, .chart-pane-2');
+    if(!paneEl) return;
+    const pid = paneEl.id === 'chart-panel-wrap-1' ? 1 : parseInt(paneEl.id.replace('chart-pane-',''), 10);
+    if(pid) setActivePane(pid);
+  });
+});
+
 function connectOrderBook(symbol){
   if(obSocket){ obSocket.close(); obSocket = null; }
   obSocket = new WebSocket('wss://stream.binance.com:9443/ws/' + symbol.toLowerCase() + '@depth20@100ms');
@@ -3358,6 +3431,8 @@ function connectOrderBook(symbol){
 }
 function initOrderBook(){
   connectOrderBook(currentSymbol);
+  highlightActivePane();
+  updateTradingWorkspaceLabel(currentSymbol);
 }
 
 function renderOrderBook(bids, asks){
@@ -3416,8 +3491,9 @@ function updateLiqPreview(){
   const qty = parseFloat(document.getElementById('term-qty').value) || 0;
   const lev = parseInt(document.getElementById('term-leverage').value) || 1;
   const preview = document.getElementById('term-liq-preview');
-  if(!qty || !latestPrice){ preview.textContent = ''; return; }
-  const liq = selectedSide==='long' ? latestPrice*(1-1/lev) : latestPrice*(1+1/lev);
+  const price = getPaneLivePrice(activePaneId);
+  if(!qty || !price){ preview.textContent = ''; return; }
+  const liq = selectedSide==='long' ? price*(1-1/lev) : price*(1+1/lev);
   preview.textContent = 'Est. liquidation: ' + liq.toFixed(1) + ' | Margin used: $' + qty.toFixed(2);
 }
 document.addEventListener('input', (e) => {
@@ -3455,7 +3531,9 @@ function calcLiqPrice(pos){
 
 async function submitDemoOrder(){
   if(!state.user){ showToast('Please sign in first','error'); return; }
-  if(!latestPrice){ showToast('Waiting for live price, try again in a sec','error'); return; }
+  const symbol = getPaneSymbol(activePaneId);
+  const entryPrice = getPaneLivePrice(activePaneId);
+  if(!symbol || !entryPrice){ showToast('Waiting for live price, try again in a sec','error'); return; }
   let qty = parseFloat(document.getElementById('term-qty').value);
   const lev = parseInt(document.getElementById('term-leverage').value);
   const tp = parseFloat(document.getElementById('term-tp').value) || null;
@@ -3465,15 +3543,15 @@ async function submitDemoOrder(){
   if(qty > demoBalance) qty = demoBalance; // clamp tiny float overshoot (e.g. 100% selection)
 
   const {data, error} = await db.from('demo_positions').insert([{
-    user_id: state.user.id, symbol: currentSymbol, side: selectedSide, leverage: lev,
-    quantity_usd: qty, entry_price: latestPrice, status:'open',
+    user_id: state.user.id, symbol: symbol, side: selectedSide, leverage: lev,
+    quantity_usd: qty, entry_price: entryPrice, status:'open',
     take_profit: tp, stop_loss: sl
   }]).select().single();
 
   if(error){ showToast('Order failed: ' + error.message, 'error'); return; }
 
   await updateDemoBalance(demoBalance - qty);
-  showToast((selectedSide==='long'?'Long':'Short')+' opened @ '+latestPrice.toFixed(1));
+  showToast((selectedSide==='long'?'Long':'Short')+' opened @ '+entryPrice.toFixed(1));
   document.getElementById('term-qty').value = '';
   document.getElementById('term-tp').value = '';
   document.getElementById('term-sl').value = '';
