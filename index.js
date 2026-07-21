@@ -2663,28 +2663,35 @@ function attachCrosshairSync(paneId, chart){
 // Time sync = scroll position (which candles are visible) matches across panes.
 // Date range sync = zoom level (candle width) matches across panes.
 // Kept as two independent channels so either can be toggled on its own.
-let isBroadcastingViewport = false;
+//
+// IMPORTANT: klinecharts' scrollToDataIndex/setBarSpace animate with easing over several
+// hundred ms, so the target chart's OWN onScroll/onZoom keeps firing well after the call
+// returns. A single shared "isBroadcasting" boolean reset on the same tick (or even a
+// couple of rAFs later) is nowhere near long enough — the target's echoed events slip
+// through, get treated as genuine user scrolls, and get broadcast right back to the
+// source (and to other panes), each round trip drifting the visible range further.
+// That feedback loop is what caused panes to run away further and further back in
+// history. Fix: mute each *target* chart's own handler for a fixed window (longer than
+// klinecharts' animation) right when we programmatically move it, tracked per-chart
+// so unrelated panes are unaffected.
+const VIEWPORT_SYNC_MUTE_MS = 500;
 function attachViewportSync(paneId, chart){
   if(!chart || chart._viewportSyncAttached) return;
   chart._viewportSyncAttached = true;
+  chart._syncMuteUntil = 0;
   const handler = () => {
-    if(isBroadcastingViewport) return;
+    if(Date.now() < chart._syncMuteUntil) return;
     if(!layoutSyncSettings.time && !layoutSyncSettings.dateRange) return;
-    isBroadcastingViewport = true;
     const range = chart.getVisibleRange();
     const barSpace = chart.getBarSpace();
+    const until = Date.now() + VIEWPORT_SYNC_MUTE_MS;
     getSyncBroadcastTargets(paneId).forEach(pid => {
       const target = getPaneChartInstance(pid);
       if(!target) return;
+      target._syncMuteUntil = until;
       if(layoutSyncSettings.dateRange && target.setBarSpace) target.setBarSpace(barSpace);
       if(layoutSyncSettings.time && target.scrollToDataIndex) target.scrollToDataIndex(range.realFrom);
     });
-    // scrollToDataIndex/setBarSpace animate asynchronously in klinecharts, so the target's own
-    // onScroll/onZoom can still fire AFTER this flag would've already been cleared synchronously.
-    // Hold the guard open across a couple of animation frames so that echoed event is swallowed
-    // instead of being broadcast back out (which is what caused the runaway "goes way too far
-    // back" feedback loop between panes).
-    requestAnimationFrame(() => requestAnimationFrame(() => { isBroadcastingViewport = false; }));
   };
   chart.subscribeAction('onScroll', handler);
   chart.subscribeAction('onZoom', handler);
@@ -2996,9 +3003,13 @@ function applyLayout(group, variantIdx){
   renderLayoutPicker();
   closeLayoutDropdowns();
 
-  if(group >= 2 && !pane2Initialized) initChart2();
+  if(group >= 2){
+    if(!pane2Initialized) initChart2();
+    else if(layoutSyncSettings.symbol && currentSymbol2 !== currentSymbol) selectMarket2(currentSymbol);
+  }
   for(let pid = 3; pid <= group; pid++){
     if(extraPanes[pid] && !extraPanes[pid].initialized) initExtraChart(pid);
+    else if(extraPanes[pid] && layoutSyncSettings.symbol && extraPanes[pid].symbol !== currentSymbol) selectExtraMarket(pid, currentSymbol);
   }
 
   setTimeout(() => {
