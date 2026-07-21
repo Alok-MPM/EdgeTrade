@@ -332,8 +332,11 @@
         <div style="padding:20px;">
           <div class="workspace-shell">
 
-            <!-- ═══ MAIN WORKSPACE : Chart Workspace + Bottom Dock ═══ -->
+            <!-- ═══ MAIN WORKSPACE : Chart + Order Book + Bottom Dock ═══ -->
             <div class="main-workspace">
+
+              <!-- CHART + ORDER BOOK ROW -->
+              <div class="chart-orderbook-row">
 
               <!-- CHART WORKSPACE -->
               <section class="chart-workspace">
@@ -548,6 +551,13 @@
 
               </section><!-- /chart-workspace -->
 
+              <div class="orderbook-panel">
+                <div style="color:var(--white);font-weight:600;margin-bottom:10px;font-family:'Outfit',sans-serif;">Order Book<span class="ob-active-symbol" id="ob-active-symbol"></span></div>
+                <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
+              </div>
+
+              </div><!-- /chart-orderbook-row -->
+
               <!-- BOTTOM DOCK -->
               <div class="bottom-dock" id="bottom-dock">
                 <div class="dock-header">
@@ -571,13 +581,8 @@
 
             </div><!-- /main-workspace -->
 
-            <!-- ═══ TRADING WORKSPACE : Order Book + Execution + AI Mentor ═══ -->
+            <!-- ═══ TRADING WORKSPACE : Execution + AI Mentor ═══ -->
             <aside class="trading-workspace">
-
-              <div class="orderbook-panel">
-                <div style="color:var(--white);font-weight:600;margin-bottom:10px;font-family:'Outfit',sans-serif;">Order Book<span class="ob-active-symbol" id="ob-active-symbol"></span></div>
-                <div id="orderBookBody"><div style="color:var(--muted);font-size:12px;padding:10px;">Loading...</div></div>
-              </div>
 
               <div class="execution-workspace">
                 <div class="execution-header">
