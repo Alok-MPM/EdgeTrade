@@ -1114,15 +1114,20 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-viewport{position:relative;flex:1;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:row;align-items:stretch;}
 .chart-viewport .chart-panel-wrap{flex:1 1 auto;min-width:0;}
 
-/* ── Split screen: panes-stack wrapper + pane 2 placeholder (Phase 1) ── */
+/* ── Split screen: panes-stack wrapper + pane 2 (Phase 1 shell + Phase 2 independent chart) ── */
 .chart-panes-stack{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:row;gap:10px;}
 .chart-panes-stack.split-col{flex-direction:column;}
 .chart-panes-stack .chart-panel-wrap{flex:1 1 0;min-width:0;min-height:0;}
-.chart-pane-2{flex:1 1 0;min-width:0;min-height:0;display:none;align-items:center;justify-content:center;background:var(--bg2);border:1px dashed var(--border2);border-radius:12px;}
+.chart-pane-2{flex:1 1 0;min-width:0;min-height:0;display:none;flex-direction:column;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;overflow:hidden;}
 .chart-pane-2-inner{text-align:center;color:var(--muted);padding:20px;}
 .chart-pane-2-inner .cp2-icon{font-size:22px;color:var(--muted);margin-bottom:6px;}
 .chart-pane-2-inner .cp2-title{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:14px;margin-bottom:4px;}
 .chart-pane-2-inner .cp2-sub{font-size:12px;font-family:'Outfit',sans-serif;}
+
+/* Pane 2's own mini-toolbar (independent symbol/timeframe/type/indicators — Phase 2) */
+.pane2-toolbar{display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border2);flex-shrink:0;}
+.pane2-chart-holder{flex:1 1 auto;min-height:0;position:relative;}
+.pane2-chart-holder > div{border-radius:0;}
 
 /* ── Layout picker: sync card + grid card (two separate popups, sync renders above) ── */
 .layout-dd{padding:12px;}

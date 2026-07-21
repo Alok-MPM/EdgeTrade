@@ -2167,6 +2167,16 @@ let currentInterval = '1m';
 let currentSymbol = 'BTCUSDT';
 let binanceMarkets = null;
 
+// ── Pane 2 (Phase 2): fully independent state, mirrors Pane 1's globals above.
+// Order Book/Trading panel stay bound to Pane 1 only — active-pane binding is Phase 4.
+let mainChartInstance2 = null;
+let activeIndicators2 = {};
+let klineSocket2 = null;
+let currentInterval2 = '1m';
+let currentSymbol2 = 'ETHUSDT';
+let currentChartType2 = 'candle_solid';
+let pane2Initialized = false;
+
 async function initMainChart(){
   const container = document.getElementById('klineMainChart');
   try {
@@ -2597,12 +2607,14 @@ function applyLayout(group, variantIdx){
   } else {
     pane2.style.display = 'flex';
     if(config.dir === 'col') stack.classList.add('split-col');
+    if(!pane2Initialized) initChart2();
   }
   if(layoutBtn) layoutBtn.classList.toggle('active-tool', group > 1);
   renderLayoutPicker();
   closeLayoutDropdowns();
   setTimeout(() => {
     if(mainChartInstance && mainChartInstance.resize) mainChartInstance.resize();
+    if(mainChartInstance2 && mainChartInstance2.resize) mainChartInstance2.resize();
     window.dispatchEvent(new Event('resize'));
   }, 60);
 }
@@ -2705,6 +2717,209 @@ function useDrawTool(name){
 function clearDrawings(){
   mainChartInstance.removeOverlay();
 }
+
+/* ═══ Pane 2: independent chart instance (Phase 2) ═══
+   Mirrors Pane 1's initMainChart/loadChartInterval/selectMarket/switchTimeframe/
+   switchChartType/toggleIndicator, but fully separate — own klinecharts instance,
+   own symbol/interval/indicator state, own dropdowns. Lazy-inited the first time
+   applyLayout() shows 2 panes, then kept alive (never disposed) so toggling back
+   to 1 pane and forward again doesn't recreate/leak — it just shows/hides. */
+
+async function initChart2(){
+  if(pane2Initialized) return;
+  pane2Initialized = true;
+  const container = document.getElementById('klineChart2');
+  if(!container) return;
+  try{
+    if(typeof klinecharts === 'undefined') throw new Error('klinecharts library not loaded');
+    mainChartInstance2 = klinecharts.init('klineChart2');
+    if(!mainChartInstance2) throw new Error('klinecharts.init() returned null for Pane 2');
+    mainChartInstance2.setStyles({
+      grid: { show:true, horizontal:{color:'#2a2a2a'}, vertical:{color:'#2a2a2a'} },
+      candle: { bar: { upColor:'#4CAF7D', downColor:'#E05252', noChangeColor:'#888888' } }
+    });
+    await loadChartInterval2(currentInterval2);
+    // Order Book/Trading panel intentionally NOT connected here — stays bound to Pane 1 until Phase 4.
+    const list = await loadBinanceMarkets();
+    renderMarketList2(list);
+  }catch(err){
+    container.innerHTML = '<div style="padding:20px;color:#E05252;font-family:monospace;font-size:13px;white-space:pre-wrap;">CHART ERROR:\n' + err.message + '</div>';
+    console.error('Pane 2 chart init failed:', err);
+  }
+}
+
+async function loadChartInterval2(interval){
+  const res = await fetch('https://api.binance.com/api/v3/klines?symbol=' + currentSymbol2 + '&interval=' + interval + '&limit=300');
+  if(!res.ok) throw new Error('Binance API fetch failed: ' + res.status);
+  const raw = await res.json();
+  const data = raw.map(k => ({
+    timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]),
+    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+  }));
+  mainChartInstance2.applyNewData(data);
+
+  if(klineSocket2) klineSocket2.close();
+  klineSocket2 = new WebSocket('wss://stream.binance.com:9443/ws/' + currentSymbol2.toLowerCase() + '@kline_' + interval);
+  klineSocket2.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const k = msg.k;
+    mainChartInstance2.updateData({
+      timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h),
+      low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+    });
+  };
+  currentInterval2 = interval;
+}
+
+async function switchTimeframe2(tf){
+  closeCockpitDropdown(document.getElementById('tf-dd-2'));
+  if(tf === currentInterval2 || !mainChartInstance2) return;
+  document.querySelectorAll('.chart-item[id^="tf-item-"][id$="-2"]').forEach(b => b.classList.remove('active-tool'));
+  const activeItem = document.getElementById('tf-item-' + tf + '-2');
+  if(activeItem) activeItem.classList.add('active-tool');
+  const selectBtn = document.getElementById('tf-select-btn-2');
+  const labelText = activeItem ? activeItem.textContent : tf;
+  if(selectBtn) selectBtn.title = 'Timeframe: ' + labelText;
+  const labelEl = document.getElementById('tf-current-label-2');
+  if(labelEl) labelEl.textContent = labelText;
+  try{ await loadChartInterval2(tf); }
+  catch(err){ console.error('Pane 2 timeframe switch failed:', err); }
+}
+
+function switchChartType2(type){
+  closeCockpitDropdown(document.getElementById('ct-dd-2'));
+  if(!mainChartInstance2 || type === currentChartType2) return;
+  mainChartInstance2.setStyles({ candle: { type } });
+  document.querySelectorAll('.chart-item[id^="ct-item-"][id$="-2"]').forEach(b => b.classList.remove('active-tool'));
+  const activeItem = document.getElementById('ct-item-' + type + '-2');
+  if(activeItem) activeItem.classList.add('active-tool');
+  const selectBtn = document.getElementById('ct-select-btn-2');
+  if(selectBtn) selectBtn.title = 'Chart type: ' + (activeItem ? activeItem.textContent : type);
+  const iconEl = document.getElementById('ct-current-icon-2');
+  if(iconEl) iconEl.innerHTML = CHART_TYPE_ICONS[type] || CHART_TYPE_ICONS.candle_solid;
+  currentChartType2 = type;
+}
+
+function renderMarketList2(list){
+  const el = document.getElementById('market-list-2');
+  if(!el) return;
+  if(!list.length){ el.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;">No match</div>'; return; }
+  el.innerHTML = list.map(sym =>
+    '<div class="chart-item" onclick="selectMarket2(\'' + sym + '\')"><span>' + formatSymbolLabel(sym) + '</span><span class="chart-item-cat">Binance</span></div>'
+  ).join('');
+}
+
+function filterMarketList2(val){
+  if(!binanceMarkets) return;
+  const v = val.trim().toUpperCase();
+  renderMarketList2(v ? binanceMarkets.filter(s => s.includes(v)) : binanceMarkets);
+}
+
+async function selectMarket2(symbol){
+  closeCockpitDropdown(document.getElementById('market-dd-2'));
+  if(symbol === currentSymbol2 || !mainChartInstance2) return;
+  currentSymbol2 = symbol;
+  const label = formatSymbolLabel(symbol);
+  const btn = document.getElementById('market-select-btn-2');
+  if(btn) btn.textContent = label + ' ▾';
+  try{ await loadChartInterval2(currentInterval2); }
+  catch(err){ console.error('Pane 2 symbol switch failed:', err); }
+}
+
+function toggleIndicator2(name, overlayOnCandle){
+  if(!mainChartInstance2) return;
+  const btn = document.getElementById('ind-btn-' + name + '-2');
+  if(activeIndicators2[name]){
+    mainChartInstance2.removeIndicator(activeIndicators2[name], name);
+    delete activeIndicators2[name];
+    if(btn) btn.classList.remove('active-tool');
+  } else {
+    let paneId;
+    if(overlayOnCandle){
+      paneId = mainChartInstance2.createIndicator(name, true, {id:'candle_pane'});
+    } else {
+      paneId = mainChartInstance2.createIndicator(name);
+    }
+    activeIndicators2[name] = paneId;
+    if(btn) btn.classList.add('active-tool');
+  }
+}
+
+// Pane 2 dropdowns reuse the same generic portal helpers (positionCockpitDropdown /
+// closeCockpitDropdown take a dd/btn pair, they're not hardcoded to Pane 1's ids) —
+// just a separate id list + separate open/close-all wrappers so Pane 1's dropdown
+// system is never touched.
+const PANE2_DD_IDS = ['market-dd-2','tf-dd-2','ct-dd-2','ind-dd-2'];
+
+function closeAllPane2Dropdowns(exceptId){
+  PANE2_DD_IDS.forEach(id => {
+    if(id === exceptId) return;
+    closeCockpitDropdown(document.getElementById(id));
+  });
+}
+
+function openPane2Dropdown(ddId, btnId){
+  const dd = document.getElementById(ddId);
+  const btn = document.getElementById(btnId);
+  if(!dd || !btn) return;
+  closeAllPane2Dropdowns(ddId);
+  closeAllCockpitDropdowns();
+  closeLayoutDropdowns();
+  if(!dd._origParent){ dd._origParent = dd.parentNode; dd._origNext = dd.nextSibling; }
+  document.body.appendChild(dd);
+  positionCockpitDropdown(dd, btn);
+  dd.classList.add('open');
+}
+
+function toggleMarketDropdown2(){
+  const dd = document.getElementById('market-dd-2');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openPane2Dropdown('market-dd-2', 'market-select-btn-2');
+  const s = document.getElementById('market-search-2');
+  if(s) setTimeout(() => s.focus(), 50);
+}
+function toggleTfDropdown2(){
+  const dd = document.getElementById('tf-dd-2');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openPane2Dropdown('tf-dd-2', 'tf-select-btn-2');
+}
+function toggleCtDropdown2(){
+  const dd = document.getElementById('ct-dd-2');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openPane2Dropdown('ct-dd-2', 'ct-select-btn-2');
+}
+function toggleIndDropdown2(){
+  const dd = document.getElementById('ind-dd-2');
+  if(!dd) return;
+  if(dd.classList.contains('open')){ closeCockpitDropdown(dd); return; }
+  openPane2Dropdown('ind-dd-2', 'ind-select-btn-2');
+}
+
+document.addEventListener('click', (e) => {
+  PANE2_DD_IDS.forEach(id => {
+    const dd = document.getElementById(id);
+    if(!dd || !dd.classList.contains('open')) return;
+    const btnId = id.replace(/-dd-2$/, '-select-btn-2');
+    const btn = document.getElementById(btnId);
+    if(dd.contains(e.target)) return;
+    if(btn && (btn === e.target || btn.contains(e.target))) return;
+    closeCockpitDropdown(dd);
+  });
+});
+function repositionOpenPane2Dropdowns(){
+  PANE2_DD_IDS.forEach(id => {
+    const dd = document.getElementById(id);
+    if(!dd || !dd.classList.contains('open')) return;
+    const btnId = id.replace(/-dd-2$/, '-select-btn-2');
+    const btn = document.getElementById(btnId);
+    if(btn) positionCockpitDropdown(dd, btn);
+  });
+}
+window.addEventListener('scroll', repositionOpenPane2Dropdowns, true);
+window.addEventListener('resize', repositionOpenPane2Dropdowns);
 
 function connectOrderBook(symbol){
   if(obSocket){ obSocket.close(); obSocket = null; }

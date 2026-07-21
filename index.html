@@ -475,12 +475,67 @@
                       <button class="chart-maximize-btn" id="chart-maximize-btn" onclick="toggleChartMaximize()" title="Maximize chart">⛶</button>
                       <div id="klineMainChart" style="width:100%;height:500px;border-radius:12px;overflow:hidden;background:var(--bg2);"></div>
                     </div>
-                    <!-- Pane 2: placeholder only for now — real independent chart instance lands in Phase 2 -->
+                    <!-- Pane 2: independent chart instance (Phase 2). Own toolbar + own klinecharts
+                         instance, fully separate from Pane 1's cockpit/state. Order Book/Trading panel
+                         binding to this pane is Phase 4 — for now it stays bound to Pane 1. -->
                     <div class="chart-pane-2" id="chart-pane-2">
-                      <div class="chart-pane-2-inner">
-                        <div class="cp2-icon">＋</div>
-                        <div class="cp2-title">Pane 2</div>
-                        <div class="cp2-sub">Independent chart — Phase 2 mein aayega</div>
+                      <div class="pane2-toolbar">
+                        <div class="chart-wrap" style="width:120px;">
+                          <button class="chart-tool-btn" id="market-select-btn-2" onclick="toggleMarketDropdown2()" title="Market" style="width:100%;text-align:left;font-family:'JetBrains Mono',monospace;font-size:12px;">ETH/USDT ▾</button>
+                          <div class="chart-dd" id="market-dd-2" data-min-width="200">
+                            <div class="chart-search-w"><input type="text" class="chart-search" id="market-search-2" placeholder="Search market..." oninput="filterMarketList2(this.value)"></div>
+                            <div class="chart-list" id="market-list-2"><div style="padding:10px;color:var(--muted);font-size:12px;">Loading markets...</div></div>
+                          </div>
+                        </div>
+                        <div class="chart-wrap">
+                          <button class="cmd-pill cmd-pill-label" id="tf-select-btn-2" onclick="toggleTfDropdown2()" title="Timeframe: 1m">
+                            <span id="tf-current-label-2">1m</span>
+                            <svg class="pill-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                          </button>
+                          <div class="chart-dd" id="tf-dd-2" data-min-width="140">
+                            <div class="chart-list">
+                              <div class="chart-item active-tool" id="tf-item-1m-2" onclick="switchTimeframe2('1m')">1m</div>
+                              <div class="chart-item" id="tf-item-5m-2" onclick="switchTimeframe2('5m')">5m</div>
+                              <div class="chart-item" id="tf-item-15m-2" onclick="switchTimeframe2('15m')">15m</div>
+                              <div class="chart-item" id="tf-item-1h-2" onclick="switchTimeframe2('1h')">1H</div>
+                              <div class="chart-item" id="tf-item-4h-2" onclick="switchTimeframe2('4h')">4H</div>
+                              <div class="chart-item" id="tf-item-1d-2" onclick="switchTimeframe2('1d')">1D</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="chart-wrap">
+                          <button class="cmd-pill cmd-pill-label" id="ct-select-btn-2" onclick="toggleCtDropdown2()" title="Chart type: Candle">
+                            <span class="ct-icon-wrap" id="ct-current-icon-2"><svg class="nav-icon-svg" viewBox="0 0 24 24"><line x1="6" y1="2" x2="6" y2="7"/><rect x="4" y="7" width="4" height="8" rx="1"/><line x1="6" y1="15" x2="6" y2="22"/><line x1="14" y1="4" x2="14" y2="9"/><rect x="12" y="9" width="4" height="7" rx="1"/><line x1="14" y1="16" x2="14" y2="20"/></svg></span>
+                            <svg class="pill-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                          </button>
+                          <div class="chart-dd" id="ct-dd-2" data-min-width="150">
+                            <div class="chart-list">
+                              <div class="chart-item active-tool" id="ct-item-candle_solid-2" onclick="switchChartType2('candle_solid')">Candle</div>
+                              <div class="chart-item" id="ct-item-candle_stroke-2" onclick="switchChartType2('candle_stroke')">Hollow</div>
+                              <div class="chart-item" id="ct-item-ohlc-2" onclick="switchChartType2('ohlc')">OHLC</div>
+                              <div class="chart-item" id="ct-item-area-2" onclick="switchChartType2('area')">Area</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="chart-wrap">
+                          <button class="cmd-pill" id="ind-select-btn-2" onclick="toggleIndDropdown2()" title="Indicators">
+                            <span class="fx-icon">ƒx</span>
+                          </button>
+                          <div class="chart-dd" id="ind-dd-2" data-min-width="150">
+                            <div class="chart-list">
+                              <div class="chart-item" id="ind-btn-MA-2" onclick="toggleIndicator2('MA', true)">MA</div>
+                              <div class="chart-item" id="ind-btn-EMA-2" onclick="toggleIndicator2('EMA', true)">EMA</div>
+                              <div class="chart-item" id="ind-btn-BOLL-2" onclick="toggleIndicator2('BOLL', true)">BOLL</div>
+                              <div class="chart-item" id="ind-btn-VOL-2" onclick="toggleIndicator2('VOL', false)">VOL</div>
+                              <div class="chart-item" id="ind-btn-MACD-2" onclick="toggleIndicator2('MACD', false)">MACD</div>
+                              <div class="chart-item" id="ind-btn-RSI-2" onclick="toggleIndicator2('RSI', false)">RSI</div>
+                              <div class="chart-item" id="ind-btn-KDJ-2" onclick="toggleIndicator2('KDJ', false)">KDJ</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="pane2-chart-holder">
+                        <div id="klineChart2" style="width:100%;height:100%;background:var(--bg2);"></div>
                       </div>
                     </div>
                   </div>
