@@ -2583,6 +2583,13 @@ function renderLayoutPicker(){
   wrap.innerHTML = html;
 }
 
+function updateLayoutBtnIcon(group, variantIdx){
+  const wrap = document.getElementById('layout-btn-icon');
+  if(!wrap) return;
+  const config = (LAYOUT_CONFIGS[group] && LAYOUT_CONFIGS[group][variantIdx]) || 'S';
+  wrap.innerHTML = renderLayoutIconHTML(config);
+}
+
 function toggleLayoutSync(key, checked){
   layoutSyncSettings[key] = checked;
   // Store-only for now — the actual cross-pane sync engine is Phase 3.
@@ -2868,6 +2875,7 @@ function applyLayout(group, variantIdx){
   stack.appendChild(rootEl);
 
   if(layoutBtn) layoutBtn.classList.toggle('active-tool', group > 1);
+  updateLayoutBtnIcon(group, variantIdx);
   renderLayoutPicker();
   closeLayoutDropdowns();
 
