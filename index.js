@@ -2664,7 +2664,7 @@ function attachCrosshairSync(paneId, chart){
 // Date range sync = zoom level (candle width) matches across panes.
 // Kept as two independent channels so either can be toggled on its own.
 //
-// IMPORTANT: klinecharts' scrollToDataIndex/setBarSpace animate with easing over several
+// IMPORTANT #1: klinecharts' scrollToDataIndex/setBarSpace animate with easing over several
 // hundred ms, so the target chart's OWN onScroll/onZoom keeps firing well after the call
 // returns. A single shared "isBroadcasting" boolean reset on the same tick (or even a
 // couple of rAFs later) is nowhere near long enough — the target's echoed events slip
@@ -2674,6 +2674,14 @@ function attachCrosshairSync(paneId, chart){
 // history. Fix: mute each *target* chart's own handler for a fixed window (longer than
 // klinecharts' animation) right when we programmatically move it, tracked per-chart
 // so unrelated panes are unaffected.
+//
+// IMPORTANT #2: each pane fetches its own kline data independently (own API call, own
+// moment in time, own limit=300 window), so the two panes' underlying data arrays are
+// NOT index-aligned even for the same symbol/interval — dataList[realFrom] in Pane 1 is
+// a different real candle/time than dataList[realFrom] in Pane 2. Broadcasting the raw
+// array index (scrollToDataIndex) therefore lands each pane on the "wrong" spot. Fix:
+// resolve the source's anchor bar to its real timestamp and sync with scrollToTimestamp,
+// which lines panes up on the exact same moment in time regardless of array offset.
 const VIEWPORT_SYNC_MUTE_MS = 500;
 function attachViewportSync(paneId, chart){
   if(!chart || chart._viewportSyncAttached) return;
@@ -2684,13 +2692,18 @@ function attachViewportSync(paneId, chart){
     if(!layoutSyncSettings.time && !layoutSyncSettings.dateRange) return;
     const range = chart.getVisibleRange();
     const barSpace = chart.getBarSpace();
+    const dataList = chart.getDataList ? chart.getDataList() : null;
+    const anchorBar = dataList && dataList[range.realFrom] ? dataList[range.realFrom] : null;
     const until = Date.now() + VIEWPORT_SYNC_MUTE_MS;
     getSyncBroadcastTargets(paneId).forEach(pid => {
       const target = getPaneChartInstance(pid);
       if(!target) return;
       target._syncMuteUntil = until;
       if(layoutSyncSettings.dateRange && target.setBarSpace) target.setBarSpace(barSpace);
-      if(layoutSyncSettings.time && target.scrollToDataIndex) target.scrollToDataIndex(range.realFrom);
+      if(layoutSyncSettings.time){
+        if(anchorBar && target.scrollToTimestamp) target.scrollToTimestamp(anchorBar.timestamp);
+        else if(target.scrollToDataIndex) target.scrollToDataIndex(range.realFrom);
+      }
     });
   };
   chart.subscribeAction('onScroll', handler);
