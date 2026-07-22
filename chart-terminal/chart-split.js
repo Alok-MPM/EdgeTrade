@@ -70,6 +70,13 @@
 
   let paneStackEl = null; // the pre-existing container the main chart lives in
 
+  // Per-tab layout memory. chart-cockpit.js owns the tabs array — this file
+  // never modifies it, only reads window.chartCockpit.getActiveTab().id to
+  // detect when the user has switched tabs, so layout/split state stays
+  // isolated per tab instead of leaking into newly-created tabs.
+  let tabLayoutState = {}; // tabId -> { layout, sync, pane2Symbol, pane2Interval }
+  let currentTabId = null;
+
   // ── Public init ─────────────────────────────────────────────────────
   function init(opts = {}) {
     const cockpit = document.getElementById('ctc-cockpit');
@@ -83,6 +90,15 @@
     injectLayoutButton(cockpit);
     wrapMainChartForSplit(mainChartEl, chartContainerId);
     bindSyncListeners();
+
+    // Seed per-tab state for whichever tab is active at load time.
+    if (window.chartCockpit && typeof window.chartCockpit.getActiveTab === 'function') {
+      const activeTab = window.chartCockpit.getActiveTab();
+      if (activeTab) {
+        currentTabId = activeTab.id;
+        tabLayoutState[currentTabId] = { layout, sync: { ...sync }, pane2Symbol, pane2Interval };
+      }
+    }
   }
 
   // ── Inject the "Layout" pill + dropdown into the existing cockpit ─────
@@ -226,10 +242,56 @@
   // ── Sync: symbol + interval (Pane 1 → Pane 2, one direction only) ────
   function bindSyncListeners() {
     marketStore.onSymbolChange(({ symbol, interval }) => {
+      // A tab switch also fires a symbol change (chart-cockpit's switchTab
+      // calls marketStore.setSymbol). Handle that case FIRST and bail out —
+      // otherwise the normal "keep pane 2 in sync" logic below would treat
+      // a tab switch as just another symbol change and leave the previous
+      // tab's split-layout (and pane 2) sitting on top of the new tab.
+      if (handleTabChangeIfNeeded()) return;
+
       if (!pane2Instance) return;
       const nextSymbol = sync.symbol ? symbol : pane2Symbol;
       const nextInterval = sync.interval ? interval : pane2Interval;
       if (nextSymbol !== pane2Symbol || nextInterval !== pane2Interval) loadPane2(nextSymbol, nextInterval);
+    });
+  }
+
+  // ── Tab-awareness (reads chart-cockpit's tabs, never writes to them) ──
+  function handleTabChangeIfNeeded() {
+    if (!window.chartCockpit || typeof window.chartCockpit.getActiveTab !== 'function') return false;
+    const activeTab = window.chartCockpit.getActiveTab();
+    if (!activeTab || activeTab.id === currentTabId) return false;
+
+    // Save the tab we're leaving so its split-layout is restored if the
+    // user comes back to it later.
+    if (currentTabId !== null) {
+      tabLayoutState[currentTabId] = { layout, sync: { ...sync }, pane2Symbol, pane2Interval };
+    }
+    currentTabId = activeTab.id;
+
+    const saved = tabLayoutState[currentTabId];
+    if (saved) {
+      // Returning to a tab that already had a layout — restore it exactly.
+      sync = { ...saved.sync };
+      pane2Symbol = saved.pane2Symbol;
+      pane2Interval = saved.pane2Interval;
+      updateSyncTogglesUI();
+      setLayout(saved.layout);
+    } else {
+      // Brand-new tab — always starts single-pane with just its own symbol,
+      // regardless of what layout was active on the tab we came from.
+      sync = { symbol: true, interval: true, crosshair: true };
+      pane2Symbol = activeTab.symbol;
+      pane2Interval = activeTab.interval;
+      updateSyncTogglesUI();
+      setLayout('1');
+    }
+    return true;
+  }
+
+  function updateSyncTogglesUI() {
+    document.querySelectorAll('#cs-layout-dd .cs-toggle input').forEach(input => {
+      input.checked = !!sync[input.dataset.syncKey];
     });
   }
 
