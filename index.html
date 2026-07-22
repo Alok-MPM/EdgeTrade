@@ -671,6 +671,20 @@
         </div><!-- /chart-terminal-layout -->
       </div>
 
+      <!-- ============================================================
+           CHART TERMINAL MIGRATION MOUNT POINT
+           This is where the NEW chart-terminal (split into /chart-terminal/*.js
+           modules) will render once migration is complete. It stays empty and
+           hidden (display:none) until we are ready — the OLD #section-chart
+           above keeps running the live site until then.
+           Do NOT delete #section-chart above until every module below has
+           been built, uploaded to /chart-terminal/, and its script tag
+           uncommented in the list near the bottom of <body>.
+           ============================================================ -->
+      <div class="content-section" id="section-chart-terminal-new" style="display:none;">
+        <div id="chart-terminal-root"><!-- filled by chart-terminal/*.js modules --></div>
+      </div>
+
       <!-- HOME -->
       <div class="content-section active" id="section-home">
         <div class="bal-grid">
@@ -1395,6 +1409,24 @@
 </div>
 
 <script src="index.js"></script>
+
+<!-- ============================================================
+     CHART TERMINAL MODULES (new split architecture)
+     Uncomment each line ONE AT A TIME as that file is built and
+     uploaded to /chart-terminal/ on GitHub. Order matters — keep
+     this exact sequence (market-store must load first, everything
+     else reads from it).
+     ============================================================ -->
+<!-- <script src="chart-terminal/market-store.js"></script> -->
+<!-- <script src="chart-terminal/chart-engine.js"></script> -->
+<!-- <script src="chart-terminal/chart-cockpit.js"></script> -->
+<!-- <script src="chart-terminal/footprint.js"></script> -->
+<!-- <script src="chart-terminal/orderflow.js"></script> -->
+<!-- <script src="chart-terminal/liquidity.js"></script> -->
+<!-- <script src="chart-terminal/order-book.js"></script> -->
+<!-- <script src="chart-terminal/trade-terminal.js"></script> -->
+<!-- <script src="chart-terminal/ai-assistant.js"></script> -->
+<!-- <script src="chart-terminal/profile-settings.js"></script> -->
 
 <!-- CHART PAGE NAV MENU (bottom sheet, opened from the "Chart" button in the chart topbar) -->
 <div class="chart-nav-popup-overlay" id="chart-nav-popup-overlay" onclick="if(event.target===this) closeChartNavMenu()">

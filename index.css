@@ -1,3 +1,13 @@
+/* ══════════════════════════════════════
+   CHART TERMINAL MIGRATION NOTE
+   Global variables below (--bg, --gold, --navy, --cream, fonts) are used by
+   BOTH this file and the future /chart-terminal/*.js modules, so they stay
+   here permanently. All other chart-specific styling further down this file
+   will move into its matching chart-terminal/*.js module (self-contained
+   <style> tag) as each module is built. Do not delete chart styles from
+   here until the matching module is live and its script tag is uncommented
+   in index.html.
+   ══════════════════════════════════════ */
 :root{
   --bg:#111317; --bg2:#1A1D24; --bg3:#20242C; --bg4:#262B34;
   --gold:#D4B886; --gold-dim:rgba(212,184,134,0.10); --gold-glow:rgba(212,184,134,0.18);

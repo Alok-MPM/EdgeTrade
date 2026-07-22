@@ -1,4 +1,15 @@
 // ══════════════════════════════════════
+// CHART TERMINAL MIGRATION NOTE
+// The chart terminal (Chart Cockpit, order book, trade terminal, footprint,
+// order flow, liquidity, AI assistant, profile/settings) is being extracted
+// out of this file into standalone modules under /chart-terminal/*.js.
+// Until that migration is complete, ALL existing chart logic below stays
+// exactly as-is and continues to run the live site. Do not remove any
+// chart-related code from this file until its replacement module has been
+// built, tested, and its <script> tag uncommented in index.html.
+// ══════════════════════════════════════
+
+// ══════════════════════════════════════
 // SUPABASE INIT
 // ══════════════════════════════════════
 const SUPA_URL = 'https://ucwgvvsnellchioltkxs.supabase.co';
