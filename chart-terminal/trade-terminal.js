@@ -80,7 +80,8 @@
   let selectedSide = 'long';
   let demoBalance = 0;
   let openPositions = [];
-  let latestPrice = null;
+  let latestPrice = null; // price of whichever symbol is CURRENTLY on screen — only safe to use for the order form (new trade), never for existing positions
+  const priceMap = {}; // symbol -> latest known price, filled from BOTH kline (active chart) and ticker (watchlist), keyed so each position's PnL uses ITS OWN symbol's price, not whatever chart happens to be open
   let closingInProgress = {};
 
   // ── Public init ─────────────────────────────────────────────────────
@@ -93,10 +94,22 @@
     ensureDemoAccount().then(loadDemoPositions);
 
     marketStore.onKline((candle) => {
+      const activeSymbol = marketStore.getState().symbol;
       latestPrice = candle.close;
+      priceMap[activeSymbol] = candle.close;
       updateLiqPreview();
-      updateOpenPositionsPnL(latestPrice);
-      checkTpSlLiquidation(latestPrice);
+      updateOpenPositionsPnL();
+      checkTpSlLiquidation();
+    });
+
+    // Watchlist ticker keeps prices updated for symbols NOT currently on screen
+    // (e.g. you're viewing BTC but hold an open ETH position) — this is what
+    // lets PnL/liquidation stay correct per-position instead of borrowing
+    // whatever price the visible chart happens to have.
+    marketStore.onTicker(({ symbol, close }) => {
+      priceMap[symbol] = close;
+      updateOpenPositionsPnL();
+      checkTpSlLiquidation();
     });
   }
 
@@ -239,8 +252,9 @@
   async function submitDemoOrder() {
     if (!state.user) { notify('Please sign in first', 'error'); return; }
     const symbol = marketStore.getState().symbol;
-    const entryPrice = latestPrice;
+    const entryPrice = priceMap[symbol] || latestPrice;
     if (!symbol || !entryPrice) { notify('Waiting for live price, try again in a sec', 'error'); return; }
+    priceMap[symbol] = entryPrice; // seed immediately — don't wait for the next tick to know this symbol's price
 
     let qty = parseFloat(document.getElementById('tt-qty').value);
     const lev = parseInt(document.getElementById('tt-leverage').value);
@@ -285,7 +299,8 @@
       return;
     }
     c.innerHTML = openPositions.map(pos => {
-      const pnl = latestPrice ? calcPnl(pos, latestPrice) : 0;
+      const p = priceMap[pos.symbol];
+      const pnl = p ? calcPnl(pos, p) : 0;
       const pnlClass = pnl >= 0 ? 'pos' : 'neg';
       return `
         <div class="tt-pos-row" data-id="${pos.id}">
@@ -301,10 +316,12 @@
     });
   }
 
-  function updateOpenPositionsPnL(price) {
+  function updateOpenPositionsPnL() {
     openPositions.forEach(pos => {
       const el = document.getElementById('tt-pnl-' + pos.id);
       if (!el) return;
+      const price = priceMap[pos.symbol];
+      if (!price) return; // no live price for this position's own symbol yet — leave last known value, don't guess with another symbol's price
       const pnl = calcPnl(pos, price);
       el.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USD';
       el.className = 'tt-pos-pnl ' + (pnl >= 0 ? 'pos' : 'neg');
@@ -312,9 +329,11 @@
   }
 
   // ── Auto TP/SL/liquidation ───────────────────────────────────────────
-  function checkTpSlLiquidation(price) {
+  function checkTpSlLiquidation() {
     if (!openPositions.length) return;
     openPositions.slice().forEach(pos => {
+      const price = priceMap[pos.symbol];
+      if (!price) return; // don't test liquidation/TP/SL against a price from a different symbol
       const liq = calcLiqPrice(pos);
       if (pos.side === 'long') {
         if (price <= liq) { closePosition(pos.id, 'liquidated', liq); return; }
@@ -333,7 +352,7 @@
     closingInProgress[id] = true;
     const pos = openPositions.find(p => p.id === id);
     if (!pos) { closingInProgress[id] = false; return; }
-    const exitPrice = forcedPrice || latestPrice || pos.entry_price;
+    const exitPrice = forcedPrice || priceMap[pos.symbol] || pos.entry_price;
     const pnl = calcPnl(pos, exitPrice);
 
     const { error } = await db.from('demo_positions').update({
