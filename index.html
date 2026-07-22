@@ -682,7 +682,13 @@
            uncommented in the list near the bottom of <body>.
            ============================================================ -->
       <div class="content-section" id="section-chart-terminal-new" style="display:none;">
-        <div id="chart-terminal-root"><!-- filled by chart-terminal/*.js modules --></div>
+        <div id="chart-terminal-root"><!-- chart-cockpit.js renders tabs + toolbar here --></div>
+        <div id="klineMainChart" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
+        <div style="display:flex;gap:14px;margin-top:14px;">
+          <div id="order-book-root" style="width:320px;flex-shrink:0;"><!-- order-book.js --></div>
+          <div id="trade-terminal-root" style="width:320px;flex-shrink:0;"><!-- trade-terminal.js --></div>
+        </div>
+        <div id="profile-settings-root"><!-- profile-settings.js — move into the terminal's top bar once positioned --></div>
       </div>
 
       <!-- HOME -->
@@ -1417,16 +1423,40 @@
      this exact sequence (market-store must load first, everything
      else reads from it).
      ============================================================ -->
-<!-- <script src="chart-terminal/market-store.js"></script> -->
-<!-- <script src="chart-terminal/chart-engine.js"></script> -->
-<!-- <script src="chart-terminal/chart-cockpit.js"></script> -->
+<script src="chart-terminal/market-store.js"></script>
+<script src="chart-terminal/chart-engine.js"></script>
+<script src="chart-terminal/chart-cockpit.js"></script>
+<script src="chart-terminal/chart-split.js"></script>
 <!-- <script src="chart-terminal/footprint.js"></script> -->
 <!-- <script src="chart-terminal/orderflow.js"></script> -->
 <!-- <script src="chart-terminal/liquidity.js"></script> -->
-<!-- <script src="chart-terminal/order-book.js"></script> -->
-<!-- <script src="chart-terminal/trade-terminal.js"></script> -->
-<!-- <script src="chart-terminal/ai-assistant.js"></script> -->
-<!-- <script src="chart-terminal/profile-settings.js"></script> -->
+<script src="chart-terminal/order-book.js"></script>
+<script src="chart-terminal/trade-terminal.js"></script>
+<script src="chart-terminal/ai-assistant.js"></script>
+<script src="chart-terminal/profile-settings.js"></script>
+
+<!-- ============================================================
+     BOOTSTRAP — DO NOT UNCOMMENT YET.
+     This is the single block that turns the new chart terminal ON.
+     When ready to test/switch (Section #section-chart-terminal-new is
+     still display:none right now, and the OLD #section-chart is still
+     what users see):
+       1. Uncomment the block below.
+       2. Change #section-chart-terminal-new's style to remove display:none
+          (or wire it into showSection()/tab-switching like the old one).
+       3. Once confirmed fully working, THEN remove the old #section-chart
+          markup and its JS from index.html/index.js.
+     ============================================================ -->
+<!--
+<script>
+  chartCockpit.init({ mountId: 'chart-terminal-root', chartContainerId: 'klineMainChart' });
+  chartSplit.init({ chartContainerId: 'klineMainChart' });
+  orderBook.init({ mountId: 'order-book-root' });
+  tradeTerminal.init({ mountId: 'trade-terminal-root' });
+  profileSettings.init({ mountId: 'profile-settings-root' });
+</script>
+-->
+
 
 <!-- CHART PAGE NAV MENU (bottom sheet, opened from the "Chart" button in the chart topbar) -->
 <div class="chart-nav-popup-overlay" id="chart-nav-popup-overlay" onclick="if(event.target===this) closeChartNavMenu()">

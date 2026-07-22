@@ -13,7 +13,7 @@
   --gold:#D4B886; --gold-dim:rgba(212,184,134,0.10); --gold-glow:rgba(212,184,134,0.18);
   --gold-text:#111317; --gold-shade:#A8875A;
   --blue:#2A6496; --blue-dim:rgba(42,100,150,0.12);
-  --white:#EAECEF; --muted:#8B949E;
+  --white:#EAECEF; --muted:#8B949E; --text:var(--white);
   --border:rgba(212,184,134,0.08); --border2:rgba(255,255,255,0.06);
   --green:#4CAF7D; --green-dim:rgba(76,175,125,0.10);
   --red:#E05252; --red-dim:rgba(224,82,82,0.10);
@@ -31,7 +31,7 @@
    Content area flips to cream. Default accent becomes navy (no gold). */
 .light-mode{
   --bg:#F3E4C9; --bg2:#FFFDF8; --bg3:#FAF2E2; --bg4:#F3E4C9;
-  --white:#0A2947; --muted:#3D5A73;
+  --white:#0A2947; --muted:#3D5A73; --text:var(--white);
   --border:rgba(10,41,71,0.22); --border2:rgba(10,41,71,0.14);
   --gold:#0A2947; --gold-dim:rgba(10,41,71,0.08); --gold-glow:rgba(10,41,71,0.20);
   --gold-text:#F3E4C9; --gold-shade:#04182B;
