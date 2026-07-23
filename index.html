@@ -297,8 +297,8 @@
 
     <div class="content-area">
 
-      <!-- CHART -->
-      <div class="content-section" id="section-chart">
+      <!-- CHART (OLD) -->
+      <div class="content-section" id="section-chart" style="display:none;"><!-- TEMP: hidden while testing the new chart-terminal below. Remove this inline style to bring the old chart back. -->
         <div class="chart-terminal-layout">
 
           <!-- CHART PAGE HEADER (logo + horizontal nav + broker + actions) -->
@@ -681,9 +681,9 @@
            been built, uploaded to /chart-terminal/, and its script tag
            uncommented in the list near the bottom of <body>.
            ============================================================ -->
-      <div class="content-section" id="section-chart-terminal-new" style="display:none;">
+      <div class="content-section" id="section-chart-terminal-new" style="display:block;"><!-- TEMP: forced visible for testing. Revert to display:none if you want it hidden again without removing the code. -->
         <div id="chart-terminal-root"><!-- chart-cockpit.js renders tabs + toolbar here --></div>
-        <div id="klineMainChart" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
+        <div id="klineMainChartNew" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
         <div style="display:flex;gap:14px;margin-top:14px;">
           <div id="order-book-root" style="width:320px;flex-shrink:0;"><!-- order-book.js --></div>
           <div id="trade-terminal-root" style="width:320px;flex-shrink:0;"><!-- trade-terminal.js --></div>
@@ -1438,24 +1438,21 @@
 <!-- ============================================================
      BOOTSTRAP — DO NOT UNCOMMENT YET.
      This is the single block that turns the new chart terminal ON.
-     When ready to test/switch (Section #section-chart-terminal-new is
-     still display:none right now, and the OLD #section-chart is still
-     what users see):
-       1. Uncomment the block below.
-       2. Change #section-chart-terminal-new's style to remove display:none
-          (or wire it into showSection()/tab-switching like the old one).
-       3. Once confirmed fully working, THEN remove the old #section-chart
-          markup and its JS from index.html/index.js.
+     STATUS: currently ACTIVE for testing. Old #section-chart is force-hidden
+     (display:none) and #section-chart-terminal-new is force-shown
+     (display:block) via inline styles a few lines up in this file — search
+     "TEMP" to find both. Once you're happy with the new terminal:
+       1. Remove the old #section-chart markup and its JS from index.js.
+       2. Remove both "TEMP" inline styles and instead wire the new section
+          into showSection()/nav routing properly, same as the old one was.
      ============================================================ -->
-<!--
 <script>
-  chartCockpit.init({ mountId: 'chart-terminal-root', chartContainerId: 'klineMainChart' });
-  chartSplit.init({ chartContainerId: 'klineMainChart' });
+  chartCockpit.init({ mountId: 'chart-terminal-root', chartContainerId: 'klineMainChartNew' });
+  chartSplit.init({ chartContainerId: 'klineMainChartNew' });
   orderBook.init({ mountId: 'order-book-root' });
   tradeTerminal.init({ mountId: 'trade-terminal-root' });
   profileSettings.init({ mountId: 'profile-settings-root' });
 </script>
--->
 
 
 <!-- CHART PAGE NAV MENU (bottom sheet, opened from the "Chart" button in the chart topbar) -->
