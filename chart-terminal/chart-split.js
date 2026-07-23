@@ -280,7 +280,7 @@
 
   // ── Tab-awareness (reads chart-cockpit's tabs, never writes to them) ──
   function handleTabChangeIfNeeded() {
-    console.log('[chart-split] tab check fired, current:', currentTabId);
+    alert('tab check fired | current=' + currentTabId);
     if (!window.chartCockpit || typeof window.chartCockpit.getActiveTab !== 'function') return false;
     const activeTab = window.chartCockpit.getActiveTab();
     if (!activeTab || activeTab.id === currentTabId) return false;
