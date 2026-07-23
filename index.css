@@ -1089,6 +1089,16 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 #page-app:has(#section-chart.active) + #mobile-nav .mn-item{ padding:3px 0; }
 #page-app:has(#section-chart.active) + #mobile-nav .mn-center-btn{ width:42px; height:42px; margin-bottom:0; }
 
+/* — Chart Terminal: chart / order book / trade terminal as one row on
+     desktop, stacked on mobile — */
+.ct-terminal-row{display:flex;gap:14px;align-items:flex-start;padding:14px;}
+.ct-terminal-chart-col{flex:1;min-width:0;}
+.ct-terminal-side-col{width:320px;flex-shrink:0;}
+@media(max-width:900px){
+  .ct-terminal-row{flex-direction:column;}
+  .ct-terminal-side-col{width:100%;}
+}
+
 /* — Responsive: tablet/mobile keep the same slim header, nav scrolls
      horizontally instead of wrapping or overflowing the page — */
 @media(max-width:1024px){

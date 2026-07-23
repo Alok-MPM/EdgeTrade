@@ -303,11 +303,13 @@
            Booted lazily, once, from showSection('chart') in index.js — see
            the chartTerminalBooted guard there. -->
       <div class="content-section" id="section-chart">
-        <div id="chart-terminal-root"><!-- chart-cockpit.js renders tabs + toolbar here --></div>
-        <div id="klineMainChart" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
-        <div style="display:flex;gap:14px;margin-top:14px;">
-          <div id="order-book-root" style="width:320px;flex-shrink:0;"><!-- order-book.js --></div>
-          <div id="trade-terminal-root" style="width:320px;flex-shrink:0;"><!-- trade-terminal.js --></div>
+        <div class="ct-terminal-row">
+          <div class="ct-terminal-chart-col">
+            <div id="chart-terminal-root"><!-- chart-cockpit.js renders tabs + toolbar here --></div>
+            <div id="klineMainChart" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
+          </div>
+          <div id="order-book-root" class="ct-terminal-side-col"><!-- order-book.js --></div>
+          <div id="trade-terminal-root" class="ct-terminal-side-col"><!-- trade-terminal.js --></div>
         </div>
         <div id="profile-settings-root"><!-- profile-settings.js — move into the terminal's top bar once positioned --></div>
       </div>
