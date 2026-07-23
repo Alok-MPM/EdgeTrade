@@ -117,11 +117,10 @@
   // new tab. This never modifies chart-cockpit.js — it only adds another
   // listener alongside its existing ones.
   function setupTabClickDetection() {
-  const tabsList = document.getElementById('ctc-tabs-list');
-  const addBtn = document.getElementById('ctc-tab-add');
-  alert('SETUP: tabsList found=' + !!tabsList + ' | addBtn found=' + !!addBtn);
-  if (tabsList) tabsList.addEventListener('click', () => { alert('TABS LIST CLICKED'); handleTabChangeIfNeeded(); });
-  if (addBtn) addBtn.addEventListener('click', () => { alert('ADD BTN CLICKED'); handleTabChangeIfNeeded(); });
+    const tabsList = document.getElementById('ctc-tabs-list');
+    const addBtn = document.getElementById('ctc-tab-add');
+    if (tabsList) tabsList.addEventListener('click', () => handleTabChangeIfNeeded());
+    if (addBtn) addBtn.addEventListener('click', () => handleTabChangeIfNeeded());
   }
 
   // ── Inject the "Layout" pill + dropdown into the existing cockpit ─────
@@ -281,7 +280,6 @@
 
   // ── Tab-awareness (reads chart-cockpit's tabs, never writes to them) ──
   function handleTabChangeIfNeeded() {
-    alert('tab check fired | current=' + currentTabId);
     if (!window.chartCockpit || typeof window.chartCockpit.getActiveTab !== 'function') return false;
     const activeTab = window.chartCockpit.getActiveTab();
     if (!activeTab || activeTab.id === currentTabId) return false;
@@ -347,7 +345,7 @@
   }
 
   // ── Expose ───────────────────────────────────────────────────────────
-  window.chartSplit = { init, setLayout, getLayout: () => layout, getSync: () => ({ ...sync }) };
+  window.chartSplit = { init, setLayout, getLayout: () => layout, getSync: () => ({ ...sync }), handleTabChangeIfNeeded };
 
 })();
 

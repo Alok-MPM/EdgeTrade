@@ -303,6 +303,13 @@
     });
 
     renderTabs();
+
+    // Tell chart-split.js the active tab changed, directly — no reliance on
+    // click-listener timing/order (that approach was unreliable).
+    if (window.chartSplit && typeof window.chartSplit.handleTabChangeIfNeeded === 'function') {
+      window.chartSplit.handleTabChangeIfNeeded();
+    }
+
     await marketStore.setSymbol(tab.symbol, tab.interval);
   }
 
