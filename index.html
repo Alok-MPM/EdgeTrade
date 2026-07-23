@@ -298,7 +298,7 @@
     <div class="content-area">
 
       <!-- CHART (OLD) -->
-      <div class="content-section" id="section-chart" style="display:none;"><!-- TEMP: hidden while testing the new chart-terminal below. Remove this inline style to bring the old chart back. -->
+      <div class="content-section" id="section-chart">
         <div class="chart-terminal-layout">
 
           <!-- CHART PAGE HEADER (logo + horizontal nav + broker + actions) -->
@@ -681,7 +681,7 @@
            been built, uploaded to /chart-terminal/, and its script tag
            uncommented in the list near the bottom of <body>.
            ============================================================ -->
-      <div class="content-section" id="section-chart-terminal-new" style="display:block;"><!-- TEMP: forced visible for testing. Revert to display:none if you want it hidden again without removing the code. -->
+      <div class="content-section" id="section-chart-terminal-new">
         <div id="chart-terminal-root"><!-- chart-cockpit.js renders tabs + toolbar here --></div>
         <div id="klineMainChartNew" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
         <div style="display:flex;gap:14px;margin-top:14px;">
@@ -1447,6 +1447,8 @@
           into showSection()/nav routing properly, same as the old one was.
      ============================================================ -->
 <script>
+  marketStore.init({ symbol: 'BTCUSDT', interval: '1m' });
+  chartEngine.init({ containerId: 'klineMainChartNew' });
   chartCockpit.init({ mountId: 'chart-terminal-root', chartContainerId: 'klineMainChartNew' });
   chartSplit.init({ chartContainerId: 'klineMainChartNew' });
   orderBook.init({ mountId: 'order-book-root' });
