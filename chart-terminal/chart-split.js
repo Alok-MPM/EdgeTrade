@@ -99,6 +99,28 @@
         tabLayoutState[currentTabId] = { layout, sync: { ...sync }, pane2Symbol, pane2Interval };
       }
     }
+
+    setupTabClickDetection();
+  }
+
+  // Detecting tab switches purely via marketStore's onSymbolChange (see
+  // bindSyncListeners below) misses the common case where the new tab has
+  // the SAME symbol/interval as the one you left (e.g. every tab still on
+  // default BTCUSDT/1m) — marketStore has nothing to report, so that event
+  // never fires and the split-layout never resets. To catch every switch
+  // reliably, also react directly to clicks on the tabs bar / add-tab
+  // button. chart-cockpit.js's own click handlers on these same elements
+  // were already bound (in chartCockpit.init(), which always runs before
+  // chartSplit.init() — see the USAGE note at the bottom of this file) and
+  // update activeTabId synchronously before yielding, so by the time this
+  // listener runs, window.chartCockpit.getActiveTab() already reflects the
+  // new tab. This never modifies chart-cockpit.js — it only adds another
+  // listener alongside its existing ones.
+  function setupTabClickDetection() {
+    const tabsList = document.getElementById('ctc-tabs-list');
+    const addBtn = document.getElementById('ctc-tab-add');
+    if (tabsList) tabsList.addEventListener('click', () => handleTabChangeIfNeeded());
+    if (addBtn) addBtn.addEventListener('click', () => handleTabChangeIfNeeded());
   }
 
   // ── Inject the "Layout" pill + dropdown into the existing cockpit ─────
