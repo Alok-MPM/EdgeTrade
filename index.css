@@ -1034,22 +1034,14 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
    or component designs are changed here — layout & spacing only.
    ═══════════════════════════════════════════════════════════════ */
 
-/* — Sidebar + global topbar disappear ONLY when Chart page is active;
-     every other page keeps them exactly as before — */
-#page-app:has(#section-chart.active) .sidebar{ display:none; }
-#page-app:has(#section-chart.active) .topbar{ display:none; }
-#page-app:has(#section-chart.active) .main-content{ margin-left:0; }
-
-/* — Chart page's content-area loses its top/left/right padding so the
-     header can sit flush at pixel 0 with no gap above it. Bottom padding
-     is left untouched (still reserves clearance above the mobile nav). — */
-#page-app:has(#section-chart.active) .content-area{
-  padding-top:0;
-  padding-left:0;
-  padding-right:0;
-  width:100%;
-  box-sizing:border-box;
-}
+/* — REVERTED: the Chart page used to get its own dedicated compact header
+     (logo + broker + actions merged into one slim row) which replaced the
+     normal sidebar/topbar. That custom header was removed along with the
+     old chart code. Rather than leave the Chart page with NO header at all,
+     the standard sidebar + topbar (same one every other page uses — logo,
+     broker selector, calculator/notifications/profile) are now shown here
+     too, same as any other page. A more compact, chart-specific header can
+     be rebuilt later as its own pass. — */
 
 .chart-nav-item{
   display:flex;
