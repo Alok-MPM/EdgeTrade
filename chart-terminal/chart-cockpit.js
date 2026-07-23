@@ -277,6 +277,13 @@
     const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', indicators: [] };
     tabs.push(tab);
     await switchTab(tab.id);
+
+    // A brand-new tab ALWAYS starts single-pane, no matter what layout the
+    // previous tab had. Forced unconditionally here — does not depend on
+    // chart-split's internal saved-state logic.
+    if (window.chartSplit && typeof window.chartSplit.setLayout === 'function') {
+      window.chartSplit.setLayout('1');
+    }
   }
 
   async function switchTab(id) {
