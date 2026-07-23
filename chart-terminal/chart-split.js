@@ -117,10 +117,11 @@
   // new tab. This never modifies chart-cockpit.js — it only adds another
   // listener alongside its existing ones.
   function setupTabClickDetection() {
-    const tabsList = document.getElementById('ctc-tabs-list');
-    const addBtn = document.getElementById('ctc-tab-add');
-    if (tabsList) tabsList.addEventListener('click', () => handleTabChangeIfNeeded());
-    if (addBtn) addBtn.addEventListener('click', () => handleTabChangeIfNeeded());
+  const tabsList = document.getElementById('ctc-tabs-list');
+  const addBtn = document.getElementById('ctc-tab-add');
+  alert('SETUP: tabsList found=' + !!tabsList + ' | addBtn found=' + !!addBtn);
+  if (tabsList) tabsList.addEventListener('click', () => { alert('TABS LIST CLICKED'); handleTabChangeIfNeeded(); });
+  if (addBtn) addBtn.addEventListener('click', () => { alert('ADD BTN CLICKED'); handleTabChangeIfNeeded(); });
   }
 
   // ── Inject the "Layout" pill + dropdown into the existing cockpit ─────
