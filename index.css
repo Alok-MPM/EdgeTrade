@@ -484,7 +484,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .dcr-loss{color:var(--red);text-shadow:0 0 7px rgba(224,82,82,0.4);}
 .dcr-be{color:var(--gold);}
 .dcr-empty{color:var(--muted);font-size:11px;}
-.dc-loading{opacity:0.5;}
 
 /* ════════════════════════════════
    TRADE LIST (C)
@@ -548,13 +547,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .entry-sec-full{grid-column:1/-1;}
 .entry-sec-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:500;color:var(--gold);margin-bottom:16px;display:flex;align-items:center;gap:9px;}
 .entry-sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,168,76,0.15),transparent);}
-.fg{display:grid;gap:12px;}.fg2{grid-template-columns:1fr 1fr;}.fg3{grid-template-columns:1fr 1fr 1fr;}
-
-.lot-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden;}
-.lot-wrap input{flex:1;background:transparent;border:none;outline:none;padding:12px 14px;color:var(--white);font-size:14px;font-family:'Outfit',sans-serif;}
-.lot-wrap input::placeholder{color:var(--muted);font-size:13px;}
-.lot-divider{width:1px;background:var(--border2);height:22px;flex-shrink:0;}
-.lot-sel{background:transparent;border:none;outline:none;padding:12px 14px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;appearance:none;-webkit-appearance:none;}
+.fg{display:grid;gap:12px;}.fg2{grid-template-columns:1fr 1fr;}
 .lot-dd-item{padding:10px 16px;font-size:13px;color:var(--white);cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background 0.15s;}
 .lot-dd-item:hover{background:rgba(201,168,76,0.12);color:var(--gold);}
 
@@ -575,32 +568,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .chart-item{padding:9px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:background 0.15s;font-family:'JetBrains Mono',monospace;}
 .chart-item:hover{background:var(--gold-dim);color:var(--gold);}
 .chart-item-cat{font-size:10px;color:var(--muted);font-family:'Outfit',sans-serif;}
-.chart-item.active-tool{background:var(--gold-dim);color:var(--gold);font-weight:700;}
-
-/* — Command pill (icon-only cockpit trigger buttons: Timeframe / Chart type / Indicators) — */
-.cmd-pill{display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;flex-shrink:0;}
-.cmd-pill:hover{background:var(--gold-dim);color:var(--white);}
-.cmd-pill.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);}
-.cmd-pill .nav-icon-svg{width:18px;height:18px;stroke-width:1.8;}
-.cmd-pill .fx-icon{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:700;font-size:16px;line-height:1;letter-spacing:-0.5px;}
-.cmd-pill-label{width:auto;padding:0 10px;gap:6px;}
-.cmd-pill-label #tf-current-label{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;letter-spacing:0.2px;line-height:1;white-space:nowrap;}
-.cmd-pill-label .pill-chevron{width:11px;height:11px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;opacity:0.65;}
-.ct-icon-wrap{display:flex;align-items:center;justify-content:center;line-height:0;}
-.ct-icon-wrap .nav-icon-svg{width:18px;height:18px;stroke-width:1.8;}
-
-/* — Drawing tools left sidebar (chart-workspace) — */
-.chart-draw-sidebar{display:flex;flex-direction:column;align-items:center;gap:4px;padding:2px 6px 2px 0;margin-right:10px;flex-shrink:0;border-right:1px solid var(--border);}
-.draw-tool-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;padding:0;flex-shrink:0;}
-.draw-tool-btn:hover{background:var(--gold-dim);color:var(--white);}
-.draw-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);}
-.draw-tool-btn .nav-icon-svg{width:17px;height:17px;stroke-width:1.8;}
-.draw-tool-divider{width:20px;height:1px;background:var(--border);margin:3px 0;flex-shrink:0;}
-.draw-tool-clear:hover{background:rgba(224,82,82,0.12);color:var(--red);}
 @media(max-width:480px){
-  .chart-draw-sidebar{gap:3px;margin-right:6px;}
-  .draw-tool-btn{width:28px;height:28px;}
-  .draw-tool-btn .nav-icon-svg{width:15px;height:15px;}
 }
 
 .dir-group{display:flex;gap:8px;}
@@ -653,14 +621,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .stats-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
 .stats-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;}
 .stats-card-title{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;color:var(--gold);margin-bottom:16px;}
-
-/* Bar chart */
-.bar-chart{display:flex;align-items:flex-end;gap:8px;height:100px;}
-.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
 .bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.8s cubic-bezier(0.34,1.56,0.64,1);}
-.bar-p{background:linear-gradient(180deg,var(--green),rgba(76,175,125,0.4));}
-.bar-l{background:linear-gradient(180deg,var(--red),rgba(224,82,82,0.4));}
-.bar-lbl{font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
 
 /* Analysis rows */
 .analysis-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border2);}
@@ -803,8 +764,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .icon-btn-del img{width:14px;height:14px;opacity:0.55;transition:opacity 0.2s;}
 .icon-btn-del:hover{border-color:rgba(224,82,82,0.4);background:var(--red-dim);}
 .icon-btn-del:hover img{opacity:1;}
-.add-broker-sec{padding:14px 22px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
-.add-broker-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
 .broker-search-w{position:relative;margin-bottom:10px;}
 .broker-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:9px 12px 9px 34px;color:var(--white);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;}
 .broker-search:focus{border-color:rgba(201,168,76,0.4);}
@@ -872,9 +831,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 .mobile-nav{display:none !important;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(17,19,23,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:7px 0 12px;}
 .mn-items{display:flex;}
 .mn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 0;font-size:9px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted);transition:color 0.2s;border:none;background:none;font-family:'Outfit',sans-serif;}
-.mn-item .mni{font-size:19px;transition:transform 0.2s;}
 .mn-item.active{color:var(--gold);}
-.mn-item.active .mni{transform:scale(1.15);}
 .mn-center-btn{width:46px;height:46px;border-radius:13px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--gold-text);margin-bottom:2px;box-shadow:0 4px 14px var(--gold-glow);}
 
 @media(max-width:1024px){
@@ -915,7 +872,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .auth-page{flex-direction:column;}
   .auth-left{display:none;}
   .auth-right{width:100%;padding:36px 22px;}
-  .fg2,.fg3{grid-template-columns:1fr;}
+  .fg2{grid-template-columns:1fr;}
   .avail-grid{grid-template-columns:1fr;}
   .stats-big-grid{grid-template-columns:1fr 1fr;}
   .stats-grid2{grid-template-columns:1fr;}
@@ -925,8 +882,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   .hero-sub{font-size:15px;padding:0 4px;}
   .hero-pills{padding:0 4px;}
   .hero-btns{flex-direction:column;align-items:stretch;padding:0 4px;}
-  .hero-btn{text-align:center;}
-  .sbar-grid{grid-template-columns:1fr 1fr;}
 }
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
@@ -934,42 +889,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(201,168,76,0.15);border-radius:2px;}
-
-/* ════════ CHART PAGE NAV MENU (bottom sheet) ════════ */
-.chart-nav-popup-overlay{
-  position:fixed;inset:0;z-index:500; /* well above chart-cockpit(70) and chart-header(75) so it always opens in front */
-  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
-  display:none;align-items:flex-end;justify-content:center;
-  overscroll-behavior:contain;
-}
-.chart-nav-popup-overlay.open{display:flex;animation:fadeIn 0.2s ease;}
-.chart-nav-popup-panel{
-  background:var(--bg2);border:1px solid var(--border);
-  border-top:1px solid rgba(201,168,76,0.15);
-  border-radius:20px 20px 0 0;
-  width:100%;max-width:480px;
-  padding-bottom:18px;
-  box-shadow:0 -20px 60px rgba(0,0,0,0.8);
-  animation:slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
-}
-.chart-nav-popup-handle{
-  width:44px;height:5px;background:rgba(255,255,255,0.18);
-  border-radius:3px;margin:10px auto 14px;cursor:grab;
-}
-.chart-nav-popup-title{
-  padding:0 18px 10px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);
-}
-.chart-nav-popup-list{display:flex;flex-direction:column;padding:0 10px;}
-.chart-nav-popup-item{
-  display:flex;align-items:center;gap:14px;padding:13px 12px;border-radius:10px;
-  background:none;border:none;color:var(--white);font-size:16px;font-family:'Outfit',sans-serif;
-  cursor:pointer;transition:background 0.15s;width:100%;text-align:left;
-}
-.chart-nav-popup-item:hover,.chart-nav-popup-item:active{background:var(--gold-dim);color:var(--gold);}
-.chart-nav-popup-item .nav-icon-svg{width:20px;height:20px;flex-shrink:0;}
-
-/* ════════ STRATEGY AUTOCOMPLETE ════════ */
-.strategy-wrap{position:relative;}
 /* Strategy Modal — broker popup style */
 .strategy-modal-overlay{
   position:fixed;inset:0;z-index:500;
@@ -1103,220 +1022,9 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   transform: translateY(0);
 }
 
-.chart-tool-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;}
-.chart-tool-btn:hover{background:var(--gold-dim);color:var(--white);}
-.chart-tool-btn.active-tool{background:var(--gold);color:var(--gold-text);border-color:var(--gold);} 
-
-/* ═══════════════════════════════════════════════
-   WORKSPACE ARCHITECTURE — Chart Cockpit / Trading Workspace / Bottom Dock
-   Z-INDEX SCALE: modal 100, context-menu 90, dropdown 80, chart-header 75, floating-cockpit 70,
-   ai-overlay 60, chart-overlay 50, panels 40, chart 30, workspace 20, bg 10
-   ═══════════════════════════════════════════════ */
-.workspace-shell{display:flex;flex-direction:column;gap:14px;min-height:0;}
-
-/* — Top row: Chart (wide) + Order Book (compact) + Trade Terminal (compact), all equal height — */
-.top-row{display:flex;gap:14px;align-items:stretch;min-height:0;}
-.top-row .chart-workspace{flex:1 1 auto;min-width:0;}
-.top-row .orderbook-panel{flex:0 0 260px;width:260px;min-width:220px;max-width:280px;}
-.top-row .execution-workspace{flex:0 0 320px;width:320px;min-width:280px;max-width:360px;}
-
-/* — Bottom row: Trade Information (wide, matches chart+orderbook) + Market Overview (matches terminal width) — */
-.bottom-row{display:flex;gap:14px;align-items:stretch;min-height:0;}
-.bottom-row .bottom-dock{flex:1 1 auto;min-width:0;}
-.bottom-row .market-overview-panel{flex:0 0 320px;width:320px;min-width:280px;max-width:360px;}
-
-/* — Chart Workspace + Cockpit — */
-.chart-workspace{position:relative;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.15);}
-.chart-cockpit{position:sticky;top:0;z-index:70;display:flex;align-items:center;gap:0;padding:10px 14px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;background:rgba(26,29,36,0.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
-.light-mode .chart-cockpit{background:rgba(255,253,248,0.72);}
-.chart-cockpit::-webkit-scrollbar{height:4px;}
-.cockpit-group{display:flex;align-items:center;gap:6px;padding:0 12px;flex-shrink:0;}
-.cockpit-group:first-child{padding-left:0;}
-.cockpit-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0;}
-.cockpit-divider{width:1px;align-self:stretch;background:var(--border);flex-shrink:0;margin:4px 0;}
-.chart-viewport{position:relative;height:640px;flex-shrink:0;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:row;align-items:stretch;}
-.chart-viewport .chart-panel-wrap{flex:1 1 auto;min-width:0;}
-
-/* ── Split screen: panes-stack wrapper + pane 2 (Phase 1 shell + Phase 2 independent chart) ── */
-.chart-panes-stack{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:row;gap:10px;}
-.chart-panes-stack.split-col{flex-direction:column;}
-.chart-panes-stack .chart-panel-wrap{flex:1 1 0;min-width:0;min-height:0;}
-.chart-pane-2{flex:1 1 0;min-width:0;min-height:0;display:none;flex-direction:column;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;overflow:hidden;}
-.chart-pane-2-inner{text-align:center;color:var(--muted);padding:20px;}
-.chart-pane-2-inner .cp2-icon{font-size:22px;color:var(--muted);margin-bottom:6px;}
-.chart-pane-2-inner .cp2-title{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:14px;margin-bottom:4px;}
-.chart-pane-2-inner .cp2-sub{font-size:12px;font-family:'Outfit',sans-serif;}
-
-/* Pane 2's own mini-toolbar (independent symbol/timeframe/type/indicators — Phase 2) */
-.pane2-toolbar{display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border2);flex-shrink:0;}
-.pane2-chart-holder{flex:1 1 auto;min-height:0;position:relative;}
-.pane2-chart-holder > div{border-radius:0;}
-
-/* Generic nested split containers for 3–8 pane layouts. Each 'S' leaf in a LAYOUT_CONFIGS
-   node becomes a real pane (chart-panel-wrap for #1, chart-pane-2 style for #2-8); each
-   {dir:'row'|'col'} node becomes one of these wrappers, nested to any depth. */
-.split-row{display:flex;flex-direction:row;gap:10px;flex:1 1 0;min-width:0;min-height:0;}
-.split-col{display:flex;flex-direction:column;gap:10px;flex:1 1 0;min-width:0;min-height:0;}
-.split-row > *, .split-col > *{flex:1 1 0;min-width:0;min-height:0;}
-
-/* ── Layout picker: sync card + grid card (two separate popups, sync renders above) ── */
-.layout-dd{padding:12px;}
-.layout-sync-title{font-size:11px;letter-spacing:0.06em;color:var(--muted);font-family:'Outfit',sans-serif;font-weight:600;margin-bottom:8px;}
-.layout-sync-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;font-family:'Outfit',sans-serif;color:var(--white);}
-.layout-grid-list{max-height:340px;overflow-y:auto;}
-.layout-grid-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
-.layout-grid-row:last-child{border-bottom:none;}
-.layout-grid-num{width:16px;flex-shrink:0;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px;}
-.layout-grid-icons{display:flex;flex-wrap:wrap;gap:6px;}
-.layout-btn-icon{display:flex;align-items:center;justify-content:center;}
-.layout-btn-icon .li-icon{width:16px;height:14px;border-width:1.3px;border-color:currentColor;}
-.layout-btn-icon .li-leaf{background:currentColor;opacity:0.55;}
-.layout-btn-icon .li-split{gap:1.5px;}
-.li-btn{padding:3px;border-radius:5px;cursor:pointer;border:1.5px solid transparent;}
-.li-btn:hover{background:var(--gold-dim);}
-.li-btn.active-tool{border-color:var(--gold);background:var(--gold-dim);}
-.li-icon{width:32px;height:24px;display:flex;gap:2px;padding:2px;box-sizing:border-box;border:1.4px solid var(--muted);border-radius:3px;}
-.li-split{display:flex;flex:1 1 auto;gap:2px;}
-.li-row{flex-direction:row;}
-.li-col{flex-direction:column;}
-.li-leaf{flex:1 1 auto;background:var(--muted);opacity:0.4;border-radius:1px;}
-.chart-future-overlay{pointer-events:none;position:absolute;inset:14px;z-index:50;}
-
-/* — Bottom Dock (Trade Information) — */
-.bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
-.dock-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
-.dock-title{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);}
-.dock-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);padding:10px 16px 0;margin-bottom:0;overflow-x:auto;}
-.dock-content{padding:16px;min-height:170px;max-height:280px;overflow-y:auto;}
-
-/* — Order Book + Trade Terminal panels — */
-.orderbook-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-.orderbook-panel > div:first-child{flex-shrink:0;}
-#orderBookBody{flex:1 1 auto;min-height:0;overflow-y:auto;}
-.execution-workspace{background:var(--bg2);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;}
-.execution-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);}
-.execution-body{padding:16px;display:flex;flex-direction:column;}
-.execution-footer{padding:14px 16px 16px;border-top:1px solid var(--border);}
-.trade-summary-box{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;}
-.ts-row{display:flex;justify-content:space-between;font-size:12px;}
-.ts-row span:first-child{color:var(--muted);}
-.ts-row span:last-child{font-family:'JetBrains Mono',monospace;color:var(--white);font-weight:500;}
-
-/* — Order Book buy/sell pressure bar — */
-.ob-pressure{flex-shrink:0;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
-.ob-pressure-labels{display:flex;justify-content:space-between;font-size:11px;font-family:'Outfit',sans-serif;margin-bottom:6px;}
-.ob-pressure-buy-lbl{color:var(--green);font-weight:600;}
-.ob-pressure-sell-lbl{color:var(--red);font-weight:600;}
-.ob-pressure-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--bg3);}
-.ob-pressure-buy{background:var(--green);height:100%;transition:width 0.3s ease;}
-.ob-pressure-sell{background:var(--red);height:100%;transition:width 0.3s ease;}
-
-/* — Market Overview panel (live Binance prices) — */
-.market-overview-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-.mo-header{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;flex-shrink:0;}
-.mo-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;}
-.mo-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;font-family:'JetBrains Mono',monospace;padding:7px 0;border-bottom:1px solid var(--border);}
-.mo-row:last-child{border-bottom:none;}
-.mo-sym{color:var(--white);font-family:'Outfit',sans-serif;font-weight:500;font-size:12.5px;flex-shrink:0;}
-.mo-price{color:var(--white);}
-.mo-chg{min-width:52px;text-align:right;}
-.mo-chg.up{color:var(--green);}
-.mo-chg.down{color:var(--red);}
-
 @media(max-width:1024px){
-  .top-row{flex-direction:column;}
-  .top-row .orderbook-panel,
-  .top-row .execution-workspace{width:100%;max-width:100%;min-width:0;flex:0 0 auto;}
-  .bottom-row{flex-direction:column;}
-  .bottom-row .market-overview-panel{width:100%;max-width:100%;min-width:0;flex:0 0 auto;}
 }
-
-.ob-row{display:flex;justify-content:space-between;position:relative;padding:4px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;overflow:hidden;border-radius:3px;margin-bottom:1px;}
-.ob-row .ob-bar{position:absolute;top:0;right:0;bottom:0;z-index:0;}
-.ob-row.ask .ob-bar{background:var(--red-dim);}
-.ob-row.bid .ob-bar{background:var(--green-dim);}
-.ob-row span{position:relative;z-index:1;color:var(--white);}
-.ob-price.ask{color:var(--red)!important;}
-.ob-price.bid{color:var(--green)!important;}
-.ob-spread{text-align:center;padding:8px 0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;color:var(--gold);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:4px 0;}
-.term-tabs{display:flex;gap:8px;margin-bottom:14px;}
-.term-tab-btn{flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--white);font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;}
-.term-tab-btn.long-active{background:var(--green);color:#fff;border-color:var(--green);}
-.term-tab-btn.short-active{background:var(--red);color:#fff;border-color:var(--red);}
-.term-input-row{margin-bottom:14px;}
-.term-input-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
-.term-input-row input,.term-input-row select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--white);font-family:'Outfit',sans-serif;box-sizing:border-box;}
-.term-quick-pct{display:flex;gap:6px;margin-top:8px;}
-.term-quick-pct button{flex:1;padding:6px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;}
-.term-submit-btn{width:100%;padding:14px;border-radius:10px;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-top:6px;font-family:'Outfit',sans-serif;}
-.term-submit-btn.long{background:var(--green);color:#fff;}
-.term-submit-btn.short{background:var(--red);color:#fff;}
-.bottom-tab-nav{display:flex;gap:20px;}
-.bottom-tab-item{padding:8px 4px 12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:500;border-bottom:2px solid transparent;}
-.bottom-tab-item.active{color:var(--gold);border-bottom-color:var(--gold);}
-.bottom-tab-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}
-.pos-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;flex-wrap:wrap;}
-.pos-side{font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px;font-family:'Outfit',sans-serif;}
-.pos-side.long{background:rgba(76,175,125,0.15);color:var(--green);}
-.pos-side.short{background:rgba(224,82,82,0.15);color:var(--red);}
-.pos-meta{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
-.pos-pnl{font-weight:700;font-family:'JetBrains Mono',monospace;font-size:14px;}
-.pos-pnl.pos{color:var(--green);}
-.pos-pnl.neg{color:var(--red);}
-.pos-close-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--white);font-size:12px;font-weight:600;cursor:pointer;}
-.pos-edit-btn{width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid rgba(212,184,134,0.35);background:rgba(212,184,134,0.08);color:var(--gold);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
-.pos-edit-btn:hover{background:var(--gold-dim);border-color:var(--gold);}
-.chart-panel-wrap{position:relative;height:100%;min-height:0;display:flex;flex-direction:column;}
 #klineMainChart{flex:1 1 auto;min-height:0;}
-.chart-maximize-btn{position:absolute;top:10px;right:10px;z-index:8;width:34px;height:34px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);color:var(--white);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
-.chart-maximize-btn:hover{background:var(--gold-dim);}
-.chart-symbol-overlay{display:none;position:absolute;top:10px;left:10px;z-index:7;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);padding:6px 12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
-.chart-symbol-overlay .csym-name{font-family:'Outfit',sans-serif;font-weight:600;color:var(--white);font-size:13px;}
-.chart-symbol-overlay .csym-sub{color:var(--muted);font-weight:400;}
-.chart-symbol-overlay .csym-price{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;}
-.chart-workspace.chart-maximized{position:fixed;inset:0;z-index:9999;background:var(--bg);border-radius:0;border:none;box-shadow:none;isolation:isolate;}
-.chart-workspace.chart-maximized .chart-cockpit{position:relative;top:auto;flex-shrink:0;z-index:100;}
-/* Tabs bar is moved inside .chart-workspace for fullscreen (see toggleChartMaximize
-   in index.js), since the maximized workspace is position:fixed on top of everything
-   and would otherwise hide it. Neutralize the sticky/top offset meant for normal
-   page scroll and give it the same flex/z-index treatment as the cockpit above. */
-.chart-tabs-bar.chart-tabs-bar-fullscreen{
-  position:relative;
-  top:auto;
-  flex-shrink:0;
-  z-index:100;
-  border-radius:0;
-}
-.chart-workspace.chart-maximized .chart-viewport{flex:1 1 auto;height:auto;min-height:0;position:relative;z-index:1;}
-.chart-workspace.chart-maximized .chart-panel-wrap{height:100%;display:flex;flex-direction:column;position:relative;z-index:1;}
-.chart-workspace.chart-maximized #klineMainChart{flex:1 1 auto !important;height:auto !important;border-radius:8px;position:relative;z-index:1;}
-.cw-badge{position:absolute;right:76px;transform:translateY(-50%);display:flex;align-items:stretch;border-radius:6px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.35);letter-spacing:0.2px;transition:opacity 0.15s;}
-.cw-seg{padding:2px 6px;}
-.cw-seg-main{background:var(--bg4);color:var(--white);border:1px solid var(--border2);border-right:none;}
-.cw-seg-tp{background:#4CAF7D;color:#0B1A12;}
-.cw-seg-sl{background:#E05252;color:#210A0A;}
-.cw-seg-pnl.pos{background:rgba(76,175,125,0.92);color:#0B1A12;}
-.cw-seg-pnl.neg{background:rgba(224,82,82,0.92);color:#210A0A;}
-.cw-badge-ghost{opacity:0.55;}
-.cw-badge-ghost .cw-seg-tp,.cw-badge-ghost .cw-seg-sl{background:transparent;border:1px dashed currentColor;}
-.cw-badge-ghost .cw-seg-tp{color:#4CAF7D;}
-.cw-badge-ghost .cw-seg-sl{color:#E05252;}
-.cw-fill-band{position:absolute;left:0;right:76px;pointer-events:none;z-index:3;display:none;}
-.cw-badge-combo{pointer-events:auto;}
-.cw-toggle{background:var(--bg4);color:var(--muted);border:1px solid var(--border2);border-right:none;cursor:pointer;pointer-events:auto;user-select:none;}
-.cw-toggle-active-tp{background:#4CAF7D;color:#0B1A12;}
-.cw-toggle-active-sl{background:#E05252;color:#210A0A;}
-.cw-seg-ghost-price{background:var(--bg3);color:var(--muted);border:1px solid var(--border2);}
-.cw-fill-tp{background:linear-gradient(180deg,rgba(76,175,125,0.24),rgba(76,175,125,0.04));}
-.cw-fill-sl{background:linear-gradient(180deg,rgba(224,82,82,0.04),rgba(224,82,82,0.24));}
-#tpsl-modal-overlay .popup-panel{width:360px;}
-.tpsl-modal-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px;}
-.tpsl-modal-entry-lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
-.tpsl-modal-entry-val{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--white);font-weight:700;}
-.tpsl-field-lbl{font-size:12px;font-weight:600;margin-bottom:6px;display:block;}
-.tpsl-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;}
-.tpsl-input:focus{border-color:var(--gold);}
-.pos-close-btn:hover{border-color:var(--red);color:var(--red);}
 
 /* ═══════════════════════════════════════════════════════════════
    STEP 2 — CHART PAGE COMPACT TRADING TERMINAL LAYOUT
@@ -1342,52 +1050,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   width:100%;
   box-sizing:border-box;
 }
-.chart-terminal-layout{
-  width:100%;
-  box-sizing:border-box;
-}
-
-/* — Chart page header: logo / horizontal nav / broker / actions, one slim row.
-     Fixed min-height (not vertical padding) + align-items:center keeps every
-     child perfectly centered regardless of its own natural height. — */
-.chart-header-wrapper{
-  position:sticky;
-  top:0;
-  left:0;
-  right:0;
-  z-index:75; /* above .chart-cockpit's 70 so the toolbar can never render over the header; stays below dropdowns/modals (80+) */
-  display:flex;
-  align-items:center;
-  gap:18px;
-  min-height:60px;
-  width:100%;
-  box-sizing:border-box;
-  padding:0 20px;
-  background:rgba(17,19,23,0.92);
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
-  border-bottom:1px solid var(--border);
-}
-.light-mode .chart-header-wrapper{
-  background:rgba(10,41,71,0.94);
-  border-color:rgba(243,228,201,0.12);
-}
-
-/* Logo (reused .sidebar-logo) — strip the sidebar box padding/border, keep it inline */
-.chart-nav-left{ display:flex; align-items:center; gap:22px; flex-shrink:0; }
-.chart-nav-left .sidebar-logo{ padding:0; border-bottom:none; }
-.chart-nav-left .chart-top-navigation{ padding-left:22px; border-left:1px solid var(--border); }
-
-.chart-top-navigation{
-  display:flex;
-  align-items:center;
-  gap:4px;
-  max-width:100%;
-  overflow-x:auto;
-  scrollbar-width:none;
-  -ms-overflow-style:none;
-}
-.chart-top-navigation::-webkit-scrollbar{ display:none; }
 
 .chart-nav-item{
   display:flex;
@@ -1413,149 +1075,12 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   border-color:var(--gold);
   color:var(--gold);
 }
-/* The chart-page menu trigger — bigger and bolder since it's now the sole nav control */
-#chart-nav-menu-btn{
-  padding:9px 18px;
-  font-size:16px;
-  font-weight:600;
-}
-#chart-nav-menu-btn .nav-icon-svg{ width:19px; height:19px; }
-#chart-nav-menu-btn svg[style*="14px"]{ width:16px !important; height:16px !important; }
 .light-mode .chart-nav-item{ color:rgba(243,228,201,0.6); }
 .light-mode .chart-nav-item:hover{ background:rgba(243,228,201,0.08); color:var(--cream); }
 .light-mode .chart-nav-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
 
-/* Right — broker selector + actions (reused .broker-sel / .tb-btn), sized to fit the slim bar */
-.chart-nav-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto; }
-.chart-nav-right .broker-sel{ padding:6px 12px; min-width:150px; }
-.chart-nav-right .tb-btn{ width:30px; height:30px; }
-
-/* ═══ Chart Tabs Bar — Chrome-style workspace tabs, sits flush under the 60px header ═══ */
-.chart-tabs-bar{
-  position:sticky;
-  top:60px;
-  left:0;
-  right:0;
-  z-index:73; /* below header(75)/dropdowns, above cockpit(70) so it never gets covered */
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 20px;
-  width:100%;
-  box-sizing:border-box;
-  background:rgba(17,19,23,0.92);
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
-  border-bottom:1px solid var(--border);
-}
-.light-mode .chart-tabs-bar{
-  background:rgba(10,41,71,0.94);
-  border-color:rgba(243,228,201,0.12);
-}
-.chart-tabs-list{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  flex:1 1 auto;
-  min-width:0;
-  overflow-x:auto;
-  scrollbar-width:none;
-  -ms-overflow-style:none;
-}
-.chart-tabs-list::-webkit-scrollbar{ display:none; }
-
-.chart-tab-item{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-shrink:0;
-  padding:7px 10px 7px 12px;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:var(--bg3);
-  color:var(--muted);
-  font-family:'JetBrains Mono',monospace;
-  font-size:12.5px;
-  font-weight:600;
-  white-space:nowrap;
-  cursor:pointer;
-  transition:background 0.18s,color 0.18s,border-color 0.18s;
-}
-.chart-tab-item:hover{ background:var(--gold-dim); color:var(--white); }
-.chart-tab-item.active{
-  background:var(--gold-dim);
-  border-color:var(--gold);
-  color:var(--gold);
-}
-.ctab-dot{ width:6px; height:6px; border-radius:50%; background:var(--muted); flex-shrink:0; }
-.chart-tab-item.active .ctab-dot{ background:var(--green); box-shadow:0 0 6px var(--green); }
-.ctab-close{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:16px;
-  height:16px;
-  border-radius:4px;
-  font-size:11px;
-  line-height:1;
-  color:inherit;
-  opacity:0.55;
-  transition:background 0.15s,color 0.15s,opacity 0.15s;
-}
-.ctab-close:hover{ background:var(--red-dim); color:var(--red); opacity:1; }
-
-.chart-tab-add{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:30px;
-  height:30px;
-  flex-shrink:0;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:var(--bg3);
-  color:var(--muted);
-  cursor:pointer;
-  transition:background 0.18s,color 0.18s,border-color 0.18s;
-}
-.chart-tab-add:hover{ background:var(--gold-dim); border-color:var(--gold); color:var(--gold); }
-.chart-tab-add .nav-icon-svg{ width:16px; height:16px; }
-
-.light-mode .chart-tab-item{
-  background:rgba(243,228,201,0.06);
-  border-color:rgba(243,228,201,0.16);
-  color:rgba(243,228,201,0.6);
-}
-.light-mode .chart-tab-item:hover{ background:rgba(243,228,201,0.12); border-color:rgba(243,228,201,0.3); color:var(--cream); }
-.light-mode .chart-tab-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
-.light-mode .chart-tab-item .ctab-dot{ background:rgba(243,228,201,0.5); }
-.light-mode .chart-tab-item.active .ctab-dot{ background:var(--green); box-shadow:0 0 6px var(--green); }
-.light-mode .chart-tab-add{ background:rgba(243,228,201,0.06); border-color:rgba(243,228,201,0.16); color:rgba(243,228,201,0.6); }
-.light-mode .chart-tab-add:hover{ background:rgba(243,228,201,0.12); border-color:var(--cream); color:var(--cream); }
-
 @media(max-width:768px){
-  .chart-tabs-bar{ padding:8px 14px; }
 }
-
-/* — Padding cleanup: the inline-padded content wrapper around workspace-shell.
-     HTML/inline styles are not touched anywhere else in this project; this is
-     the one necessary !important, since only an inline style already sets
-     this element's padding and it must shrink for a compact terminal feel — */
-.chart-terminal-layout > div:not(.chart-header-wrapper):not(.chart-tabs-bar){ padding:14px !important; }
-
-/* — Chart workspace internals: tighter padding/gaps, chart canvas itself untouched — */
-.chart-terminal-layout .workspace-shell{ gap:10px; }
-.chart-terminal-layout .top-row{ gap:10px; }
-.chart-terminal-layout .bottom-row{ gap:10px; }
-.chart-terminal-layout .chart-cockpit{ padding:8px 12px; }
-.chart-terminal-layout .chart-viewport{ padding:10px; }
-
-/* — Slightly tighter card radius, professional exchange feel — */
-.chart-terminal-layout .chart-workspace,
-.chart-terminal-layout .bottom-dock{ border-radius:12px; }
-.chart-terminal-layout .execution-workspace,
-.chart-terminal-layout .orderbook-panel,
-.chart-terminal-layout .market-overview-panel{ border-radius:10px; }
 
 /* — Bottom mobile nav gets slimmer ONLY while the Chart page is active,
      freeing vertical room for the chart; every other page's bottom nav
@@ -1567,19 +1092,6 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* — Responsive: tablet/mobile keep the same slim header, nav scrolls
      horizontally instead of wrapping or overflowing the page — */
 @media(max-width:1024px){
-  .chart-terminal-layout > div:not(.chart-header-wrapper):not(.chart-tabs-bar){ padding:10px !important; }
-  .chart-header-wrapper{ padding:0 16px; }
 }
 @media(max-width:768px){
-  .chart-header-wrapper{ padding:0 14px; gap:10px; }
-  .chart-nav-right .broker-sel{ min-width:120px; }
 }
-
-/* — Phase 4: Active pane binding — clicking a chart pane makes it the source for
-     Order Book + Trade Terminal. Subtle border highlight shows which pane is active. — */
-.chart-panel-wrap,
-.chart-pane-2{ border:1px solid transparent; border-radius:10px; transition:border-color 0.15s; }
-.chart-panel-wrap.active-pane,
-.chart-pane-2.active-pane{ border-color:var(--gold); }
-.ob-active-symbol{ color:var(--gold); font-weight:600; margin-left:6px; }
-.term-active-symbol{ color:var(--gold); font-weight:600; }
