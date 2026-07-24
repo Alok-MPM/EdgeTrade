@@ -1026,23 +1026,60 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 }
 #klineMainChart{flex:1 1 auto;min-height:0;}
 
-/* ═══════════════════════════════════════════════════════════════
-   STEP 2 — CHART PAGE COMPACT TRADING TERMINAL LAYOUT
-   Scoped strictly to the Chart page via #page-app:has(#section-chart.active)
-   and the .chart-terminal-layout / .chart-header-wrapper wrapper classes
-   added in Step 1. No colors, fonts, shadows, themes, chart styling,
-   or component designs are changed here — layout & spacing only.
-   ═══════════════════════════════════════════════════════════════ */
+/* — Sidebar + global topbar disappear ONLY when Chart page is active
+     (replaced by .chart-header-wrapper below); every other page keeps
+     them exactly as before — */
+#page-app:has(#section-chart.active) .sidebar{ display:none; }
+#page-app:has(#section-chart.active) .topbar{ display:none; }
+#page-app:has(#section-chart.active) .main-content{ margin-left:0; }
+#page-app:has(#section-chart.active) .content-area{
+  padding-top:0;
+  padding-left:0;
+  padding-right:0;
+  width:100%;
+  box-sizing:border-box;
+}
+.chart-terminal-layout{
+  width:100%;
+  box-sizing:border-box;
+}
 
-/* — REVERTED: the Chart page used to get its own dedicated compact header
-     (logo + broker + actions merged into one slim row) which replaced the
-     normal sidebar/topbar. That custom header was removed along with the
-     old chart code. Rather than leave the Chart page with NO header at all,
-     the standard sidebar + topbar (same one every other page uses — logo,
-     broker selector, calculator/notifications/profile) are now shown here
-     too, same as any other page. A more compact, chart-specific header can
-     be rebuilt later as its own pass. — */
-
+/* — Chart page header: logo / horizontal nav / broker / actions, one slim row — */
+.chart-header-wrapper{
+  position:sticky;
+  top:0;
+  left:0;
+  right:0;
+  z-index:75;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  min-height:60px;
+  width:100%;
+  box-sizing:border-box;
+  padding:0 20px;
+  background:rgba(17,19,23,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+.light-mode .chart-header-wrapper{
+  background:rgba(10,41,71,0.94);
+  border-color:rgba(243,228,201,0.12);
+}
+.chart-nav-left{ display:flex; align-items:center; gap:22px; flex-shrink:0; }
+.chart-nav-left .sidebar-logo{ padding:0; border-bottom:none; }
+.chart-nav-left .chart-top-navigation{ padding-left:22px; border-left:1px solid var(--border); }
+.chart-top-navigation{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  max-width:100%;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+.chart-top-navigation::-webkit-scrollbar{ display:none; }
 .chart-nav-item{
   display:flex;
   align-items:center;
@@ -1067,9 +1104,42 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
   border-color:var(--gold);
   color:var(--gold);
 }
+#chart-nav-menu-btn{
+  padding:9px 18px;
+  font-size:16px;
+  font-weight:600;
+}
+#chart-nav-menu-btn .nav-icon-svg{ width:19px; height:19px; }
+#chart-nav-menu-btn svg[style*="14px"]{ width:16px !important; height:16px !important; }
 .light-mode .chart-nav-item{ color:rgba(243,228,201,0.6); }
 .light-mode .chart-nav-item:hover{ background:rgba(243,228,201,0.08); color:var(--cream); }
 .light-mode .chart-nav-item.active{ background:var(--cream); border-color:transparent; color:var(--navy); }
+.chart-nav-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto; }
+.chart-nav-right .broker-sel{ padding:6px 12px; min-width:150px; }
+.chart-nav-right .tb-btn{ width:30px; height:30px; }
+
+/* — Chart page nav popup (mobile "Go to" bottom sheet) — */
+.chart-nav-popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:90;align-items:flex-end;justify-content:center;}
+.chart-nav-popup-overlay.open{display:flex;animation:fadeIn 0.2s ease;}
+.chart-nav-popup-panel{width:100%;max-width:420px;background:var(--bg2);border-radius:18px 18px 0 0;padding-bottom:20px;}
+.chart-nav-popup-handle{width:36px;height:4px;background:var(--border);border-radius:4px;margin:12px auto;cursor:pointer;}
+.chart-nav-popup-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:13px;color:var(--muted);padding:0 20px 8px;}
+.chart-nav-popup-list{display:flex;flex-direction:column;padding:0 10px;}
+.chart-nav-popup-item{display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:10px;border:none;background:none;color:var(--white);font-family:'Outfit',sans-serif;font-size:14.5px;font-weight:500;cursor:pointer;text-align:left;}
+.chart-nav-popup-item:hover,.chart-nav-popup-item:active{background:var(--gold-dim);color:var(--gold);}
+.chart-nav-popup-item .nav-icon-svg{width:20px;height:20px;flex-shrink:0;}
+
+/* — Padding cleanup: the inline-padded content wrapper around workspace-shell — */
+.chart-terminal-layout > div:not(.chart-header-wrapper){ padding:14px !important; }
+.chart-terminal-layout .workspace-shell{ gap:10px; }
+.chart-terminal-layout .top-row{ gap:10px; }
+
+/* — Workspace shell / top row / chart workspace (white card housing the chart) — */
+.workspace-shell{display:flex;flex-direction:column;gap:14px;min-height:0;}
+.top-row{display:flex;gap:14px;align-items:stretch;min-height:0;}
+.top-row .chart-workspace{flex:1 1 auto;min-width:0;}
+.chart-workspace{position:relative;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.15);}
+#klineMainChart{flex:1 1 auto;min-height:0;}
 
 @media(max-width:768px){
 }
@@ -1081,13 +1151,11 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 #page-app:has(#section-chart.active) + #mobile-nav .mn-item{ padding:3px 0; }
 #page-app:has(#section-chart.active) + #mobile-nav .mn-center-btn{ width:42px; height:42px; margin-bottom:0; }
 
-/* — Chart Terminal: chart / order book / trade terminal as one row on
-     desktop, stacked on mobile — */
-.ct-terminal-row{display:flex;gap:14px;align-items:flex-start;padding:14px;}
-.ct-terminal-chart-col{flex:1;min-width:0;}
+/* — Order book / trade terminal side columns (widths only — order-book.js
+     and trade-terminal.js already draw their own white-card look) — */
 .ct-terminal-side-col{width:320px;flex-shrink:0;}
 @media(max-width:900px){
-  .ct-terminal-row{flex-direction:column;}
+  .top-row{flex-direction:column;}
   .ct-terminal-side-col{width:100%;}
 }
 

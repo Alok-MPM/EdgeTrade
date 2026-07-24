@@ -90,7 +90,6 @@ function bootChartTerminalOnce(){
   chartSplit.init({ chartContainerId: 'klineMainChart' });
   orderBook.init({ mountId: 'order-book-root' });
   tradeTerminal.init({ mountId: 'trade-terminal-root' });
-  profileSettings.init({ mountId: 'profile-settings-root' });
 }
 
 function setSideNav(id){
@@ -249,6 +248,8 @@ async function loadProfile(){
     const sideAv=document.getElementById('sidebar-av');
     // Topbar avatar
     const topAv=document.getElementById('topbar-av');
+    // Chart header's twin avatar
+    const topAvChart=document.getElementById('topbar-av-chart');
     if(savedDp){
       // Profile big
       avEl.style.backgroundImage=`url(${savedDp})`;
@@ -265,10 +266,18 @@ async function loadProfile(){
       topAv.style.backgroundSize='cover';
       topAv.style.backgroundPosition='center';
       topAv.textContent='';
+      // Chart header
+      if(topAvChart){
+        topAvChart.style.backgroundImage=`url(${savedDp})`;
+        topAvChart.style.backgroundSize='cover';
+        topAvChart.style.backgroundPosition='center';
+        topAvChart.textContent='';
+      }
     } else {
       avEl.textContent=initials;
       sideAv.textContent=initials;
       topAv.textContent=initials;
+      if(topAvChart) topAvChart.textContent=initials;
     }
   }
 }
@@ -281,6 +290,7 @@ async function loadBrokers(){
     state.activeBroker=b.id;
     const nm=b.account_label||b.name||'Broker';
     document.getElementById('active-broker-nm').textContent=nm;
+    const nmChart1=document.getElementById('active-broker-nm-chart'); if(nmChart1) nmChart1.textContent=nm;
   }
 }
 
@@ -1234,6 +1244,7 @@ function selectBroker(b){
   state.activeBroker = b.id;
   const name = b.account_label || b.name;
   document.getElementById('active-broker-nm').textContent = name;
+  const nmChart2=document.getElementById('active-broker-nm-chart'); if(nmChart2) nmChart2.textContent = name;
   closeBrokerPopup();
   closeBrokerCentre();
   closeBrokerAddPage();
@@ -1288,6 +1299,7 @@ async function deleteBroker(connectionId, name){
     state.activeBroker = state.brokers[0]?.id || null;
     const nm = state.brokers[0]?.account_label || state.brokers[0]?.name || 'No Broker';
     document.getElementById('active-broker-nm').textContent = nm;
+    const nmChart3=document.getElementById('active-broker-nm-chart'); if(nmChart3) nmChart3.textContent = nm;
   }
   renderConnected();
   renderAvailable(allBrokerConfigs);
@@ -1694,6 +1706,7 @@ function changeDP(){
       applyDp(document.getElementById('profile-av-big'));
       applyDp(document.getElementById('sidebar-av'));
       applyDp(document.getElementById('topbar-av'));
+      applyDp(document.getElementById('topbar-av-chart'));
       if(state.profile) state.profile.avatar_url = publicUrl;
       showToast('Profile photo updated!','success');
     }catch(err){
