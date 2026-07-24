@@ -341,6 +341,27 @@
                 <div id="order-book-root" class="ct-terminal-side-col"><!-- order-book.js --></div>
                 <div id="trade-terminal-root" class="ct-terminal-side-col"><!-- trade-terminal.js --></div>
               </div>
+
+              <!-- TRADE INFORMATION (Open Positions / Trade History) — rendered by trade-terminal.js -->
+              <div class="bottom-dock" id="bottom-dock">
+                <div class="dock-header">
+                  <span class="dock-title">Trade Information</span>
+                </div>
+                <div class="dock-tabs">
+                  <div class="bottom-tab-nav">
+                    <div class="bottom-tab-item active" id="btab-positions" onclick="switchBottomTab('positions')">Open Positions</div>
+                    <div class="bottom-tab-item" id="btab-history" onclick="switchBottomTab('history')">Trade History</div>
+                  </div>
+                </div>
+                <div class="dock-content">
+                  <div class="bottom-tab-content" id="btab-content-positions">
+                    <div class="tt-empty">No open positions — place a demo trade to see it here.</div>
+                  </div>
+                  <div class="bottom-tab-content" id="btab-content-history" style="display:none;">
+                    <div class="tt-empty">No closed trades yet.</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

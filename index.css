@@ -1154,6 +1154,17 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 /* — Order book / trade terminal side columns (widths only — order-book.js
      and trade-terminal.js already draw their own white-card look) — */
 .ct-terminal-side-col{width:320px;flex-shrink:0;}
+
+/* — Bottom Dock (Trade Information: Open Positions / Trade History) — */
+.bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.dock-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
+.dock-title{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);}
+.dock-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);padding:10px 16px 0;margin-bottom:0;overflow-x:auto;}
+.dock-content{padding:16px;min-height:170px;max-height:280px;overflow-y:auto;}
+.bottom-tab-nav{display:flex;gap:20px;}
+.bottom-tab-item{padding:8px 4px 12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:500;border-bottom:2px solid transparent;}
+.bottom-tab-item.active{color:var(--gold);border-bottom-color:var(--gold);}
+.bottom-tab-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}
 @media(max-width:900px){
   .top-row{flex-direction:column;}
   .ct-terminal-side-col{width:100%;}
