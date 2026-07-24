@@ -157,8 +157,6 @@
 
         <button class="tt-submit long" id="tt-submit">Buy / Long</button>
         <div class="tt-submit-note">Demo mode — no real funds</div>
-
-        <div class="tt-positions" id="tt-positions"><div class="tt-empty">No open positions — place a demo trade to see it here.</div></div>
       </div>
     `;
     bindEvents();
@@ -292,7 +290,7 @@
   }
 
   function renderPositions() {
-    const c = document.getElementById('tt-positions');
+    const c = document.getElementById('btab-content-positions');
     if (!c) return;
     if (!openPositions.length) {
       c.innerHTML = '<div class="tt-empty">No open positions — place a demo trade to see it here.</div>';
@@ -327,6 +325,55 @@
       el.className = 'tt-pos-pnl ' + (pnl >= 0 ? 'pos' : 'neg');
     });
   }
+
+  // ── Bottom dock: Open Positions / Trade History tabs ──────────────────
+  // Wired to the restored old dock markup (#bottom-dock, #btab-positions,
+  // #btab-history, #btab-content-positions, #btab-content-history) — see
+  // index.html. switchBottomTab is called directly from that HTML's
+  // onclick attributes, so it must be exposed globally.
+  let tradeHistoryLoaded = false;
+
+  function switchBottomTab(tab) {
+    const posTabBtn = document.getElementById('btab-positions');
+    const histTabBtn = document.getElementById('btab-history');
+    const posContent = document.getElementById('btab-content-positions');
+    const histContent = document.getElementById('btab-content-history');
+    if (!posTabBtn || !histTabBtn || !posContent || !histContent) return;
+
+    posTabBtn.classList.toggle('active', tab === 'positions');
+    histTabBtn.classList.toggle('active', tab === 'history');
+    posContent.style.display = tab === 'positions' ? '' : 'none';
+    histContent.style.display = tab === 'history' ? '' : 'none';
+
+    if (tab === 'history' && !tradeHistoryLoaded) {
+      tradeHistoryLoaded = true;
+      loadTradeHistory();
+    }
+  }
+  window.switchBottomTab = switchBottomTab;
+
+  async function loadTradeHistory() {
+    if (!state.user) return;
+    const c = document.getElementById('btab-content-history');
+    if (!c) return;
+    const { data, error } = await db.from('demo_positions').select('*').eq('user_id', state.user.id).eq('status', 'closed').order('closed_at', { ascending: false }).limit(50);
+    if (error) { c.innerHTML = '<div class="tt-empty">Could not load trade history.</div>'; return; }
+    if (!data || !data.length) { c.innerHTML = '<div class="tt-empty">No closed trades yet.</div>'; return; }
+
+    c.innerHTML = data.map(pos => {
+      const pnl = typeof pos.pnl === 'number' ? pos.pnl : 0;
+      const pnlClass = pnl >= 0 ? 'pos' : 'neg';
+      return `
+        <div class="tt-pos-row">
+          <span class="tt-pos-side ${pos.side}">${pos.side.toUpperCase()} ${pos.leverage}x</span>
+          <span class="tt-pos-meta">${pos.symbol.replace(/USDT$/, '')}/USDT · Entry ${pos.entry_price.toFixed(1)} → Exit ${(pos.exit_price || 0).toFixed(1)}</span>
+          <span class="tt-pos-pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD</span>
+        </div>`;
+    }).join('');
+  }
+
+  // Re-fetch history next time the tab is opened after a new trade closes.
+  function invalidateTradeHistoryCache() { tradeHistoryLoaded = false; }
 
   // ── Auto TP/SL/liquidation ───────────────────────────────────────────
   function checkTpSlLiquidation() {
@@ -367,6 +414,7 @@
     notify((labels[reason] || 'Closed') + ' @ ' + exitPrice.toFixed(1) + ' | PnL ' + (pnl >= 0 ? '+' : '') + pnl.toFixed(2), pnl >= 0 ? 'success' : 'error');
 
     closingInProgress[id] = false;
+    invalidateTradeHistoryCache();
     await loadDemoPositions();
   }
 
