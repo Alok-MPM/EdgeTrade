@@ -2560,3 +2560,716 @@ document.addEventListener("DOMContentLoaded", () => {
     if(card) handleReset(card);
   });
 })();
+
+// ══════════════════════════════════════════════════════════════════════
+// PHASE 3 + PHASE 4 + PHASE 5 — TERMINAL BEHAVIOUR, INTELLIGENCE & POLISH
+// Self-contained, additive module. Nothing above this point is modified,
+// no existing function is renamed, no business/API logic is touched.
+// Exposes exactly ONE global: window.EdgeTerminal (no other global
+// pollution). Hooks itself onto #section-chart via a MutationObserver so
+// it needs zero edits to showSection()/bootChartTerminalOnce() above.
+// ══════════════════════════════════════════════════════════════════════
+(function(){
+  'use strict';
+  if (window.EdgeTerminal) return; // guard against double-inclusion
+
+  // ── shared feature flags ──────────────────────────────────────────
+  const reduceMotionMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  let reducedMotion = reduceMotionMQ ? reduceMotionMQ.matches : false;
+  if (reduceMotionMQ && reduceMotionMQ.addEventListener) {
+    reduceMotionMQ.addEventListener('change', e => { reducedMotion = e.matches; applyReducedMotionClass(); });
+  }
+  let tabVisible = document.visibilityState !== 'hidden';
+  const isDebug = (function(){
+    try { return localStorage.getItem('edgetrade_debug') === '1' || /localhost|127\.0\.0\.1/.test(location.hostname); }
+    catch(e){ return false; }
+  })();
+
+  // ── PHASE 5 §8 / PHASE 4 §1: central state + persistence ───────────
+  const LS_KEY = 'edgetrade_terminal_state_v1';
+  const terminalState = {
+    activeSymbol: null,
+    timeframe: null,
+    theme: 'dark',
+    layout: { historyCollapsed: false, marketWatchWidth: null },
+    sidebarState: 'expanded',
+    aiOpen: false,
+    adLoaded: false
+  };
+  function loadState(){
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      if (p.layout) Object.assign(terminalState.layout, p.layout);
+      if (p.theme) terminalState.theme = p.theme;
+      if (p.sidebarState) terminalState.sidebarState = p.sidebarState;
+    } catch(e){ /* corrupt/unavailable storage — start fresh */ }
+  }
+  let saveTimer = null;
+  function saveState(){
+    showSaveIndicator('Saving...');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify({
+          layout: terminalState.layout, theme: terminalState.theme, sidebarState: terminalState.sidebarState
+        }));
+        showSaveIndicator('Saved ✓', 1200);
+      } catch(e){ /* storage unavailable — silently skip */ }
+    }, 600);
+  }
+  let saveIndicatorEl = null;
+  function showSaveIndicator(text, hideAfter){
+    if (!saveIndicatorEl) {
+      saveIndicatorEl = document.createElement('div');
+      saveIndicatorEl.className = 'ct-save-indicator';
+      document.body.appendChild(saveIndicatorEl);
+    }
+    saveIndicatorEl.textContent = text;
+    saveIndicatorEl.classList.add('visible');
+    if (hideAfter) setTimeout(() => saveIndicatorEl.classList.remove('visible'), hideAfter);
+  }
+
+  // ── DOM cache (perf: query once, reuse) ─────────────────────────────
+  const dom = {};
+  function cacheDom(){
+    dom.section       = document.getElementById('section-chart');
+    dom.layout        = document.querySelector('.chart-terminal-layout');
+    dom.shell         = document.querySelector('.terminal-shell');
+    dom.chartWorkspace= document.querySelector('.chart-workspace');
+    dom.chartMount    = document.getElementById('klineMainChart');
+    dom.marketWatch   = document.querySelector('.market-watch-panel');
+    dom.tradePanel    = document.querySelector('.trade-panel');
+    dom.aiPanel       = document.querySelector('.ai-panel');
+    dom.adSlot        = document.querySelector('.terminal-ad-slot');
+    dom.adPlaceholder = document.querySelector('.adsense-placeholder');
+    dom.bottomDock    = document.querySelector('.bottom-dock');
+    dom.dockHeader    = document.querySelector('.dock-header');
+    dom.dockContent   = document.querySelector('.dock-content');
+    dom.posContent    = document.getElementById('btab-content-positions');
+    dom.histContent   = document.getElementById('btab-content-history');
+    dom.floatingAI    = document.querySelector('.floating-ai-button');
+    dom.notifLayer    = document.getElementById('notification-layer');
+    dom.navRight      = document.querySelector('.chart-nav-right');
+  }
+
+  function applyReducedMotionClass(){
+    if (!dom.layout) return;
+    dom.layout.classList.toggle('ct-reduced-motion', !!reducedMotion);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 1+2 — sequential startup sequence + chart entrance
+  // ══════════════════════════════════════════════════════════════════
+  let startupPlayed = false;
+  function playStartupSequence(){
+    if (startupPlayed) return;
+    startupPlayed = true;
+    if (reducedMotion) { // just show everything, no stagger
+      [dom.chartWorkspace, dom.marketWatch, dom.tradePanel, dom.aiPanel, dom.adSlot, dom.bottomDock]
+        .forEach(el => el && el.classList.add('ct-ready'));
+      return;
+    }
+    const seq = [
+      [dom.chartWorkspace, 0],
+      [dom.marketWatch,   120],
+      [dom.tradePanel,    200],
+      [dom.aiPanel,       260],
+      [dom.bottomDock,    340],
+      [dom.floatingAI,    420]
+    ];
+    seq.forEach(([el, delay]) => {
+      if (!el) return;
+      el.classList.add('ct-stagger-hidden');
+      setTimeout(() => el.classList.add('ct-ready'), delay);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 3 & 13 — price flash + rolling number counters
+  // Public API so market-store.js / trade-terminal.js can call these
+  // whenever a price or balance figure actually updates.
+  // ══════════════════════════════════════════════════════════════════
+  function flashPrice(el, direction){
+    if (!el || reducedMotion) return;
+    el.classList.remove('price-flash-up', 'price-flash-down');
+    void el.offsetWidth; // restart animation
+    el.classList.add(direction === 'down' ? 'price-flash-down' : 'price-flash-up');
+  }
+  function animateNumber(el, toValue, opts){
+    if (!el) return;
+    opts = opts || {};
+    const duration = reducedMotion ? 0 : (opts.duration || 260);
+    const decimals = opts.decimals != null ? opts.decimals : 2;
+    const prefix = opts.prefix || '';
+    const suffix = opts.suffix || '';
+    const from = parseFloat((el.dataset.ctVal || '0').replace(/,/g,'')) || 0;
+    const to = parseFloat(toValue) || 0;
+    el.dataset.ctVal = to;
+    if (!duration) { el.textContent = prefix + to.toFixed(decimals) + suffix; return; }
+    const start = performance.now();
+    function tick(now){
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      const cur = from + (to - from) * eased;
+      el.textContent = prefix + cur.toFixed(decimals) + suffix;
+      if (p < 1 && tabVisible) requestAnimationFrame(tick);
+      else el.textContent = prefix + to.toFixed(decimals) + suffix;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 4 & 6 — auto fade-in for new orderbook/history rows
+  // Generic MutationObserver so it works regardless of which module
+  // (order-book.js / trade-terminal.js) inserts the row markup.
+  // ══════════════════════════════════════════════════════════════════
+  function watchRowInsertions(container, rowClassHint){
+    if (!container || !window.MutationObserver) return;
+    const obs = new MutationObserver(muts => {
+      if (reducedMotion) return;
+      muts.forEach(m => m.addedNodes.forEach(node => {
+        if (node.nodeType !== 1) return;
+        if (rowClassHint && !node.matches(rowClassHint) && !node.querySelector) return;
+        node.classList && node.classList.add('ct-row-enter');
+        requestAnimationFrame(() => node.classList && node.classList.add('ct-row-enter-active'));
+      }));
+    });
+    obs.observe(container, { childList: true, subtree: true });
+    return obs;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 7  +  PHASE 4 §7 — categorized notification queue
+  // ══════════════════════════════════════════════════════════════════
+  const NOTIF_ICONS = { success:'✓', warning:'⚠', risk:'⛔', ai:'✨', market:'📊' };
+  const notifQueue = [];
+  let notifActive = 0;
+  const NOTIF_MAX_VISIBLE = 3;
+  function notify(message, category, opts){
+    category = category || 'market';
+    opts = opts || {};
+    notifQueue.push({ message, category, ttl: opts.ttl || 4200 });
+    drainNotifQueue();
+  }
+  function drainNotifQueue(){
+    if (!dom.notifLayer) return;
+    while (notifQueue.length && notifActive < NOTIF_MAX_VISIBLE) {
+      const item = notifQueue.shift();
+      renderNotification(item);
+    }
+  }
+  function renderNotification(item){
+    notifActive++;
+    const card = document.createElement('div');
+    card.className = 'ct-notif ct-notif-' + item.category;
+    card.innerHTML =
+      '<span class="ct-notif-icon">' + (NOTIF_ICONS[item.category] || '•') + '</span>' +
+      '<span class="ct-notif-msg"></span>';
+    card.querySelector('.ct-notif-msg').textContent = item.message; // textContent = safe, no injection
+    dom.notifLayer.appendChild(card);
+    requestAnimationFrame(() => card.classList.add('ct-notif-in'));
+    const dismiss = () => {
+      card.classList.remove('ct-notif-in');
+      card.classList.add('ct-notif-out');
+      setTimeout(() => { card.remove(); notifActive--; drainNotifQueue(); }, 240);
+    };
+    card.addEventListener('click', dismiss);
+    setTimeout(dismiss, item.ttl);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 8 — AI dock: breathing (CSS-driven), hover tilt,
+  // click-to-expand, typing-dots while "thinking"
+  // ══════════════════════════════════════════════════════════════════
+  function initAIDock(){
+    if (!dom.floatingAI) return;
+    dom.floatingAI.addEventListener('mousemove', e => {
+      if (reducedMotion) return;
+      const r = dom.floatingAI.getBoundingClientRect();
+      const cx = r.left + r.width/2, cy = r.top + r.height/2;
+      const rot = ((e.clientX - cx) / (r.width/2)) * 2; // max 2deg
+      dom.floatingAI.style.transform = 'rotate(' + rot.toFixed(2) + 'deg)';
+    }, { passive:true });
+    dom.floatingAI.addEventListener('mouseleave', () => { dom.floatingAI.style.transform = ''; });
+    dom.floatingAI.addEventListener('click', () => {
+      terminalState.aiOpen = !terminalState.aiOpen;
+      dom.floatingAI.classList.toggle('ct-ai-expanded', terminalState.aiOpen);
+      if (dom.aiPanel) dom.aiPanel.classList.toggle('ct-ai-expanded', terminalState.aiOpen);
+    });
+  }
+  function setAITyping(on){
+    if (!dom.aiPanel) return;
+    let dots = dom.aiPanel.querySelector('.ct-typing-dots');
+    if (on) {
+      if (!dots) {
+        dots = document.createElement('div');
+        dots.className = 'ct-typing-dots';
+        dots.innerHTML = '<span></span><span></span><span></span>';
+        dom.aiPanel.appendChild(dots);
+      }
+    } else if (dots) dots.remove();
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 9  +  PHASE 5 §5 — ad placeholder → ad, zero CLS
+  // Height is reserved by CSS (.adsense-placeholder min-height), so
+  // swapping content never shifts layout.
+  // ══════════════════════════════════════════════════════════════════
+  function markAdLoaded(html){
+    if (!dom.adPlaceholder || terminalState.adLoaded) return;
+    dom.adPlaceholder.classList.add('ct-fade-out');
+    setTimeout(() => {
+      if (html) dom.adPlaceholder.innerHTML = html; // caller-provided ad markup only
+      dom.adPlaceholder.classList.remove('ct-fade-out');
+      dom.adPlaceholder.classList.add('ct-fade-in');
+      terminalState.adLoaded = true;
+    }, reducedMotion ? 0 : 200);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 10  +  PHASE 4 §2 — Focus Mode
+  // ══════════════════════════════════════════════════════════════════
+  function enterFocusMode(){
+    if (dom.shell) dom.shell.classList.add('ct-focus-mode');
+  }
+  function exitFocusMode(){
+    if (dom.shell) dom.shell.classList.remove('ct-focus-mode');
+  }
+  function initFocusMode(){
+    if (!dom.chartWorkspace) return;
+    dom.chartWorkspace.addEventListener('click', enterFocusMode);
+  }
+  // Trade-confirmation focus pulse — exposed for trade-terminal.js to call
+  // right after a trade is placed / confirmed.
+  function focusOnTradeConfirm(){
+    enterFocusMode();
+    setTimeout(exitFocusMode, 1400);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 11  +  PHASE 4 §6 — keyboard shortcuts
+  // ══════════════════════════════════════════════════════════════════
+  function isTypingTarget(el){
+    return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  }
+  function initKeyboardShortcuts(){
+    document.addEventListener('keydown', e => {
+      if (!dom.section || !dom.section.classList.contains('active')) return;
+      if (isTypingTarget(e.target)) { if (e.key === 'Escape') e.target.blur(); return; }
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          if (dom.chartWorkspace) dom.chartWorkspace.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block:'center' });
+          enterFocusMode();
+          break;
+        case 'a': case 'A':
+          if (dom.floatingAI) dom.floatingAI.click();
+          break;
+        case '/': {
+          e.preventDefault();
+          const searchInp = dom.section.querySelector('input[type="text"]:not([disabled])');
+          if (searchInp) searchInp.focus();
+          break;
+        }
+        case 'Escape':
+          exitFocusMode();
+          document.querySelectorAll('.strategy-modal-overlay.open, .chart-nav-popup-overlay.open')
+            .forEach(el => el.classList.remove('open'));
+          break;
+        case 'f': case 'F':
+          if (dom.chartWorkspace) dom.chartWorkspace.classList.toggle('ct-chart-fullscreen');
+          break;
+      }
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 12 — sound architecture (silent by default)
+  // ══════════════════════════════════════════════════════════════════
+  const sound = {
+    enabled: false,
+    files: { hover:'hover.wav', click:'click.wav', notification:'notification.wav' },
+    play(name){ if (!this.enabled) return; try { new Audio(this.files[name]).play().catch(()=>{}); } catch(e){} }
+  };
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 15 — lazy animation: only animate panels once in view
+  // ══════════════════════════════════════════════════════════════════
+  function onFirstVisible(el, cb){
+    if (!el || !window.IntersectionObserver) { cb(); return; }
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) { cb(); io.unobserve(entry.target); }
+      });
+    }, { threshold: 0.15 });
+    io.observe(el);
+    return io;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 16  +  PHASE 5 §4 — page visibility pause/resume
+  // ══════════════════════════════════════════════════════════════════
+  function initVisibilityHandling(){
+    document.addEventListener('visibilitychange', () => {
+      tabVisible = document.visibilityState !== 'hidden';
+      if (dom.layout) dom.layout.classList.toggle('ct-paused', !tabVisible);
+      if (tabVisible) sessionTick(); // resume session-chip freshness immediately
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 17 — subtle mouse-depth parallax (0.5px, rAF-driven)
+  // ══════════════════════════════════════════════════════════════════
+  function initParallax(){
+    if (!dom.shell) return;
+    let targetX = 0, targetY = 0, curX = 0, curY = 0, raf = null;
+    dom.shell.addEventListener('mousemove', e => {
+      if (reducedMotion || !tabVisible) return;
+      const r = dom.shell.getBoundingClientRect();
+      targetX = ((e.clientX - r.left) / r.width - 0.5) * 1; // px range, kept tiny
+      targetY = ((e.clientY - r.top) / r.height - 0.5) * 1;
+      if (!raf) raf = requestAnimationFrame(loop);
+    }, { passive:true });
+    function loop(){
+      curX += (targetX - curX) * 0.08;
+      curY += (targetY - curY) * 0.08;
+      [dom.chartWorkspace, dom.marketWatch, dom.tradePanel].forEach(el => {
+        if (el) el.style.transform = 'translate(' + (curX*0.5).toFixed(2) + 'px,' + (curY*0.5).toFixed(2) + 'px)';
+      });
+      if (Math.abs(targetX-curX) > 0.001 || Math.abs(targetY-curY) > 0.001) raf = requestAnimationFrame(loop);
+      else raf = null;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 18 — magnetic buttons (tiny, professional)
+  // ══════════════════════════════════════════════════════════════════
+  function initMagneticButtons(){
+    const targets = [dom.floatingAI, dom.tradePanel].filter(Boolean);
+    targets.forEach(zone => {
+      zone.addEventListener('mousemove', e => {
+        if (reducedMotion) return;
+        const btn = e.target.closest('button, .toolbar-btn');
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        const dx = (e.clientX - (r.left + r.width/2)) * 0.15;
+        const dy = (e.clientY - (r.top + r.height/2)) * 0.15;
+        btn.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+      }, { passive:true });
+      zone.addEventListener('mouseleave', e => {
+        const btn = e.target.closest && e.target.closest('button, .toolbar-btn');
+        if (btn) btn.style.transform = '';
+      }, true);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 19 — ripple on Long/Short/AI actions
+  // ══════════════════════════════════════════════════════════════════
+  function initRipple(){
+    if (!dom.shell) return;
+    dom.shell.addEventListener('click', e => {
+      if (reducedMotion) return;
+      const btn = e.target.closest('.trade-panel button, .floating-ai-button');
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'ct-ripple';
+      ripple.style.left = (e.clientX - r.left) + 'px';
+      ripple.style.top = (e.clientY - r.top) + 'px';
+      const prevPos = getComputedStyle(btn).position;
+      if (prevPos === 'static') btn.style.position = 'relative';
+      btn.style.overflow = 'hidden';
+      btn.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 500);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 3 · MODULE 20 — loading skeletons (chart / history / orderbook)
+  // ══════════════════════════════════════════════════════════════════
+  function addSkeleton(container, kind){
+    if (!container || container.querySelector('.ct-skeleton-' + kind)) return null;
+    const sk = document.createElement('div');
+    sk.className = 'ct-skeleton ct-skeleton-' + kind;
+    container.appendChild(sk);
+    return sk;
+  }
+  function initSkeletons(){
+    const chartSk = addSkeleton(dom.chartMount, 'chart');
+    if (chartSk && dom.chartMount && window.MutationObserver) {
+      const obs = new MutationObserver(() => {
+        if (dom.chartMount.querySelector('canvas')) { chartSk.remove(); obs.disconnect(); }
+      });
+      obs.observe(dom.chartMount, { childList: true, subtree: true });
+    }
+    [ ['posContent','positions'], ['histContent','history'], ['marketWatch','orderbook'] ].forEach(([key, kind]) => {
+      const el = dom[key];
+      if (!el) return;
+      const sk = addSkeleton(el, kind);
+      if (sk && window.MutationObserver) {
+        const obs = new MutationObserver(() => {
+          const real = Array.from(el.children).some(c => !c.classList.contains('ct-skeleton') && !c.classList.contains('tt-empty'));
+          if (real) { sk.remove(); obs.disconnect(); }
+        });
+        obs.observe(el, { childList: true });
+        setTimeout(() => { sk.remove(); obs.disconnect(); }, 6000); // safety timeout, never stuck forever
+      }
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 4 §1 — Adaptive workspace: remember History collapsed state
+  // Adds a small collapse toggle into the existing dock-header (no HTML
+  // file edits — created at runtime, styled purely via injected class).
+  // ══════════════════════════════════════════════════════════════════
+  function initAdaptiveWorkspace(){
+    if (!dom.dockHeader || dom.dockHeader.querySelector('.ct-collapse-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'ct-collapse-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Toggle trade information panel');
+    btn.textContent = terminalState.layout.historyCollapsed ? '▸' : '▾';
+    dom.dockHeader.appendChild(btn);
+    applyCollapsedState();
+    btn.addEventListener('click', () => {
+      terminalState.layout.historyCollapsed = !terminalState.layout.historyCollapsed;
+      btn.textContent = terminalState.layout.historyCollapsed ? '▸' : '▾';
+      applyCollapsedState();
+      saveState();
+    });
+  }
+  function applyCollapsedState(){
+    if (dom.bottomDock) dom.bottomDock.classList.toggle('ct-collapsed', !!terminalState.layout.historyCollapsed);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 4 §3 — context-aware AI hints (self-contained example: Friday
+  // evening session warning; other triggers exposed as public hooks for
+  // trade-terminal.js to call with real trade/leverage data).
+  // ══════════════════════════════════════════════════════════════════
+  function checkConsecutiveLosses(count){
+    if (count >= 3) notify('3 losses in a row. Consider taking a short break.', 'ai', { ttl: 6000 });
+  }
+  function checkLeverageRisk(leverage){
+    if (leverage >= 50) notify('High leverage selected (' + leverage + 'x). Double-check your position size.', 'risk', { ttl: 6000 });
+  }
+  function checkFridaySession(){
+    const now = new Date();
+    if (now.getUTCDay() === 5 && now.getUTCHours() >= 19) { // Friday evening UTC, liquidity thinning
+      notify('Friday evening — liquidity is thinning ahead of the weekend close.', 'market', { ttl: 6000 });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 4 §4 — Market session awareness chip
+  // ══════════════════════════════════════════════════════════════════
+  let sessionChipEl = null;
+  function getSession(){
+    const d = new Date();
+    const day = d.getUTCDay(), h = d.getUTCHours();
+    if (day === 0 || day === 6) return { label: 'Weekend', dot: '🔴' };
+    if (h >= 7 && h < 16)  return { label: 'London Open', dot: '🟢' };
+    if (h >= 12 && h < 21) return { label: 'New York', dot: '🔵' };
+    if (h >= 23 || h < 8)  return { label: 'Asia', dot: '🟡' };
+    return { label: 'Market Open', dot: '🟢' };
+  }
+  function ensureSessionChip(){
+    if (!dom.navRight || sessionChipEl) return;
+    sessionChipEl = document.createElement('span');
+    sessionChipEl.className = 'ct-session-chip';
+    dom.navRight.insertBefore(sessionChipEl, dom.navRight.firstChild);
+  }
+  let sessionTimer = null;
+  function sessionTick(){
+    ensureSessionChip();
+    if (!sessionChipEl) return;
+    const s = getSession();
+    sessionChipEl.textContent = s.dot + ' ' + s.label;
+    clearTimeout(sessionTimer);
+    if (tabVisible) sessionTimer = setTimeout(sessionTick, 60000); // self-rescheduling, not setInterval
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 4 §5 — empty state design (upgrades the default .tt-empty
+  // copy already shipped in the Phase 1 HTML, purely at runtime)
+  // ══════════════════════════════════════════════════════════════════
+  function upgradeEmptyStates(){
+    document.querySelectorAll('#btab-content-positions .tt-empty, #btab-content-history .tt-empty').forEach(el => {
+      if (el.dataset.ctUpgraded) return;
+      el.dataset.ctUpgraded = '1';
+      el.classList.add('ct-empty-state');
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'ct-empty-cta';
+      cta.textContent = 'Log your first trade →';
+      cta.addEventListener('click', () => { if (typeof showSection === 'function') showSection('trade-entry'); });
+      el.textContent = 'Your first trade starts your edge.';
+      el.appendChild(document.createElement('br'));
+      el.appendChild(cta);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 5 §6 — offline awareness banner
+  // ══════════════════════════════════════════════════════════════════
+  let offlineBannerEl = null;
+  function setOfflineBanner(show){
+    if (show) {
+      if (offlineBannerEl) return;
+      offlineBannerEl = document.createElement('div');
+      offlineBannerEl.className = 'ct-offline-banner';
+      offlineBannerEl.textContent = 'Offline Mode';
+      (dom.layout || document.body).prepend(offlineBannerEl);
+    } else if (offlineBannerEl) {
+      offlineBannerEl.remove();
+      offlineBannerEl = null;
+    }
+  }
+  function initOfflineAwareness(){
+    window.addEventListener('online',  () => setOfflineBanner(false));
+    window.addEventListener('offline', () => setOfflineBanner(true));
+    if (!navigator.onLine) setOfflineBanner(true);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 5 §5 — smart error recovery for the chart mount
+  // ══════════════════════════════════════════════════════════════════
+  function watchChartHealth(){
+    if (!dom.chartMount) return;
+    setTimeout(() => {
+      if (dom.chartMount.querySelector('canvas')) return; // chart loaded fine
+      const box = document.createElement('div');
+      box.className = 'ct-chart-error';
+      box.innerHTML = '<span>Chart unavailable. Retrying…</span>';
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.textContent = 'Retry now';
+      retryBtn.addEventListener('click', attemptRetry);
+      box.appendChild(retryBtn);
+      dom.chartMount.appendChild(box);
+      attemptRetry();
+      function attemptRetry(){
+        if (typeof chartEngine !== 'undefined' && chartEngine && typeof chartEngine.init === 'function') {
+          try { chartEngine.init({ containerId: 'klineMainChart' }); } catch(e){ /* left for chart-engine.js to define/own */ }
+        }
+        setTimeout(() => { if (dom.chartMount.querySelector('canvas')) box.remove(); }, 3000);
+      }
+    }, 6000);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 5 §3 — resize optimisation via ResizeObserver + debounce
+  // ══════════════════════════════════════════════════════════════════
+  function debounce(fn, wait){
+    let t = null;
+    return function(...args){ clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); };
+  }
+  function initResizeObserver(){
+    if (!dom.shell || !window.ResizeObserver) return;
+    const onResize = debounce(entries => {
+      // cached width recompute point — kept intentionally light; heavier
+      // panels (chart-engine.js etc.) already own their own resize logic.
+      const w = entries && entries[0] ? entries[0].contentRect.width : dom.shell.offsetWidth;
+      dom.shell.dataset.ctWidth = Math.round(w);
+    }, 150);
+    const ro = new ResizeObserver(onResize);
+    ro.observe(dom.shell);
+    return ro;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 5 §1 — dev-only FPS/perf monitor
+  // ══════════════════════════════════════════════════════════════════
+  function initPerfMonitor(){
+    if (!isDebug) return;
+    const box = document.createElement('div');
+    box.className = 'ct-perf-monitor';
+    document.body.appendChild(box);
+    let frames = 0, lastT = performance.now();
+    function loop(now){
+      frames++;
+      if (now - lastT >= 1000) {
+        const fps = frames;
+        frames = 0; lastT = now;
+        const mem = performance.memory ? (performance.memory.usedJSHeapSize/1048576).toFixed(1) + 'MB' : 'n/a';
+        box.textContent = 'FPS ' + fps + ' · MEM ' + mem;
+      }
+      if (tabVisible) requestAnimationFrame(loop);
+      else requestAnimationFrame(loop); // keep sampling cheaply even hidden; no work when hidden anyway (rAF throttled by browser)
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 5 §4 — theme system prep (Dark active; Midnight/Carbon ready)
+  // ══════════════════════════════════════════════════════════════════
+  function setTheme(name){
+    if (!dom.layout) return;
+    dom.layout.classList.remove('ct-theme-dark', 'ct-theme-midnight', 'ct-theme-carbon');
+    dom.layout.classList.add('ct-theme-' + (name || 'dark'));
+    terminalState.theme = name || 'dark';
+    saveState();
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // BOOT — runs once #section-chart is actually shown (no edits needed
+  // to showSection()/bootChartTerminalOnce() above).
+  // ══════════════════════════════════════════════════════════════════
+  let booted = false;
+  function bootTerminalUX(){
+    if (booted) return;
+    booted = true;
+    cacheDom();
+    loadState();
+    applyReducedMotionClass();
+    setTheme(terminalState.theme);
+    initSkeletons();
+    playStartupSequence();
+    watchRowInsertions(dom.marketWatch, '.ob-row');
+    watchRowInsertions(dom.posContent);
+    watchRowInsertions(dom.histContent);
+    initAIDock();
+    initFocusMode();
+    initKeyboardShortcuts();
+    initVisibilityHandling();
+    onFirstVisible(dom.tradePanel, initMagneticButtons);
+    onFirstVisible(dom.shell, initParallax);
+    initRipple();
+    initAdaptiveWorkspace();
+    upgradeEmptyStates();
+    initOfflineAwareness();
+    watchChartHealth();
+    initResizeObserver();
+    initPerfMonitor();
+    sessionTick();
+    checkFridaySession();
+  }
+
+  // Watches #section-chart's class list — fires bootTerminalUX() the
+  // first time it gains "active", exactly like chartTerminalBooted does
+  // above, but without touching that code.
+  document.addEventListener('DOMContentLoaded', () => {
+    const section = document.getElementById('section-chart');
+    if (!section) return;
+    if (section.classList.contains('active')) { bootTerminalUX(); return; }
+    const mo = new MutationObserver(() => {
+      if (section.classList.contains('active')) { bootTerminalUX(); mo.disconnect(); }
+    });
+    mo.observe(section, { attributes: true, attributeFilter: ['class'] });
+  });
+
+  // ── cleanup on unload (Phase 4 §12 / Phase 5 §7) ────────────────────
+  window.addEventListener('beforeunload', () => { clearTimeout(sessionTimer); clearTimeout(saveTimer); });
+
+  // ── public API ───────────────────────────────────────────────────
+  window.EdgeTerminal = {
+    state: terminalState,
+    notify, flashPrice, animateNumber, markAdLoaded,
+    setAITyping, focusOnTradeConfirm,
+    checkConsecutiveLosses, checkLeverageRisk,
+    setTheme, sound
+  };
+})();
