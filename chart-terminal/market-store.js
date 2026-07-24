@@ -12,10 +12,12 @@
 //   2. marketStore.setSymbol(...) / setInterval(...)      — control active market
 //
 // ALL brokers in ACTIVE_BROKERS run SIMULTANEOUSLY — this is an AGGREGATE
-// feed, not a switchable single source. Every candle and every order-book
-// level emitted to the rest of the app is the SUM across all active brokers
-// (e.g. Binance + Bybit volume added together). Modules never see per-broker
-// data separately.
+// feed, not a switchable single source. Modules never see per-broker data
+// separately. BUT: only VOLUME is summed across brokers — price (open/high/
+// low/close) always comes from PRIMARY_BROKER alone. Mixing high/low across
+// Binance spot and Bybit futures produces fake wicks (futures/perp price can
+// briefly spike or wick beyond spot during fast moves/liquidations), so price
+// action must stay single-source while volume aggregates underneath it.
 //
 // VOLUME / ORDER BOOK ARE IN DOLLARS (quote-asset value), not base-asset qty:
 //   - candle.volume      → dollar (quote) volume  [candle.volumeBase = asset qty, kept for reference]
@@ -25,6 +27,10 @@
 // ══════════════════════════════════════════════════════════════════════════
 
 (function () {
+
+  // Price (OHLC) always comes from this broker. Every other broker in
+  // ACTIVE_BROKERS only contributes its VOLUME to the aggregate.
+  const PRIMARY_BROKER = 'binance';
 
   // ── Broker registry ─────────────────────────────────────────────────────
   const BROKERS = {
@@ -145,6 +151,7 @@
       const list = json.result && json.result.list ? json.result.list : [];
       // Bybit returns newest-first — reverse to chronological ascending order.
       return list.slice().reverse().map(k => ({
+        broker: 'bybit',
         timestamp: Number(k[0]),
         open: parseFloat(k[1]),
         high: parseFloat(k[2]),
@@ -161,6 +168,7 @@
     if (!res.ok) throw new Error('Binance klines fetch failed: ' + res.status);
     const raw = await res.json();
     return raw.map(k => ({
+      broker: 'binance',
       timestamp: k[0],
       open: parseFloat(k[1]),
       high: parseFloat(k[2]),
@@ -173,8 +181,9 @@
 
   // ── REST: historical candles — AGGREGATE across all active brokers ─────
   // Fetches every broker's history in parallel, then merges candles that
-  // share the same timestamp bucket: price (OHLC) comes from the first
-  // broker present in that bucket, volume is SUMMED across all of them.
+  // share the same timestamp bucket: price (OHLC) ALWAYS comes from
+  // PRIMARY_BROKER (never mixed with another broker's high/low — that's
+  // what was creating fake wicks). Volume is SUMMED across all of them.
   async function fetchCandles(symbol = state.symbol, interval = state.interval, limit = 300) {
     const results = await Promise.allSettled(
       ACTIVE_BROKERS.map(b => fetchOneBrokerCandles(b, symbol, interval, limit))
@@ -194,15 +203,18 @@
 
     const candles = [...byTimestamp.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([timestamp, parts]) => ({
-        timestamp,
-        open: parts[0].open,
-        high: Math.max(...parts.map(p => p.high)),
-        low: Math.min(...parts.map(p => p.low)),
-        close: parts[0].close,
-        volume: parts.reduce((sum, p) => sum + p.volume, 0),
-        volumeBase: parts.reduce((sum, p) => sum + p.volumeBase, 0),
-      }));
+      .map(([timestamp, parts]) => {
+        const primary = parts.find(p => p.broker === PRIMARY_BROKER) || parts[0];
+        return {
+          timestamp,
+          open: primary.open,
+          high: primary.high,
+          low: primary.low,
+          close: primary.close,
+          volume: parts.reduce((sum, p) => sum + p.volume, 0),
+          volumeBase: parts.reduce((sum, p) => sum + p.volumeBase, 0),
+        };
+      });
 
     emit('klineHistory', candles);
     return candles;
@@ -296,25 +308,33 @@
   // Merges the latest per-broker candle into ONE aggregate candle and emits
   // it — ONLY using broker parts whose timestamp matches the just-arrived
   // candle's bucket, so a slower broker's stale previous-bucket candle never
-  // gets summed into the new bucket. This is what fixes the volume-spike bug:
-  // previously a leftover candle from the last minute could get added to the
-  // new minute's volume, producing sudden multi-hundred-K / multi-million jumps.
+  // gets summed into the new bucket (fixes the earlier volume-spike bug).
+  //
+  // Price (open/high/low/close) ALWAYS comes from PRIMARY_BROKER — never
+  // mixed with another broker's high/low. Mixing created fake wicks, since
+  // Bybit (futures/perp) can briefly spike beyond Binance (spot) during fast
+  // moves or liquidations even though neither market alone printed that wick.
+  // Only volume is summed across every broker that has data for this bucket.
   function emitMergedCandle() {
     const timestamps = ACTIVE_BROKERS.filter(b => brokerCandle[b]).map(b => brokerCandle[b].timestamp);
     if (!timestamps.length) return;
     const latestTs = Math.max(...timestamps);
-    const parts = ACTIVE_BROKERS.map(b => brokerCandle[b]).filter(c => c && c.timestamp === latestTs);
+    const parts = ACTIVE_BROKERS
+      .filter(b => brokerCandle[b] && brokerCandle[b].timestamp === latestTs)
+      .map(b => ({ broker: b, candle: brokerCandle[b] }));
     if (!parts.length) return;
+
+    const primary = parts.find(p => p.broker === PRIMARY_BROKER) || parts[0];
 
     const merged = {
       timestamp: latestTs,
-      open: parts[0].open,
-      high: Math.max(...parts.map(p => p.high)),
-      low: Math.min(...parts.map(p => p.low)),
-      close: parts[parts.length - 1].close,
-      volume: parts.reduce((sum, p) => sum + p.volume, 0),
-      volumeBase: parts.reduce((sum, p) => sum + p.volumeBase, 0),
-      isClosed: parts.every(p => p.isClosed),
+      open: primary.candle.open,
+      high: primary.candle.high,
+      low: primary.candle.low,
+      close: primary.candle.close,
+      volume: parts.reduce((sum, p) => sum + p.candle.volume, 0),
+      volumeBase: parts.reduce((sum, p) => sum + p.candle.volumeBase, 0),
+      isClosed: parts.every(p => p.candle.isClosed),
     };
     state.latestPrice = merged.close;
     emit('kline', merged);

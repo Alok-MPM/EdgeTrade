@@ -66,7 +66,7 @@
           <span class="ob-header-title">Order Book</span>
           <span class="ob-header-symbol" id="ob-symbol-label">${formatSymbol(symbol)}</span>
         </div>
-        <div class="ob-col-labels"><span>Price</span><span>Size</span></div>
+        <div class="ob-col-labels"><span>Price</span><span>Size ($)</span></div>
         <div class="ob-body" id="ob-body"><div style="color:var(--muted,#8a8f98);font-size:12px;padding:10px;">Loading order book...</div></div>
         <div class="ob-pressure" id="ob-pressure">
           <div class="ob-pressure-labels">
@@ -91,43 +91,53 @@
   }
 
   // ── Render bid/ask rows + spread + pressure bar ────────────────────
+  // NOTE: market-store now emits each level as {price, qty, total} — total
+  // is the DOLLAR value (price * qty), summed across all active brokers.
+  // "Size" column shows `total` (dollars), not raw asset qty.
   function renderRows(bids, asks) {
     const body = document.getElementById('ob-body');
     if (!body) return;
 
     const topAsks = asks.slice(0, VISIBLE_DEPTH).reverse();
     const topBids = bids.slice(0, VISIBLE_DEPTH);
-    const allQty = [...topAsks, ...topBids].map(x => parseFloat(x[1]));
-    const maxQty = Math.max(...allQty, 0.001);
+    const allTotals = [...topAsks, ...topBids].map(level => level.total);
+    const maxTotal = Math.max(...allTotals, 0.001);
 
     let html = '';
-    topAsks.forEach(([price, qty]) => {
-      const pct = (parseFloat(qty) / maxQty * 100).toFixed(0);
-      html += `<div class="ob-row ask"><div class="ob-bar" style="width:${pct}%"></div><span class="ob-price ask">${parseFloat(price).toFixed(1)}</span><span>${parseFloat(qty).toFixed(4)}</span></div>`;
+    topAsks.forEach(level => {
+      const pct = (level.total / maxTotal * 100).toFixed(0);
+      html += `<div class="ob-row ask"><div class="ob-bar" style="width:${pct}%"></div><span class="ob-price ask">${level.price.toFixed(1)}</span><span>${formatDollar(level.total)}</span></div>`;
     });
 
-    const bestBid = topBids[0] ? parseFloat(topBids[0][0]) : 0;
-    const bestAsk = topAsks[topAsks.length - 1] ? parseFloat(topAsks[topAsks.length - 1][0]) : 0;
+    const bestBid = topBids[0] ? topBids[0].price : 0;
+    const bestAsk = topAsks[topAsks.length - 1] ? topAsks[topAsks.length - 1].price : 0;
     html += `<div class="ob-spread">${bestAsk && bestBid ? (bestAsk - bestBid).toFixed(1) : '--'} spread</div>`;
 
-    topBids.forEach(([price, qty]) => {
-      const pct = (parseFloat(qty) / maxQty * 100).toFixed(0);
-      html += `<div class="ob-row bid"><div class="ob-bar" style="width:${pct}%"></div><span class="ob-price bid">${parseFloat(price).toFixed(1)}</span><span>${parseFloat(qty).toFixed(4)}</span></div>`;
+    topBids.forEach(level => {
+      const pct = (level.total / maxTotal * 100).toFixed(0);
+      html += `<div class="ob-row bid"><div class="ob-bar" style="width:${pct}%"></div><span class="ob-price bid">${level.price.toFixed(1)}</span><span>${formatDollar(level.total)}</span></div>`;
     });
 
     body.innerHTML = html;
 
-    // Buy/Sell pressure — cumulative bid vs ask size across the same visible depth.
-    const totalBidQty = topBids.reduce((sum, [, qty]) => sum + parseFloat(qty), 0);
-    const totalAskQty = topAsks.reduce((sum, [, qty]) => sum + parseFloat(qty), 0);
-    const totalQty = totalBidQty + totalAskQty;
-    const buyPct = totalQty > 0 ? (totalBidQty / totalQty * 100) : 50;
+    // Buy/Sell pressure — cumulative bid vs ask DOLLAR value across the same visible depth.
+    const totalBidValue = topBids.reduce((sum, level) => sum + level.total, 0);
+    const totalAskValue = topAsks.reduce((sum, level) => sum + level.total, 0);
+    const totalValue = totalBidValue + totalAskValue;
+    const buyPct = totalValue > 0 ? (totalBidValue / totalValue * 100) : 50;
     const sellPct = 100 - buyPct;
 
     setText('ob-pressure-buy-pct', buyPct.toFixed(0) + '%');
     setText('ob-pressure-sell-pct', sellPct.toFixed(0) + '%');
     setWidth('ob-pressure-buy', buyPct.toFixed(0) + '%');
     setWidth('ob-pressure-sell', sellPct.toFixed(0) + '%');
+  }
+
+  // Formats a dollar amount like the chart's volume tooltip (e.g. $52.4K, $1.2M).
+  function formatDollar(v) {
+    if (v >= 1000000) return '$' + (v / 1000000).toFixed(2) + 'M';
+    if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'K';
+    return '$' + v.toFixed(0);
   }
 
   function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
