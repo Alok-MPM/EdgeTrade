@@ -29,11 +29,11 @@
   // ── Style ────────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
-    .cs-panes{display:flex;gap:10px;width:100%;}
+    .cs-panes{display:flex;gap:10px;width:100%;flex:1 1 auto;min-height:0;}
     .cs-panes.layout-1{}
     .cs-panes.layout-2h{flex-direction:row;}
     .cs-panes.layout-2v{flex-direction:column;}
-    .cs-pane{flex:1;min-width:0;min-height:280px;position:relative;border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden;}
+    .cs-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column;border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden;}
     .cs-pane-hidden{display:none;}
     .cs-pane-label{position:absolute;top:6px;left:8px;z-index:5;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#8a8f98);background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;}
 
