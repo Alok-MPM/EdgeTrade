@@ -206,6 +206,19 @@
       const isFs = ws.classList.toggle('ct-chart-fullscreen');
       fsBtn.classList.toggle('on', isFs);
       fsBtn.title = isFs ? 'Exit fullscreen' : 'Fullscreen chart';
+
+      // The .cs-panes container CSS resizes correctly right away, but
+      // KLineCharts' own canvas doesn't reliably pick up a sudden,
+      // class-toggle-driven jump this large on its own — it can stay
+      // drawn at its old size, leaving the (correctly-sized) container
+      // looking empty below it. requestAnimationFrame waits one frame so
+      // the browser has actually applied the new CSS box size before we
+      // tell each chart instance to redraw at it.
+      requestAnimationFrame(() => {
+        const mainInstance = chartEngine.getInstance ? chartEngine.getInstance() : null;
+        if (mainInstance && typeof mainInstance.resize === 'function') mainInstance.resize();
+        if (pane2Instance && typeof pane2Instance.resize === 'function') pane2Instance.resize();
+      });
     };
     cockpit.appendChild(fsBtn);
 
