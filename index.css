@@ -1153,7 +1153,7 @@ footer{padding:36px 60px;border-top:1px solid var(--border);display:flex;align-i
 
 /* — Order book / trade terminal side columns (widths only — order-book.js
      and trade-terminal.js already draw their own white-card look) — */
-.ct-terminal-side-col{width:320px;flex-shrink:0;}
+.ct-terminal-side-col{width:260px;flex-shrink:0;}
 
 /* — Bottom Dock (Trade Information: Open Positions / Trade History) — */
 .bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
