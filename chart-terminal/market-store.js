@@ -44,6 +44,7 @@
       id: 'binance-spot',
       exchange: 'binance',
       marketType: 'spot',
+      displayName: 'Binance', // UI-facing label (market-search dropdown's Spot/Perp tabs) — not used in any data logic
       rest: 'https://api.binance.com/api/v3',
       ws: 'wss://stream.binance.com:9443',
     },
@@ -51,6 +52,7 @@
       id: 'binance-perp',
       exchange: 'binance',
       marketType: 'perp',
+      displayName: 'Binance', // UI-facing label (market-search dropdown's Spot/Perp tabs) — not used in any data logic
       rest: 'https://fapi.binance.com/fapi/v1',   // USDT-M perpetual futures
       ws: 'wss://fstream.binance.com',
     },
@@ -58,6 +60,7 @@
       id: 'bybit-spot',
       exchange: 'bybit',
       marketType: 'spot',
+      displayName: 'Bybit', // UI-facing label (market-search dropdown's Spot/Perp tabs) — not used in any data logic
       rest: 'https://api.bybit.com/v5/market',
       ws: 'wss://stream.bybit.com/v5/public/spot',
       category: 'spot',
@@ -66,6 +69,7 @@
       id: 'bybit-perp',
       exchange: 'bybit',
       marketType: 'perp',
+      displayName: 'Bybit', // UI-facing label (market-search dropdown's Spot/Perp tabs) — not used in any data logic
       rest: 'https://api.bybit.com/v5/market',
       ws: 'wss://stream.bybit.com/v5/public/linear', // USDT perpetual (linear) category
       category: 'linear',
@@ -111,19 +115,27 @@
   const state = {
     symbol: 'BTCUSDT',       // active chart symbol, uppercase, no slash
     interval: '1m',          // active chart timeframe (canonical, Binance-style)
-    marketType: DEFAULT_MODE, // 'spot' | 'perp' | 'combined' — which brokers are aggregated
+    marketType: DEFAULT_MODE, // 'spot' | 'perp' | 'combined' — which brokers are aggregated (only used when source==='edge')
+    source: 'edge',          // 'edge' (aggregate, uses marketType above) | a specific broker id (single-broker passthrough, no aggregation)
     watchlist: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'], // Market Overview panel (always Binance spot)
     latestPrice: null,
     latestDepth: null,       // { bids: [{price,qty,total}], asks: [...] } — merged across brokers
   };
 
-  // Brokers currently aggregated together — ALWAYS derived from
-  // state.marketType, never hardcoded. This is what every function below
-  // must call instead of referencing a fixed broker list.
+  // Brokers currently active — normally derived from state.marketType (the
+  // 'edge' aggregate path, unchanged from before). BUT if state.source is a
+  // specific broker id (Spot/Perp tab picked one broker individually), that
+  // ONE broker is the entire active set — the existing merge/sum logic
+  // downstream (emitMergedCandle, fetchCandles) then degenerates naturally
+  // into a plain passthrough of that single broker's data, since summing/
+  // picking-primary across a one-item list just returns that one item.
+  // This is why no other function in this file needs to change for Phase 2.
   function activeBrokerIds() {
+    if (state.source !== 'edge' && BROKERS[state.source]) return [state.source];
     return (MODES[state.marketType] || MODES[DEFAULT_MODE]).brokers;
   }
   function primaryBrokerId() {
+    if (state.source !== 'edge' && BROKERS[state.source]) return state.source;
     return (MODES[state.marketType] || MODES[DEFAULT_MODE]).primary;
   }
 
@@ -165,6 +177,7 @@
     depth: [],         // fires on every order book update: ({symbol, bids, asks}) => {}  — MERGED
     ticker: [],        // fires per watchlist symbol update: ({symbol, close, open}) => {}
     symbolChange: [],  // fires when setSymbol/setInterval changes context: ({symbol, interval, brokers}) => {}
+    symbolListsReady: [], // fires once, after every broker's tradable-symbol list has been fetched: () => {}
     error: [],         // fires on any socket error: ({stream, broker, error}) => {}  — broker = which one failed
   };
 
@@ -275,6 +288,77 @@
 
     emit('klineHistory', candles);
     return candles;
+  }
+
+  // ── REST: per-broker tradable-symbol lists (Phase 3 — market-search dropdown) ──
+  // NOTE: this lives here (not in chart-cockpit.js) on purpose, per this file's
+  // own rule at the top — "no other chart-terminal module talks to a broker
+  // directly". chart-cockpit.js's existing loadBinanceMarkets() predates that
+  // rule being applied to symbol lists; Phase 4 will switch it to call the
+  // functions below instead of fetching Binance directly itself.
+  const brokerSymbolCache = {}; // brokerId -> Set<symbol> | null (null = not loaded / failed)
+  let symbolListsLoaded = false;
+
+  async function fetchOneBrokerSymbols(broker) {
+    const cfg = BROKERS[broker];
+
+    if (cfg.exchange === 'bybit') {
+      const url = `${cfg.rest}/tickers?category=${cfg.category}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(broker + ' symbols fetch failed: ' + res.status);
+      const json = await res.json();
+      if (json.retCode !== 0) throw new Error(broker + ' symbols error: ' + json.retMsg);
+      const list = json.result && json.result.list ? json.result.list : [];
+      return list.map(t => t.symbol).filter(s => s.endsWith('USDT'));
+    }
+
+    // binance (spot or perp — cfg.rest already points at the right host)
+    const url = `${cfg.rest}/ticker/24hr`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(broker + ' symbols fetch failed: ' + res.status);
+    const raw = await res.json();
+    return raw
+      .map(t => t.symbol)
+      .filter(s => s.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(s));
+  }
+
+  // Fetches every registered broker's tradable-symbol list in parallel, once.
+  // Safe to call more than once (e.g. cockpit re-init) — just re-fetches.
+  // A broker whose fetch fails gets an empty Set, not left undefined, so
+  // getBrokersForSymbol() below can treat "loaded but has nothing" and
+  // "still loading" as different, unambiguous states.
+  async function loadBrokerSymbolLists() {
+    symbolListsLoaded = false;
+    const ids = Object.keys(BROKERS);
+    const results = await Promise.allSettled(ids.map(b => fetchOneBrokerSymbols(b)));
+    results.forEach((r, i) => {
+      const broker = ids[i];
+      if (r.status === 'fulfilled') {
+        brokerSymbolCache[broker] = new Set(r.value);
+      } else {
+        console.warn('[market-store] symbol list fetch failed for', broker, r.reason);
+        brokerSymbolCache[broker] = new Set(); // loaded-but-empty, not "still loading"
+      }
+    });
+    symbolListsLoaded = true;
+    emit('symbolListsReady', {});
+  }
+
+  function areSymbolListsReady() {
+    return symbolListsLoaded;
+  }
+
+  // For the market-search dropdown's Spot/Perp tabs: returns only the
+  // brokers (of the given marketType) that actually list this symbol.
+  // Returns [] before loadBrokerSymbolLists() has finished — callers should
+  // check areSymbolListsReady() first to tell "still loading" apart from
+  // "genuinely not available anywhere".
+  function getBrokersForSymbol(symbol, marketType) {
+    const sym = symbol.toUpperCase();
+    return getBrokersForMarketType(marketType).filter(b => {
+      const set = brokerSymbolCache[b.id];
+      return set ? set.has(sym) : false;
+    });
   }
 
   // ── WS: live kline (candle) stream — one socket PER active broker ──────
@@ -597,6 +681,54 @@
     return state.marketType;
   }
 
+  // Closes kline+depth sockets and clears cached data for ONE broker —
+  // used by setSource() below so that narrowing from many active brokers
+  // down to a single one (or widening back to 'edge') doesn't leave stale
+  // sockets running in the background for brokers that are no longer active.
+  function disconnectBrokerStreams(broker) {
+    if (klineSockets[broker]) { klineSockets[broker].onclose = null; try { klineSockets[broker].close(); } catch (e) {} klineSockets[broker] = null; }
+    if (depthSockets[broker]) { depthSockets[broker].onclose = null; try { depthSockets[broker].close(); } catch (e) {} depthSockets[broker] = null; }
+    clearBybitPing('kline_' + broker);
+    clearBybitPing('depth_' + broker);
+    brokerCandle[broker] = null;
+    brokerDepthLevels[broker] = null;
+    if (bybitDepthBooks[broker] !== undefined) bybitDepthBooks[broker] = null;
+  }
+
+  // Switches the "source" layer: 'edge' = today's aggregate behavior (sums
+  // whichever brokers state.marketType selects, unchanged); a specific
+  // broker id = single-broker passthrough, no aggregation at all — used by
+  // the market-search dropdown's Spot/Perp tabs when the user picks ONE
+  // broker individually instead of the aggregated 'EdgeTrade' line.
+  // marketType/setMarketType are untouched by this — 'edge' still reads
+  // whatever marketType is currently set.
+  async function setSource(source) {
+    if (source !== 'edge' && !BROKERS[source]) { console.warn('[market-store] unknown source:', source); return; }
+    state.source = source;
+    const newActive = activeBrokerIds();
+    // Any broker not in the new active set must be fully disconnected —
+    // otherwise switching Edge → single-broker (or back) leaves old sockets
+    // open in the background even though their data is no longer used.
+    Object.keys(BROKERS).forEach(b => { if (!newActive.includes(b)) disconnectBrokerStreams(b); });
+    emit('symbolChange', { symbol: state.symbol, interval: state.interval, brokers: newActive });
+    await fetchCandles(state.symbol, state.interval, 300);
+    connectKline(state.symbol, state.interval);
+    connectDepth(state.symbol);
+  }
+
+  function getSource() {
+    return state.source;
+  }
+
+  // Returns the registry entries for one market type ('spot' | 'perp'), for
+  // the market-search dropdown to render one row per broker under its
+  // Spot/Perp tabs. Purely a read — does not touch connections/state.
+  function getBrokersForMarketType(marketType) {
+    return Object.values(BROKERS)
+      .filter(b => b.marketType === marketType)
+      .map(b => ({ id: b.id, exchange: b.exchange, displayName: b.displayName, marketType: b.marketType }));
+  }
+
   function setWatchlist(symbols) {
     state.watchlist = symbols;
     connectWatchlist(symbols);
@@ -612,6 +744,7 @@
     connectKline(state.symbol, state.interval);
     connectDepth(state.symbol);
     connectWatchlist(state.watchlist);
+    loadBrokerSymbolLists(); // fire-and-forget — populates the market-search dropdown's per-broker availability cache
   }
 
   function disconnectAll() {
@@ -647,6 +780,12 @@
     setInterval: setInterval_,
     setMarketType,
     getMarketType,
+    setSource,
+    getSource,
+    getBrokersForMarketType,
+    getBrokersForSymbol,
+    loadBrokerSymbolLists,
+    areSymbolListsReady,
     setWatchlist,
     fetchCandles,
     disconnectAll,
@@ -663,6 +802,8 @@
     offTicker: (cb) => off('ticker', cb),
     onSymbolChange: (cb) => on('symbolChange', cb),
     offSymbolChange: (cb) => off('symbolChange', cb),
+    onSymbolListsReady: (cb) => on('symbolListsReady', cb),
+    offSymbolListsReady: (cb) => off('symbolListsReady', cb),
     onError: (cb) => on('error', cb),
     offError: (cb) => off('error', cb),
   };
