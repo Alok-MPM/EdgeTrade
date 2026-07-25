@@ -29,7 +29,7 @@
   // ── Style ────────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
-    .cs-panes{display:flex;gap:10px;width:100%;flex:1 1 auto;min-height:0;}
+    .cs-panes{display:flex;gap:10px;width:100%;height:620px;flex-shrink:0;}
     .cs-panes.layout-1{}
     .cs-panes.layout-2h{flex-direction:row;}
     .cs-panes.layout-2v{flex-direction:column;}
