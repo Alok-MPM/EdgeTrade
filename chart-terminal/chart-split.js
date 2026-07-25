@@ -37,16 +37,17 @@
     .cs-pane-hidden{display:none;}
     .cs-pane-label{position:absolute;top:6px;left:8px;z-index:5;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#8a8f98);background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;}
 
-    .cs-dd{padding:10px;min-width:230px;}
+    .cs-dd{padding:10px;min-width:230px;left:auto;right:0;}
     .cs-grid-list{display:flex;gap:8px;margin-bottom:10px;}
-    .cs-grid-opt{flex:1;aspect-ratio:1;border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:6px;cursor:pointer;display:flex;padding:4px;gap:3px;background:var(--bg);}
+    .cs-grid-opt{width:42px;height:42px;flex:0 0 auto;border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:6px;cursor:pointer;display:flex;padding:6px;gap:3px;background:var(--bg);}
     .cs-grid-opt.active{border-color:var(--gold);background:var(--gold-dim);}
     .cs-grid-opt-1{}
-    .cs-grid-opt-1 .cs-swatch{width:100%;height:100%;background:var(--bg4);border-radius:2px;}
+    .cs-grid-opt-1 .cs-swatch{width:100%;height:100%;border:1.5px solid var(--muted,#8a8f98);border-radius:2px;background:transparent;box-sizing:border-box;}
     .cs-grid-opt-2h{flex-direction:row;}
-    .cs-grid-opt-2h .cs-swatch{flex:1;background:var(--bg4);border-radius:2px;}
+    .cs-grid-opt-2h .cs-swatch{flex:1;border:1.5px solid var(--muted,#8a8f98);border-radius:2px;background:transparent;box-sizing:border-box;}
     .cs-grid-opt-2v{flex-direction:column;}
-    .cs-grid-opt-2v .cs-swatch{flex:1;background:var(--bg4);border-radius:2px;}
+    .cs-grid-opt-2v .cs-swatch{flex:1;border:1.5px solid var(--muted,#8a8f98);border-radius:2px;background:transparent;box-sizing:border-box;}
+    .cs-grid-opt.active .cs-swatch{border-color:var(--gold);}
 
     .cs-sync-title{font-size:11px;color:var(--muted,#8a8f98);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
     .cs-sync-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:12.5px;color:var(--text,#EAECEF);}
@@ -59,7 +60,7 @@
 
     .cs-icon-btn{padding:7px 10px;}
     .cs-ico{display:flex;width:15px;height:15px;gap:2px;flex-shrink:0;}
-    .cs-ico i{background:currentColor;border-radius:2px;display:block;}
+    .cs-ico i{border:1.5px solid currentColor;border-radius:2px;display:block;box-sizing:border-box;}
     .cs-ico-1{}
     .cs-ico-1 i{width:100%;height:100%;}
     .cs-ico-2h{flex-direction:row;}
