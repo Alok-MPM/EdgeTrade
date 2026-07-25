@@ -30,6 +30,11 @@
   const style = document.createElement('style');
   style.textContent = `
     .cs-panes{display:flex;gap:10px;width:100%;height:620px;flex-shrink:0;}
+    /* Fullscreen gives .chart-workspace a real, definite viewport height
+       (position:fixed;inset:0 from index.css), so here — and only here —
+       it's safe to let the panes flex-fill that height instead of staying
+       locked at 620px, otherwise a dead gap is left below the chart. */
+    .chart-workspace.ct-chart-fullscreen .cs-panes{height:auto;flex:1 1 auto;min-height:0;}
     .cs-panes.layout-1{}
     .cs-panes.layout-2h{flex-direction:row;}
     .cs-panes.layout-2v{flex-direction:column;}
@@ -73,6 +78,15 @@
     .cs-ico-fs i:nth-child(2){top:0;right:0;border-left:none;border-bottom:none;}
     .cs-ico-fs i:nth-child(3){bottom:0;left:0;border-right:none;border-top:none;}
     .cs-ico-fs i:nth-child(4){bottom:0;right:0;border-left:none;border-top:none;}
+
+    /* Fullscreen must fully own the screen. Instead of relying on
+       z-index/paint order (fragile — some mobile browsers don't repaint a
+       freshly-fixed element right away, letting old content flash through),
+       we explicitly remove the side panels and bottom dock from the render
+       tree for the duration of fullscreen. This makes bleed-through
+       impossible rather than just visually unlikely. */
+    .top-row:has(.chart-workspace.ct-chart-fullscreen) .ct-terminal-side-col{display:none;}
+    .workspace-shell:has(.chart-workspace.ct-chart-fullscreen) .bottom-dock{display:none;}
   `;
   document.head.appendChild(style);
 
