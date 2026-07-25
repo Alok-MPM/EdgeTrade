@@ -38,7 +38,15 @@
     .cs-panes.layout-1{}
     .cs-panes.layout-2h{flex-direction:row;}
     .cs-panes.layout-2v{flex-direction:column;}
-    .cs-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column;border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden;}
+    .cs-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column;background:var(--bg2,#111317);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden;}
+    /* KLineCharts' own canvas is transparent by design (chart-engine.js never
+       sets a pane background) — it always relied on this container's CSS
+       background showing through. That's fine at normal size, but on the
+       big, sudden resize into fullscreen the canvas can lag a beat behind,
+       exposing whatever's underneath. Forcing the background directly on
+       the chart's own container (not just an ancestor) means there's never
+       a gap to show through, regardless of canvas resize timing. */
+    #klineMainChart,#klineChart2{background:var(--bg2,#111317);}
     .cs-pane-hidden{display:none;}
     .cs-pane-label{position:absolute;top:6px;left:8px;z-index:5;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#8a8f98);background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;}
 
