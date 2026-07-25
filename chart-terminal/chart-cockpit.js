@@ -55,7 +55,7 @@
   document.head.appendChild(style);
 
   // ── State ────────────────────────────────────────────────────────────
-  let tabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', indicators: [] }];
+  let tabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', marketType: 'spot', indicators: [] }];
   let activeTabId = 1;
   let nextTabId = 2;
   let binanceMarkets = null; // cached top-150 USDT pair list, for the market search dropdown
@@ -63,6 +63,7 @@
   let mountEl = null;
 
   const CHART_TYPE_LABELS = { candle_solid: 'Candle', candle_stroke: 'Hollow', ohlc: 'OHLC', area: 'Area' };
+  const MARKET_TYPE_LABELS = { spot: 'Spot', perp: 'Perp', combined: 'Combined' };
   const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
   const INDICATORS = [
     { name: 'MA', overlay: true }, { name: 'EMA', overlay: true }, { name: 'BOLL', overlay: true },
@@ -76,7 +77,7 @@
 
     render();
     chartEngine.init({ containerId: opts.chartContainerId || 'klineMainChart' });
-    marketStore.init({ symbol: tabs[0].symbol, interval: tabs[0].interval });
+    marketStore.init({ symbol: tabs[0].symbol, interval: tabs[0].interval, marketType: tabs[0].marketType });
 
     loadBinanceMarkets(); // fire and forget, populates dropdown when ready
 
@@ -112,6 +113,15 @@
           </button>
           <div class="ctc-dd" id="ctc-tf-dd">
             <div class="ctc-dd-list">${TIMEFRAMES.map(tf => `<div class="ctc-dd-item${tf === activeTab().interval ? ' active' : ''}" data-tf="${tf}">${tf}</div>`).join('')}</div>
+          </div>
+        </div>
+
+        <div class="ctc-wrap" id="ctc-mt-wrap">
+          <button class="ctc-pill" id="ctc-mt-btn"><span id="ctc-mt-label">${MARKET_TYPE_LABELS[activeTab().marketType]}</span>
+            <svg class="ctc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="ctc-dd" id="ctc-mt-dd">
+            <div class="ctc-dd-list">${Object.keys(MARKET_TYPE_LABELS).map(m => `<div class="ctc-dd-item${m === activeTab().marketType ? ' active' : ''}" data-mt="${m}">${MARKET_TYPE_LABELS[m]}</div>`).join('')}</div>
           </div>
         </div>
 
@@ -172,12 +182,17 @@
 
     document.getElementById('ctc-market-btn').onclick = () => toggleDropdown('ctc-market-dd');
     document.getElementById('ctc-tf-btn').onclick = () => toggleDropdown('ctc-tf-dd');
+    document.getElementById('ctc-mt-btn').onclick = () => toggleDropdown('ctc-mt-dd');
     document.getElementById('ctc-ct-btn').onclick = () => toggleDropdown('ctc-ct-dd');
     document.getElementById('ctc-ind-btn').onclick = () => toggleDropdown('ctc-ind-dd');
 
     document.getElementById('ctc-tf-dd').addEventListener('click', (e) => {
       const tf = e.target.getAttribute('data-tf');
       if (tf) selectTimeframe(tf);
+    });
+    document.getElementById('ctc-mt-dd').addEventListener('click', (e) => {
+      const mt = e.target.getAttribute('data-mt');
+      if (mt) selectMarketType(mt);
     });
     document.getElementById('ctc-ct-dd').addEventListener('click', (e) => {
       const ct = e.target.getAttribute('data-ct');
@@ -242,6 +257,16 @@
     await marketStore.setInterval(tf);
   }
 
+  async function selectMarketType(mode) {
+    closeAllDropdowns();
+    const tab = activeTab();
+    if (mode === tab.marketType) return;
+    tab.marketType = mode;
+    document.getElementById('ctc-mt-label').textContent = MARKET_TYPE_LABELS[mode];
+    document.querySelectorAll('#ctc-mt-dd .ctc-dd-item').forEach(el => el.classList.toggle('active', el.getAttribute('data-mt') === mode));
+    await marketStore.setMarketType(mode);
+  }
+
   function selectChartType(type) {
     closeAllDropdowns();
     const tab = activeTab();
@@ -274,7 +299,7 @@
   // ── Tabs ────────────────────────────────────────────────────────────
   async function addTab() {
     const fromSymbol = activeTab().symbol;
-    const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', indicators: [] };
+    const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', marketType: 'spot', indicators: [] };
     tabs.push(tab);
     await switchTab(tab.id);
 
@@ -294,6 +319,7 @@
     // Restore this tab's saved config into market-store + chart-engine.
     document.getElementById('ctc-market-label').textContent = formatSymbol(tab.symbol);
     document.getElementById('ctc-tf-label').textContent = tab.interval;
+    document.getElementById('ctc-mt-label').textContent = MARKET_TYPE_LABELS[tab.marketType];
     document.getElementById('ctc-ct-label').textContent = CHART_TYPE_LABELS[tab.chartType];
     chartEngine.setChartType(tab.chartType);
 
@@ -317,6 +343,9 @@
       window.chartSplit.handleTabChangeIfNeeded();
     }
 
+    if (marketStore.getMarketType() !== tab.marketType) {
+      await marketStore.setMarketType(tab.marketType);
+    }
     await marketStore.setSymbol(tab.symbol, tab.interval);
   }
 
