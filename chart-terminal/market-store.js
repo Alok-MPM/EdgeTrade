@@ -7,17 +7,23 @@
 //
 //   Binance / Bybit WS  →  market-store.js  →  (events)  →  every other module
 //
-// Other modules only ever do two things with this file:
+// Other modules only ever do three things with this file:
 //   1. marketStore.onXxx(callback)                       — subscribe to a data stream
 //   2. marketStore.setSymbol(...) / setInterval(...)      — control active market
+//   3. marketStore.setMarketType('spot'|'perp'|'combined') — control which brokers aggregate
 //
-// ALL brokers in ACTIVE_BROKERS run SIMULTANEOUSLY — this is an AGGREGATE
-// feed, not a switchable single source. Modules never see per-broker data
-// separately. BUT: only VOLUME is summed across brokers — price (open/high/
-// low/close) always comes from PRIMARY_BROKER alone. Mixing high/low across
-// Binance spot and Bybit futures produces fake wicks (futures/perp price can
-// briefly spike or wick beyond spot during fast moves/liquidations), so price
-// action must stay single-source while volume aggregates underneath it.
+// THREE MARKET-TYPE MODES (see MODES below), only one active at a time:
+//   'spot'     → Binance spot     + Bybit spot
+//   'perp'     → Binance USDT-M perp (futures) + Bybit linear (perp)
+//   'combined' → all four of the above, summed together
+// Whichever brokers are active for the current mode run SIMULTANEOUSLY —
+// this is an AGGREGATE feed within that mode, not a switchable single
+// source. Modules never see per-broker data separately. BUT: only VOLUME is
+// summed across the active brokers — price (open/high/low/close) always
+// comes from that mode's single primary broker. Mixing high/low across spot
+// and perp produces fake wicks (perp price can briefly spike or wick beyond
+// spot during fast moves/liquidations), so price action must stay
+// single-source while volume aggregates underneath it.
 //
 // VOLUME / ORDER BOOK ARE IN DOLLARS (quote-asset value), not base-asset qty:
 //   - candle.volume      → dollar (quote) volume  [candle.volumeBase = asset qty, kept for reference]
@@ -28,24 +34,59 @@
 
 (function () {
 
-  // Price (OHLC) always comes from this broker. Every other broker in
-  // ACTIVE_BROKERS only contributes its VOLUME to the aggregate.
-  const PRIMARY_BROKER = 'binance';
-
   // ── Broker registry ─────────────────────────────────────────────────────
+  // Keyed by composite id "<exchange>-<marketType>" so spot and perp are
+  // always separate broker entries, never conflated. `exchange` and
+  // `marketType` are read by every function below instead of comparing
+  // against a hardcoded literal like 'bybit' or 'binance'.
   const BROKERS = {
-    binance: {
-      id: 'binance',
+    'binance-spot': {
+      id: 'binance-spot',
+      exchange: 'binance',
+      marketType: 'spot',
       rest: 'https://api.binance.com/api/v3',
       ws: 'wss://stream.binance.com:9443',
     },
-    bybit: {
-      id: 'bybit',
+    'binance-perp': {
+      id: 'binance-perp',
+      exchange: 'binance',
+      marketType: 'perp',
+      rest: 'https://fapi.binance.com/fapi/v1',   // USDT-M perpetual futures
+      ws: 'wss://fstream.binance.com',
+    },
+    'bybit-spot': {
+      id: 'bybit-spot',
+      exchange: 'bybit',
+      marketType: 'spot',
+      rest: 'https://api.bybit.com/v5/market',
+      ws: 'wss://stream.bybit.com/v5/public/spot',
+      category: 'spot',
+    },
+    'bybit-perp': {
+      id: 'bybit-perp',
+      exchange: 'bybit',
+      marketType: 'perp',
       rest: 'https://api.bybit.com/v5/market',
       ws: 'wss://stream.bybit.com/v5/public/linear', // USDT perpetual (linear) category
       category: 'linear',
     },
   };
+
+  // Which broker ids are aggregated together for each market-type mode, and
+  // which one of them is PRIMARY (source of OHLC) in that mode — every other
+  // active broker only contributes its VOLUME to the aggregate. OHLC is
+  // NEVER mixed across brokers (fake-wick reasoning above still applies:
+  // perp price can wick beyond spot during fast moves/liquidations).
+  //
+  // Default mode is 'spot' — matches the volumes that were already
+  // confirmed correct before Bybit (perp) was added, so behavior doesn't
+  // silently change until a UI toggle explicitly calls setMarketType().
+  const MODES = {
+    spot:     { brokers: ['binance-spot', 'bybit-spot'],                               primary: 'binance-spot' },
+    perp:     { brokers: ['binance-perp', 'bybit-perp'],                               primary: 'binance-perp' },
+    combined: { brokers: ['binance-spot', 'binance-perp', 'bybit-spot', 'bybit-perp'], primary: 'binance-spot' },
+  };
+  const DEFAULT_MODE = 'spot';
 
   // Binance-style interval strings ('1m','1h','1d',...) are the canonical
   // format used everywhere in this file's public API. Convert to Bybit's
@@ -66,32 +107,42 @@
   // Bybit public WS needs a client ping roughly every 20s or it disconnects.
   const BYBIT_PING_INTERVAL_MS = 20000;
 
-  // Brokers that are aggregated together. Always all of these, all the time.
-  const ACTIVE_BROKERS = ['binance', 'bybit'];
-
   // ── Internal state ────────────────────────────────────────────────────
   const state = {
     symbol: 'BTCUSDT',       // active chart symbol, uppercase, no slash
     interval: '1m',          // active chart timeframe (canonical, Binance-style)
-    watchlist: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'], // Market Overview panel (always Binance)
+    marketType: DEFAULT_MODE, // 'spot' | 'perp' | 'combined' — which brokers are aggregated
+    watchlist: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'], // Market Overview panel (always Binance spot)
     latestPrice: null,
     latestDepth: null,       // { bids: [{price,qty,total}], asks: [...] } — merged across brokers
   };
 
+  // Brokers currently aggregated together — ALWAYS derived from
+  // state.marketType, never hardcoded. This is what every function below
+  // must call instead of referencing a fixed broker list.
+  function activeBrokerIds() {
+    return (MODES[state.marketType] || MODES[DEFAULT_MODE]).brokers;
+  }
+  function primaryBrokerId() {
+    return (MODES[state.marketType] || MODES[DEFAULT_MODE]).primary;
+  }
+
   // ── Internal sockets (never exposed directly) — one PER broker per stream ──
-  const klineSockets = { binance: null, bybit: null };
-  const depthSockets = { binance: null, bybit: null };
+  const klineSockets = { 'binance-spot': null, 'binance-perp': null, 'bybit-spot': null, 'bybit-perp': null };
+  const depthSockets = { 'binance-spot': null, 'binance-perp': null, 'bybit-spot': null, 'bybit-perp': null };
   let watchlistSocket = null;
   let watchlistReconnectAttempt = 0;
 
   // Latest raw (already dollar-denominated) candle / depth levels from EACH
   // broker — used to build the merged/aggregate candle and order book.
-  const brokerCandle = { binance: null, bybit: null };
-  const brokerDepthLevels = { binance: null, bybit: null };
+  const brokerCandle = { 'binance-spot': null, 'binance-perp': null, 'bybit-spot': null, 'bybit-perp': null };
+  const brokerDepthLevels = { 'binance-spot': null, 'binance-perp': null, 'bybit-spot': null, 'bybit-perp': null };
 
-  // Bybit orderbook is delta-based — we maintain a local price->qty book and
-  // re-derive the top levels on every message. Reset whenever depth reconnects.
-  let bybitDepthBook = null; // { bids: Map<price,qty>, asks: Map<price,qty> }
+  // Bybit orderbook is delta-based — we maintain a local price->qty book per
+  // Bybit broker (spot and perp are two INDEPENDENT connections/books now,
+  // not one) and re-derive the top levels on every message. Reset whenever
+  // that broker's depth socket reconnects.
+  const bybitDepthBooks = { 'bybit-spot': null, 'bybit-perp': null }; // { bids: Map<price,qty>, asks: Map<price,qty> }
 
   // Bybit requires a client-side ping heartbeat per open connection.
   const pingIntervals = { kline: null, depth: null, watchlist: null };
@@ -141,17 +192,19 @@
 
   // ── REST: historical candles per broker (internal helper, not exposed) ─
   async function fetchOneBrokerCandles(broker, symbol, interval, limit) {
-    if (broker === 'bybit') {
+    const cfg = BROKERS[broker];
+
+    if (cfg.exchange === 'bybit') {
       const bybitInterval = toBybitInterval(interval);
-      const url = `${BROKERS.bybit.rest}/kline?category=${BROKERS.bybit.category}&symbol=${symbol}&interval=${bybitInterval}&limit=${limit}`;
+      const url = `${cfg.rest}/kline?category=${cfg.category}&symbol=${symbol}&interval=${bybitInterval}&limit=${limit}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error('Bybit klines fetch failed: ' + res.status);
+      if (!res.ok) throw new Error(cfg.id + ' klines fetch failed: ' + res.status);
       const json = await res.json();
-      if (json.retCode !== 0) throw new Error('Bybit klines error: ' + json.retMsg);
+      if (json.retCode !== 0) throw new Error(cfg.id + ' klines error: ' + json.retMsg);
       const list = json.result && json.result.list ? json.result.list : [];
       // Bybit returns newest-first — reverse to chronological ascending order.
       return list.slice().reverse().map(k => ({
-        broker: 'bybit',
+        broker: cfg.id,
         timestamp: Number(k[0]),
         open: parseFloat(k[1]),
         high: parseFloat(k[2]),
@@ -162,13 +215,15 @@
       }));
     }
 
-    // default: binance
-    const url = `${BROKERS.binance.rest}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    // binance (spot or perp — cfg.rest already points at the right host:
+    // api.binance.com for spot, fapi.binance.com for perp; response shape
+    // is identical between the two so parsing doesn't need to branch)
+    const url = `${cfg.rest}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('Binance klines fetch failed: ' + res.status);
+    if (!res.ok) throw new Error(cfg.id + ' klines fetch failed: ' + res.status);
     const raw = await res.json();
     return raw.map(k => ({
-      broker: 'binance',
+      broker: cfg.id,
       timestamp: k[0],
       open: parseFloat(k[1]),
       high: parseFloat(k[2]),
@@ -182,17 +237,18 @@
   // ── REST: historical candles — AGGREGATE across all active brokers ─────
   // Fetches every broker's history in parallel, then merges candles that
   // share the same timestamp bucket: price (OHLC) ALWAYS comes from
-  // PRIMARY_BROKER (never mixed with another broker's high/low — that's
+  // the current mode's primary broker (never mixed with another broker's high/low — that's
   // what was creating fake wicks). Volume is SUMMED across all of them.
   async function fetchCandles(symbol = state.symbol, interval = state.interval, limit = 300) {
+    const activeBrokers = activeBrokerIds();
     const results = await Promise.allSettled(
-      ACTIVE_BROKERS.map(b => fetchOneBrokerCandles(b, symbol, interval, limit))
+      activeBrokers.map(b => fetchOneBrokerCandles(b, symbol, interval, limit))
     );
 
     const byTimestamp = new Map();
     results.forEach((r, i) => {
       if (r.status !== 'fulfilled') {
-        console.warn('[market-store] history fetch failed for', ACTIVE_BROKERS[i], r.reason);
+        console.warn('[market-store] history fetch failed for', activeBrokers[i], r.reason);
         return;
       }
       r.value.forEach(c => {
@@ -201,16 +257,17 @@
       });
     });
 
+    const primary = primaryBrokerId();
     const candles = [...byTimestamp.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([timestamp, parts]) => {
-        const primary = parts.find(p => p.broker === PRIMARY_BROKER) || parts[0];
+        const primaryPart = parts.find(p => p.broker === primary) || parts[0];
         return {
           timestamp,
-          open: primary.open,
-          high: primary.high,
-          low: primary.low,
-          close: primary.close,
+          open: primaryPart.open,
+          high: primaryPart.high,
+          low: primaryPart.low,
+          close: primaryPart.close,
           volume: parts.reduce((sum, p) => sum + p.volume, 0),
           volumeBase: parts.reduce((sum, p) => sum + p.volumeBase, 0),
         };
@@ -220,29 +277,30 @@
     return candles;
   }
 
-  // ── WS: live kline (candle) stream — one socket PER broker, always both ──
+  // ── WS: live kline (candle) stream — one socket PER active broker ──────
   function connectKline(symbol = state.symbol, interval = state.interval) {
-    ACTIVE_BROKERS.forEach(broker => connectKlineForBroker(broker, symbol, interval));
+    activeBrokerIds().forEach(broker => connectKlineForBroker(broker, symbol, interval));
   }
 
-  const klineAttempts = { binance: 0, bybit: 0 };
+  const klineAttempts = {};
 
   function connectKlineForBroker(broker, symbol, interval) {
+    const cfg = BROKERS[broker];
     if (klineSockets[broker]) { klineSockets[broker].onclose = null; try { klineSockets[broker].close(); } catch (e) {} klineSockets[broker] = null; }
     clearBybitPing('kline_' + broker);
     brokerCandle[broker] = null; // stale candle from old symbol/interval must not leak into the merge
 
-    if (broker === 'bybit') {
-      const url = BROKERS.bybit.ws;
+    if (cfg.exchange === 'bybit') {
+      const url = cfg.ws;
       const bybitInterval = toBybitInterval(interval);
       const topic = `kline.${bybitInterval}.${symbol}`;
       const sock = new WebSocket(url);
-      klineSockets.bybit = sock;
+      klineSockets[broker] = sock;
 
       sock.onopen = () => {
-        klineAttempts.bybit = 0;
+        klineAttempts[broker] = 0;
         sock.send(JSON.stringify({ op: 'subscribe', args: [topic] }));
-        startBybitPing(sock, 'kline_bybit');
+        startBybitPing(sock, 'kline_' + broker);
       };
 
       sock.onmessage = (event) => {
@@ -250,7 +308,7 @@
         if (msg.topic !== topic || !msg.data) return;
         const list = Array.isArray(msg.data) ? msg.data : [msg.data];
         list.forEach(k => {
-          brokerCandle.bybit = {
+          brokerCandle[broker] = {
             timestamp: Number(k.start),
             open: parseFloat(k.open),
             high: parseFloat(k.high),
@@ -264,27 +322,28 @@
         });
       };
 
-      sock.onerror = (err) => emit('error', { stream: 'kline', broker: 'bybit', error: err });
+      sock.onerror = (err) => emit('error', { stream: 'kline', broker, error: err });
 
       sock.onclose = () => {
-        clearBybitPing('kline_bybit');
-        if (klineSockets.bybit !== sock) return; // a newer connection has already replaced this one
-        scheduleReconnect('kline_bybit', () => connectKlineForBroker('bybit', state.symbol, state.interval));
+        clearBybitPing('kline_' + broker);
+        if (klineSockets[broker] !== sock) return; // a newer connection has already replaced this one
+        scheduleReconnect('kline_' + broker, () => connectKlineForBroker(broker, state.symbol, state.interval));
       };
       return;
     }
 
-    // binance
-    const url = `${BROKERS.binance.ws}/ws/${symbol.toLowerCase()}@kline_${interval}`;
+    // binance (spot or perp — cfg.ws already points at the right host:
+    // stream.binance.com for spot, fstream.binance.com for perp)
+    const url = `${cfg.ws}/ws/${symbol.toLowerCase()}@kline_${interval}`;
     const sock = new WebSocket(url);
-    klineSockets.binance = sock;
+    klineSockets[broker] = sock;
 
-    sock.onopen = () => { klineAttempts.binance = 0; };
+    sock.onopen = () => { klineAttempts[broker] = 0; };
 
     sock.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       const k = msg.k;
-      brokerCandle.binance = {
+      brokerCandle[broker] = {
         timestamp: k.t,
         open: parseFloat(k.o),
         high: parseFloat(k.h),
@@ -297,11 +356,11 @@
       emitMergedCandle();
     };
 
-    sock.onerror = (err) => emit('error', { stream: 'kline', broker: 'binance', error: err });
+    sock.onerror = (err) => emit('error', { stream: 'kline', broker, error: err });
 
     sock.onclose = () => {
-      if (klineSockets.binance !== sock) return;
-      scheduleReconnect('kline_binance', () => connectKlineForBroker('binance', state.symbol, state.interval));
+      if (klineSockets[broker] !== sock) return;
+      scheduleReconnect('kline_' + broker, () => connectKlineForBroker(broker, state.symbol, state.interval));
     };
   }
 
@@ -310,21 +369,22 @@
   // candle's bucket, so a slower broker's stale previous-bucket candle never
   // gets summed into the new bucket (fixes the earlier volume-spike bug).
   //
-  // Price (open/high/low/close) ALWAYS comes from PRIMARY_BROKER — never
+  // Price (open/high/low/close) ALWAYS comes from the current mode's primary broker — never
   // mixed with another broker's high/low. Mixing created fake wicks, since
   // Bybit (futures/perp) can briefly spike beyond Binance (spot) during fast
   // moves or liquidations even though neither market alone printed that wick.
   // Only volume is summed across every broker that has data for this bucket.
   function emitMergedCandle() {
-    const timestamps = ACTIVE_BROKERS.filter(b => brokerCandle[b]).map(b => brokerCandle[b].timestamp);
+    const activeBrokers = activeBrokerIds();
+    const timestamps = activeBrokers.filter(b => brokerCandle[b]).map(b => brokerCandle[b].timestamp);
     if (!timestamps.length) return;
     const latestTs = Math.max(...timestamps);
-    const parts = ACTIVE_BROKERS
+    const parts = activeBrokers
       .filter(b => brokerCandle[b] && brokerCandle[b].timestamp === latestTs)
       .map(b => ({ broker: b, candle: brokerCandle[b] }));
     if (!parts.length) return;
 
-    const primary = parts.find(p => p.broker === PRIMARY_BROKER) || parts[0];
+    const primary = parts.find(p => p.broker === primaryBrokerId()) || parts[0];
 
     const merged = {
       timestamp: latestTs,
@@ -340,90 +400,93 @@
     emit('kline', merged);
   }
 
-  // ── WS: live order book depth stream — one socket PER broker, always both ──
+  // ── WS: live order book depth stream — one socket PER active broker ────
   function connectDepth(symbol = state.symbol) {
-    ACTIVE_BROKERS.forEach(broker => connectDepthForBroker(broker, symbol));
+    activeBrokerIds().forEach(broker => connectDepthForBroker(broker, symbol));
   }
 
   function connectDepthForBroker(broker, symbol) {
+    const cfg = BROKERS[broker];
     if (depthSockets[broker]) { depthSockets[broker].onclose = null; try { depthSockets[broker].close(); } catch (e) {} depthSockets[broker] = null; }
     clearBybitPing('depth_' + broker);
     brokerDepthLevels[broker] = null; // stale book from old symbol must not leak into the merge
 
-    if (broker === 'bybit') {
-      bybitDepthBook = { bids: new Map(), asks: new Map() };
-      const url = BROKERS.bybit.ws;
+    if (cfg.exchange === 'bybit') {
+      bybitDepthBooks[broker] = { bids: new Map(), asks: new Map() };
+      const url = cfg.ws;
       const topic = `orderbook.50.${symbol}`;
       const sock = new WebSocket(url);
-      depthSockets.bybit = sock;
+      depthSockets[broker] = sock;
 
       sock.onopen = () => {
         sock.send(JSON.stringify({ op: 'subscribe', args: [topic] }));
-        startBybitPing(sock, 'depth_bybit');
+        startBybitPing(sock, 'depth_' + broker);
       };
 
       sock.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.topic !== topic || !msg.data) return;
-        applyBybitDepthMessage(msg.type, msg.data);
+        applyBybitDepthMessage(broker, msg.type, msg.data);
       };
 
-      sock.onerror = (err) => emit('error', { stream: 'depth', broker: 'bybit', error: err });
+      sock.onerror = (err) => emit('error', { stream: 'depth', broker, error: err });
 
       sock.onclose = () => {
-        clearBybitPing('depth_bybit');
-        if (depthSockets.bybit !== sock) return;
-        scheduleReconnect('depth_bybit', () => connectDepthForBroker('bybit', state.symbol));
+        clearBybitPing('depth_' + broker);
+        if (depthSockets[broker] !== sock) return;
+        scheduleReconnect('depth_' + broker, () => connectDepthForBroker(broker, state.symbol));
       };
       return;
     }
 
-    // binance
-    const url = `${BROKERS.binance.ws}/ws/${symbol.toLowerCase()}@depth20@100ms`;
+    // binance (spot or perp — cfg.ws already points at the right host)
+    const url = `${cfg.ws}/ws/${symbol.toLowerCase()}@depth20@100ms`;
     const sock = new WebSocket(url);
-    depthSockets.binance = sock;
+    depthSockets[broker] = sock;
 
     sock.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      brokerDepthLevels.binance = {
+      brokerDepthLevels[broker] = {
         bids: (data.bids || []).map(([price, qty]) => toDollarLevel(price, qty)),
         asks: (data.asks || []).map(([price, qty]) => toDollarLevel(price, qty)),
       };
       emitMergedDepth(symbol);
     };
 
-    sock.onerror = (err) => emit('error', { stream: 'depth', broker: 'binance', error: err });
+    sock.onerror = (err) => emit('error', { stream: 'depth', broker, error: err });
 
     sock.onclose = () => {
-      if (depthSockets.binance !== sock) return;
-      scheduleReconnect('depth_binance', () => connectDepthForBroker('binance', state.symbol));
+      if (depthSockets[broker] !== sock) return;
+      scheduleReconnect('depth_' + broker, () => connectDepthForBroker(broker, state.symbol));
     };
   }
 
   // Bybit orderbook.50 delivers a full "snapshot" first, then "delta" messages
   // where a level with qty "0" means "remove this price". We keep a running
-  // book locally and re-derive the sorted dollar-value levels each time.
-  function applyBybitDepthMessage(type, data) {
-    if (!bybitDepthBook) bybitDepthBook = { bids: new Map(), asks: new Map() };
+  // book locally PER Bybit broker (spot and perp books are independent) and
+  // re-derive the sorted dollar-value levels each time.
+  function applyBybitDepthMessage(brokerId, type, data) {
+    if (!bybitDepthBooks[brokerId]) bybitDepthBooks[brokerId] = { bids: new Map(), asks: new Map() };
+    const book = bybitDepthBooks[brokerId];
     if (type === 'snapshot') {
-      bybitDepthBook.bids.clear();
-      bybitDepthBook.asks.clear();
+      book.bids.clear();
+      book.asks.clear();
     }
 
     (data.b || []).forEach(([price, qty]) => {
       const q = parseFloat(qty);
-      if (q === 0) bybitDepthBook.bids.delete(price);
-      else bybitDepthBook.bids.set(price, q);
+      if (q === 0) book.bids.delete(price);
+      else book.bids.set(price, q);
     });
     (data.a || []).forEach(([price, qty]) => {
       const q = parseFloat(qty);
-      if (q === 0) bybitDepthBook.asks.delete(price);
-      else bybitDepthBook.asks.set(price, q);
+      if (q === 0) book.asks.delete(price);
+      else book.asks.set(price, q);
     });
 
-    brokerDepthLevels.bybit = {
-      bids: [...bybitDepthBook.bids.entries()].map(([price, qty]) => toDollarLevel(price, qty)),
-      asks: [...bybitDepthBook.asks.entries()].map(([price, qty]) => toDollarLevel(price, qty)),
+    brokerDepthLevels[brokerId] = {
+      bids: [...book.bids.entries()].map(([price, qty]) => toDollarLevel(price, qty)),
+      asks: [...book.asks.entries()].map(([price, qty]) => toDollarLevel(price, qty)),
     };
     emitMergedDepth(state.symbol);
   }
@@ -437,7 +500,7 @@
     const bidMap = new Map();
     const askMap = new Map();
 
-    ACTIVE_BROKERS.forEach(broker => {
+    activeBrokerIds().forEach(broker => {
       const levels = brokerDepthLevels[broker];
       if (!levels) return; // this broker hasn't sent anything yet — merge with what we have
       levels.bids.forEach(l => addLevel(bidMap, l));
@@ -468,7 +531,7 @@
     if (watchlistSocket) { watchlistSocket.onclose = null; try { watchlistSocket.close(); } catch (e) {} watchlistSocket = null; }
 
     const streams = symbols.map(s => s.toLowerCase() + '@miniTicker').join('/');
-    const url = `${BROKERS.binance.ws}/stream?streams=${streams}`;
+    const url = `${BROKERS['binance-spot'].ws}/stream?streams=${streams}`;
     const sock = new WebSocket(url);
     watchlistSocket = sock;
 
@@ -507,7 +570,7 @@
   async function setSymbol(symbol, interval = state.interval) {
     state.symbol = symbol.toUpperCase();
     state.interval = interval;
-    emit('symbolChange', { symbol: state.symbol, interval: state.interval, brokers: ACTIVE_BROKERS });
+    emit('symbolChange', { symbol: state.symbol, interval: state.interval, brokers: activeBrokerIds() });
     await fetchCandles(state.symbol, state.interval, 300);
     connectKline(state.symbol, state.interval);
     connectDepth(state.symbol);
@@ -517,16 +580,34 @@
     return setSymbol(state.symbol, interval);
   }
 
+  // Switches which brokers are aggregated — 'spot' | 'perp' | 'combined' —
+  // for the CURRENT symbol/interval: refetches history and reconnects
+  // kline+depth using the new broker set. This is the function chart-cockpit's
+  // Spot/Perp/Combined toggle should call; symbol/interval are untouched.
+  async function setMarketType(mode) {
+    if (!MODES[mode]) { console.warn('[market-store] unknown market type:', mode); return; }
+    state.marketType = mode;
+    emit('symbolChange', { symbol: state.symbol, interval: state.interval, brokers: activeBrokerIds() });
+    await fetchCandles(state.symbol, state.interval, 300);
+    connectKline(state.symbol, state.interval);
+    connectDepth(state.symbol);
+  }
+
+  function getMarketType() {
+    return state.marketType;
+  }
+
   function setWatchlist(symbols) {
     state.watchlist = symbols;
     connectWatchlist(symbols);
   }
 
   // Call once, on page load, after the chart-terminal is ready to receive data.
-  function init({ symbol = state.symbol, interval = state.interval, watchlist = state.watchlist } = {}) {
+  function init({ symbol = state.symbol, interval = state.interval, watchlist = state.watchlist, marketType = state.marketType } = {}) {
     state.symbol = symbol.toUpperCase();
     state.interval = interval;
     state.watchlist = watchlist;
+    state.marketType = MODES[marketType] ? marketType : DEFAULT_MODE;
     fetchCandles(state.symbol, state.interval, 300).catch(err => emit('error', { stream: 'klineHistory', error: err }));
     connectKline(state.symbol, state.interval);
     connectDepth(state.symbol);
@@ -534,17 +615,20 @@
   }
 
   function disconnectAll() {
-    ACTIVE_BROKERS.forEach(b => {
+    // Cleans up EVERY broker's sockets, not just the currently active mode's
+    // — a mode switch earlier in the session may have left other brokers'
+    // sockets open, so this must not rely on activeBrokerIds().
+    Object.keys(BROKERS).forEach(b => {
       if (klineSockets[b]) { klineSockets[b].onclose = null; try { klineSockets[b].close(); } catch (e) {} klineSockets[b] = null; }
       if (depthSockets[b]) { depthSockets[b].onclose = null; try { depthSockets[b].close(); } catch (e) {} depthSockets[b] = null; }
       clearBybitPing('kline_' + b);
       clearBybitPing('depth_' + b);
+      brokerCandle[b] = null;
+      brokerDepthLevels[b] = null;
     });
     if (watchlistSocket) { watchlistSocket.onclose = null; try { watchlistSocket.close(); } catch (e) {} watchlistSocket = null; }
     clearBybitPing('watchlist');
-    bybitDepthBook = null;
-    brokerCandle.binance = brokerCandle.bybit = null;
-    brokerDepthLevels.binance = brokerDepthLevels.bybit = null;
+    Object.keys(bybitDepthBooks).forEach(b => { bybitDepthBooks[b] = null; });
   }
 
   function getState() {
@@ -553,7 +637,7 @@
   }
 
   function getBrokers() {
-    return ACTIVE_BROKERS; // brokers currently being aggregated together
+    return activeBrokerIds(); // brokers currently being aggregated together
   }
 
   // ── Expose ───────────────────────────────────────────────────────────
@@ -561,6 +645,8 @@
     init,
     setSymbol,
     setInterval: setInterval_,
+    setMarketType,
+    getMarketType,
     setWatchlist,
     fetchCandles,
     disconnectAll,
@@ -586,23 +672,30 @@
 // ══════════════════════════════════════════════════════════════════════════
 // USAGE (for the next modules — chart-engine.js, order-book.js, etc.):
 //
-//   marketStore.init({ symbol: 'BTCUSDT', interval: '1m' });
-//   // Binance + Bybit both connect automatically and stay aggregated — there
-//   // is no per-broker switch anymore, every event below is already merged.
+//   marketStore.init({ symbol: 'BTCUSDT', interval: '1m', marketType: 'spot' });
+//   // marketType defaults to 'spot' if omitted. All brokers for that mode
+//   // connect automatically and stay aggregated — every event below is
+//   // already merged, there's no per-broker switch to manage.
 //
 //   marketStore.onKlineHistory(candles => chart.applyNewData(candles));
 //   marketStore.onKline(candle => chart.updateData(candle));
-//   // candle.volume is the SUMMED dollar volume across all active brokers;
-//   // candle.volumeBase is the summed asset qty.
+//   // candle.volume is the SUMMED dollar volume across the CURRENT mode's
+//   // active brokers; candle.volumeBase is the summed asset qty.
 //
 //   marketStore.onDepth(({symbol, bids, asks}) => renderOrderBook(bids, asks));
 //   // each level is {price, qty, total} — total is the SUMMED dollar value
-//   // (price * qty) across brokers, merged onto matching price levels.
+//   // (price * qty) across the current mode's brokers, merged onto matching
+//   // price levels.
 //
 //   marketStore.onTicker(({symbol, close, open}) => updateWatchlistRow(symbol, close, open));
 //
 //   // when user picks a new market/timeframe in chart-cockpit.js:
 //   marketStore.setSymbol('ETHUSDT', '5m');
 //
-//   marketStore.getBrokers();  // ['binance', 'bybit'] — which brokers are being aggregated
+//   // when user picks a new Spot/Perp/Combined mode in chart-cockpit.js:
+//   marketStore.setMarketType('perp');   // 'spot' | 'perp' | 'combined'
+//   marketStore.getMarketType();         // currently active mode
+//
+//   marketStore.getBrokers();  // e.g. ['binance-spot','bybit-spot'] — which
+//                               // broker ids are being aggregated right now
 // ══════════════════════════════════════════════════════════════════════════
