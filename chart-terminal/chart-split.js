@@ -56,6 +56,22 @@
     .cs-toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.15s;}
     .cs-toggle input:checked + .cs-toggle-slider{background:var(--gold);}
     .cs-toggle input:checked + .cs-toggle-slider::before{transform:translateX(14px);}
+
+    .cs-icon-btn{padding:7px 10px;}
+    .cs-ico{display:flex;width:15px;height:15px;gap:2px;flex-shrink:0;}
+    .cs-ico i{background:currentColor;border-radius:2px;display:block;}
+    .cs-ico-1{}
+    .cs-ico-1 i{width:100%;height:100%;}
+    .cs-ico-2h{flex-direction:row;}
+    .cs-ico-2h i{flex:1;height:100%;}
+    .cs-ico-2v{flex-direction:column;}
+    .cs-ico-2v i{width:100%;flex:1;}
+    .cs-ico-fs{width:15px;height:15px;position:relative;flex-shrink:0;}
+    .cs-ico-fs i{position:absolute;width:6px;height:6px;border:1.5px solid currentColor;}
+    .cs-ico-fs i:nth-child(1){top:0;left:0;border-right:none;border-bottom:none;}
+    .cs-ico-fs i:nth-child(2){top:0;right:0;border-left:none;border-bottom:none;}
+    .cs-ico-fs i:nth-child(3){bottom:0;left:0;border-right:none;border-top:none;}
+    .cs-ico-fs i:nth-child(4){bottom:0;right:0;border-left:none;border-top:none;}
   `;
   document.head.appendChild(style);
 
@@ -133,7 +149,7 @@
     wrap.className = 'ctc-wrap';
     wrap.id = 'cs-layout-wrap';
     wrap.innerHTML = `
-      <button class="ctc-pill" id="cs-layout-btn" title="Layout / Split screen">⬛ Layout</button>
+      <button class="ctc-pill cs-icon-btn" id="cs-layout-btn" title="Layout / Split screen">${layoutIconHtml(layout)}</button>
       <div class="ctc-dd cs-dd" id="cs-layout-dd">
         <div class="cs-grid-list">
           <div class="cs-grid-opt cs-grid-opt-1 active" data-layout="1"><div class="cs-swatch"></div></div>
@@ -147,6 +163,28 @@
       </div>
     `;
     cockpit.appendChild(wrap);
+
+    // Fullscreen — self-contained, toggles the same .ct-chart-fullscreen
+    // class that index.js's "F" keyboard shortcut already uses on
+    // .chart-workspace (see index.css). Doesn't touch index.js at all;
+    // both just flip the same DOM class independently. Since split-screen's
+    // panes live inside .chart-workspace (wrapMainChartForSplit wraps the
+    // chart that's already mounted there), fullscreen covers split-screen
+    // automatically — no extra wiring needed.
+    const fsBtn = document.createElement('button');
+    fsBtn.className = 'ctc-pill cs-icon-btn';
+    fsBtn.id = 'cs-fullscreen-btn';
+    fsBtn.title = 'Fullscreen chart';
+    fsBtn.innerHTML = fullscreenIconHtml();
+    fsBtn.onclick = (e) => {
+      e.stopPropagation();
+      const ws = document.querySelector('.chart-workspace');
+      if (!ws) return;
+      const isFs = ws.classList.toggle('ct-chart-fullscreen');
+      fsBtn.classList.toggle('on', isFs);
+      fsBtn.title = isFs ? 'Exit fullscreen' : 'Fullscreen chart';
+    };
+    cockpit.appendChild(fsBtn);
 
     document.getElementById('cs-layout-btn').onclick = (e) => {
       e.stopPropagation();
@@ -167,6 +205,19 @@
 
   function toggleHtml(key, checked) {
     return `<label class="cs-toggle"><input type="checkbox" data-sync-key="${key}" ${checked ? 'checked' : ''}><span class="cs-toggle-slider"></span></label>`;
+  }
+
+  // Small icon shown on the Layout button itself — mirrors whichever split
+  // mode is currently active, so the button always reads at a glance
+  // instead of needing a text label.
+  function layoutIconHtml(mode) {
+    if (mode === '2h') return '<span class="cs-ico cs-ico-2h"><i></i><i></i></span>';
+    if (mode === '2v') return '<span class="cs-ico cs-ico-2v"><i></i><i></i></span>';
+    return '<span class="cs-ico cs-ico-1"><i></i></span>';
+  }
+
+  function fullscreenIconHtml() {
+    return '<span class="cs-ico-fs"><i></i><i></i><i></i><i></i></span>';
   }
 
   // ── Wrap the existing single chart container in a 2-pane flex shell ──
@@ -204,6 +255,12 @@
     document.querySelectorAll('#cs-layout-dd [data-layout]').forEach(el => el.classList.toggle('active', el.getAttribute('data-layout') === mode));
     paneStackEl.className = 'cs-panes layout-' + mode;
     const pane2 = document.getElementById('cs-pane-2');
+
+    const layoutBtn = document.getElementById('cs-layout-btn');
+    if (layoutBtn) {
+      layoutBtn.innerHTML = layoutIconHtml(mode);
+      layoutBtn.classList.toggle('on', mode !== '1');
+    }
 
     if (mode === '1') {
       pane2.classList.add('cs-pane-hidden');
