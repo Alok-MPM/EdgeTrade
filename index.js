@@ -18,6 +18,26 @@ const { createClient } = supabase;
 const db = createClient(SUPA_URL, SUPA_KEY);
 
 // ══════════════════════════════════════
+// FOOTPRINT BACKEND — WAKE-UP PING
+// Render's free-tier backend (server.js) sleeps after 15 min idle and takes
+// ~1 min to wake + prime its candle/tick buffer. So we ping it on EVERY app
+// visit (not just when the user opens the Chart/Footprint page) — by the
+// time they actually click "Footprint", the backend is already warm and can
+// hand over its buffered snapshot in milliseconds instead of making them wait.
+// Fire-and-forget: never awaited, never blocks app init, and a failure here
+// (backend down/asleep-and-slow) must not break login or navigation.
+// ══════════════════════════════════════
+const FOOTPRINT_BACKEND_URL = 'https://m-edgetrade-api-server.onrender.com';
+
+function pingFootprintBackend(symbol = 'BTCUSDT'){
+  fetch(FOOTPRINT_BACKEND_URL + '/api/wakeup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol })
+  }).catch(()=>{ /* silent — footprint just won't be pre-warmed this visit */ });
+}
+
+// ══════════════════════════════════════
 // APP STATE
 // ══════════════════════════════════════
 let state = {
@@ -225,6 +245,7 @@ async function handlePasswordChange(){
 async function initApp(user){
   state.user=user;
   showPage('page-app');
+  pingFootprintBackend(); // fire-and-forget — warms the footprint backend as soon as user enters the app
   await loadProfile();
   await loadBrokers();
   await loadDays();
