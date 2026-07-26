@@ -40,278 +40,129 @@
 
 <!-- ════════════ LANDING PAGE ════════════ -->
 <div class="page active" id="page-landing">
-  <div class="scroll-progress" id="scrollProgress"></div>
-  <div class="page-particles" id="pageParticles"></div>
-
-  <nav class="nav" id="nav">
-    <div class="nav-logo hero-seq" style="animation-delay:.6s" onclick="showPage('page-landing')">
-      <svg width="30" height="30" viewBox="0 0 38 38" fill="none"><rect width="38" height="38" rx="6" fill="rgba(212,184,134,.08)" stroke="#D4B886" stroke-width="0.8"/><line x1="10" y1="9" x2="28" y2="9" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="9" x2="10" y2="29" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="19" x2="24" y2="19" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="29" x2="26" y2="29" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/></svg>
+  <nav class="nav">
+    <div class="nav-logo" onclick="showPage('page-landing')">
+      <svg width="32" height="32" viewBox="0 0 38 38" fill="none"><rect width="38" height="38" rx="6" fill="rgba(201,168,76,0.08)" stroke="#C9A84C" stroke-width="0.8"/><line x1="10" y1="9" x2="28" y2="9" stroke="#C9A84C" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="9" x2="10" y2="29" stroke="#C9A84C" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="19" x2="24" y2="19" stroke="#C9A84C" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="29" x2="26" y2="29" stroke="#C9A84C" stroke-width="2.2" stroke-linecap="square"/></svg>
       <span class="logo-text">EDGE<span>TRADE</span></span>
     </div>
-    <div class="nav-links hero-seq" style="animation-delay:.9s">
+    <div class="nav-links">
       <a href="#features" class="nav-link">Features</a>
       <a href="#how" class="nav-link">How It Works</a>
       <a href="#brokers" class="nav-link">Brokers</a>
     </div>
-    <div class="nav-cta hero-seq" style="animation-delay:.9s">
+    <div class="nav-cta">
       <button class="btn-ghost" onclick="showAuth('login')">Sign In</button>
       <button class="btn-gold" onclick="showAuth('signup')">Get Started Free</button>
     </div>
   </nav>
 
-  <section class="hero" id="heroSection">
-    <div class="hero-grid hero-seq" style="animation-delay:.3s"></div>
-    <div class="hero-aurora a"></div>
-    <div class="hero-aurora b"></div>
-    <div class="hero-aurora c"></div>
-    <div class="hero-light" id="heroLight"></div>
-    <div class="orbit-rings"><span></span><span></span><span></span></div>
-
-    <div class="hero-inner">
-      <div>
-        <span class="hero-badge hero-seq" style="animation-delay:1.2s">The Professional Trading Journal</span>
-        <h1 class="hero-title">
-          <span class="mask" style="animation-delay:1.5s"><span style="animation-delay:1.5s">Know Your Edge.</span></span>
-          <strong class="mask" style="animation-delay:1.6s"><span style="animation-delay:1.6s">Master Your Trade.</span></strong>
-        </h1>
-        <p class="hero-sub hero-seq" style="animation-delay:1.8s">The only trading journal built for serious traders who refuse to repeat mistakes. Track, analyze, and elevate every trade — completely free.</p>
-        <div class="hero-pills hero-seq" style="animation-delay:1.8s">
-          <div class="pill"><span class="pill-dot"></span>Auto-sync with 50+ Brokers</div>
-          <div class="pill"><span class="pill-dot"></span>Psychology Tracking</div>
-          <div class="pill"><span class="pill-dot"></span>Deep Analytics</div>
-          <div class="pill"><span class="pill-dot"></span>100% Free Forever</div>
-        </div>
-        <div class="hero-btns hero-seq" style="animation-delay:2.1s">
-          <button class="btn-hp btn-hp-primary" onclick="showAuth('signup')">Start Free — No Card Needed</button>
-          <button class="btn-hp btn-hp-secondary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">See Features ↓</button>
-        </div>
+  <section class="hero">
+    <canvas id="candle-rain" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
+    <div class="hero-bg">
+      <svg class="candle-bg" viewBox="0 0 1440 400" fill="none" preserveAspectRatio="none">
+        <g stroke="#C9A84C">
+          <line x1="80" y1="320" x2="80" y2="180" stroke-width="1" opacity="0.5"/><rect x="70" y="200" width="20" height="80" fill="#C9A84C" opacity="0.3"/>
+          <line x1="140" y1="280" x2="140" y2="150" stroke-width="1" opacity="0.5"/><rect x="130" y="170" width="20" height="60" fill="#2A6496" opacity="0.3"/>
+          <line x1="200" y1="260" x2="200" y2="120" stroke-width="1" opacity="0.5"/><rect x="190" y="140" width="20" height="70" fill="#C9A84C" opacity="0.3"/>
+          <line x1="260" y1="220" x2="260" y2="80" stroke-width="1" opacity="0.5"/><rect x="250" y="100" width="20" height="60" fill="#C9A84C" opacity="0.4"/>
+          <line x1="320" y1="240" x2="320" y2="100" stroke-width="1" opacity="0.5"/><rect x="310" y="120" width="20" height="70" fill="#2A6496" opacity="0.3"/>
+          <line x1="380" y1="200" x2="380" y2="60" stroke-width="1" opacity="0.5"/><rect x="370" y="80" width="20" height="60" fill="#C9A84C" opacity="0.4"/>
+          <line x1="440" y1="180" x2="440" y2="40" stroke-width="1" opacity="0.5"/><rect x="430" y="60" width="20" height="55" fill="#C9A84C" opacity="0.4"/>
+          <line x1="560" y1="160" x2="560" y2="30" stroke-width="1" opacity="0.5"/><rect x="550" y="50" width="20" height="55" fill="#C9A84C" opacity="0.4"/>
+          <line x1="680" y1="140" x2="680" y2="20" stroke-width="1" opacity="0.5"/><rect x="670" y="40" width="20" height="50" fill="#C9A84C" opacity="0.4"/>
+          <line x1="800" y1="150" x2="800" y2="30" stroke-width="1" opacity="0.5"/><rect x="790" y="50" width="20" height="50" fill="#2A6496" opacity="0.3"/>
+          <line x1="920" y1="130" x2="920" y2="20" stroke-width="1" opacity="0.5"/><rect x="910" y="40" width="20" height="46" fill="#C9A84C" opacity="0.4"/>
+          <line x1="1040" y1="120" x2="1040" y2="10" stroke-width="1" opacity="0.5"/><rect x="1030" y="30" width="20" height="44" fill="#C9A84C" opacity="0.4"/>
+          <line x1="1160" y1="130" x2="1160" y2="20" stroke-width="1" opacity="0.5"/><rect x="1150" y="40" width="20" height="48" fill="#2A6496" opacity="0.3"/>
+          <line x1="1280" y1="110" x2="1280" y2="10" stroke-width="1" opacity="0.5"/><rect x="1270" y="28" width="20" height="42" fill="#C9A84C" opacity="0.4"/>
+          <path d="M80 260 C300 220 560 160 800 110 C1040 75 1280 55 1440 45" stroke="#C9A84C" stroke-width="1.5" fill="none" opacity="0.25"/>
+        </g>
+        <line x1="0" y1="399" x2="1440" y2="399" stroke="#C9A84C" stroke-width="1" opacity="0.1"/>
+      </svg>
+      <div class="hero-glow g1"></div>
+      <div class="hero-glow g2"></div>
+    </div>
+    <div class="hero-content">
+      <div class="hero-badge">⚡ The Professional Trading Journal</div>
+      <h1 class="hero-title">Know Your Edge.<strong>Master Your Trade.</strong></h1>
+      <div class="hero-line"></div>
+      <p class="hero-sub">The only trading journal built for serious traders who refuse to repeat mistakes. Track, analyze, and elevate every trade — completely free.</p>
+      <div class="hero-pills">
+        <div class="pill"><span class="pill-dot"></span>Auto-sync with 50+ Brokers</div>
+        <div class="pill"><span class="pill-dot"></span>Psychology Tracking</div>
+        <div class="pill"><span class="pill-dot"></span>Deep Analytics</div>
+        <div class="pill"><span class="pill-dot"></span>100% Free Forever</div>
       </div>
-
-      <div class="terminal-wrap hero-seq" style="animation-delay:2.4s">
-        <div class="term" id="term">
-          <div class="term-head">
-            <div class="term-dots"><span></span><span></span><span></span></div>
-            <div class="term-label">EDGE TERMINAL</div>
-          </div>
-          <div class="term-body">
-            <div class="chart-box">
-              <div class="chart-grid"></div>
-              <svg class="chart-svg" viewBox="0 0 500 190" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#D4B886" stop-opacity="0.28"/>
-                    <stop offset="100%" stop-color="#D4B886" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path class="area" fill="url(#areaFill)" d="M0 150 C60 130 90 140 130 100 C180 55 220 80 270 65 C330 48 380 85 430 55 C460 38 480 42 500 18 L500 190 L0 190 Z"/>
-                <path class="line" d="M0 150 C60 130 90 140 130 100 C180 55 220 80 270 65 C330 48 380 85 430 55 C460 38 480 42 500 18"/>
-              </svg>
-              <div class="price-tag pt1">$112.4K</div>
-              <div class="price-tag pt2">$118.9K</div>
-            </div>
-            <div class="term-stats">
-              <div class="tstat"><span>Win Rate</span><strong>87.4%</strong></div>
-              <div class="tstat"><span>Risk : Reward</span><strong>1 : 3.4</strong></div>
-              <div class="tstat"><span>PnL (30d)</span><strong class="green">+$4,820</strong></div>
-            </div>
-            <div class="ai-chip">
-              <span class="ai-label">Edge AI Insight</span>
-              <p id="aiText">Avoid revenge trading. Losses spike 32% after a red trade.</p>
-            </div>
-          </div>
-        </div>
+      <div class="hero-btns">
+        <button class="btn-hp btn-hp-primary" onclick="showAuth('signup')">Start Free — No Card Needed</button>
+        <button class="btn-hp btn-hp-secondary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">See Features ↓</button>
       </div>
     </div>
   </section>
 
-  <div class="stats-bar reveal">
-    <div class="sbar-item"><span class="sbar-num" data-count="50" data-suffix="+">0</span><span class="sbar-lbl">Brokers Supported</span></div>
-    <div class="sbar-item"><span class="sbar-num" data-count="100" data-suffix="%">0</span><span class="sbar-lbl">Free Forever</span></div>
+  <div class="stats-bar">
+    <div class="sbar-item"><span class="sbar-num">50+</span><span class="sbar-lbl">Brokers Supported</span></div>
+    <div class="sbar-item"><span class="sbar-num">100%</span><span class="sbar-lbl">Free Forever</span></div>
     <div class="sbar-item"><span class="sbar-num">All</span><span class="sbar-lbl">Markets Covered</span></div>
-    <div class="sbar-item"><span class="sbar-num" data-count="0" data-suffix="">0</span><span class="sbar-lbl">Limitations</span></div>
+    <div class="sbar-item"><span class="sbar-num">0</span><span class="sbar-lbl">Limitations</span></div>
   </div>
 
   <section class="section" id="features">
-    <div class="sec-center reveal">
-      <span class="sec-tag">The Intelligence Layer</span>
-      <h2 class="sec-title">Every trade tells a story.</h2>
-      <p class="sec-desc">EdgeTrade finds the patterns that human eyes usually miss.</p>
+    <div class="sec-center">
+      <span class="sec-tag">What You Get</span>
+      <h2 class="sec-title">Everything a serious trader <em>actually needs</em></h2>
+      <p class="sec-desc">Every feature exists to make you better — not just to impress you.</p>
     </div>
-
-    <div class="features-layout">
-      <div class="features-left reveal">
-        <h2>Your entire trading DNA, mapped.</h2>
-        <p>From the moment a trade syncs to the moment you find your edge — every layer works together.</p>
-        <div class="timeline" id="timeline">
-          <div class="timeline-progress" id="timelineProgress"></div>
-          <div class="timeline-item active"><span class="timeline-dot"></span><span>Broker</span></div>
-          <div class="timeline-item"><span class="timeline-dot"></span><span>Analysis</span></div>
-          <div class="timeline-item"><span class="timeline-dot"></span><span>Order Flow</span></div>
-          <div class="timeline-item"><span class="timeline-dot"></span><span>Psychology</span></div>
-          <div class="timeline-item"><span class="timeline-dot"></span><span>AI</span></div>
-          <div class="timeline-item"><span class="timeline-dot"></span><span>Growth</span></div>
-        </div>
-      </div>
-
-      <div class="features-right">
-        <div class="feature-module">
-          <div class="fm-tag">Auto Import</div>
-          <h3 class="fm-title">Every trade, already there.</h3>
-          <p class="fm-desc">Connect once. Every fill, every close, every position — imported automatically, in real time.</p>
-          <div class="mock-row"><span>Binance</span><span class="ok">● Connected</span></div>
-          <div class="mock-row"><span>Delta Exchange</span><span class="ok">● Connected</span></div>
-          <div class="mock-row"><span>Bybit</span><span class="ok">● Connected</span></div>
-          <div class="mock-nums">
-            <div class="mock-num"><span>Trades Imported</span><strong>142</strong></div>
-            <div class="mock-num"><span>Today's</span><strong>6</strong></div>
-          </div>
-        </div>
-
-        <div class="feature-module">
-          <div class="fm-tag">Trade Analysis</div>
-          <h3 class="fm-title">Your edge, quantified.</h3>
-          <p class="fm-desc">Win rate, risk-reward, drawdown — every number that actually matters, tracked automatically.</p>
-          <div class="mock-nums">
-            <div class="mock-num"><span>Win Rate</span><strong>87.4%</strong></div>
-            <div class="mock-num"><span>Loss Rate</span><strong>12.6%</strong></div>
-            <div class="mock-num"><span>Avg RR</span><strong>1 : 3.4</strong></div>
-          </div>
-        </div>
-
-        <!-- NEW ORDER FLOW MODULE -->
-        <div class="feature-module">
-          <div class="fm-tag">Order Flow & Liquidity</div>
-          <h3 class="fm-title">See inside the candle.</h3>
-          <p class="fm-desc">Stop guessing. Visualize real-time market mechanics with Footprint charts, institutional liquidity pools, and order flow imbalances.</p>
-        
-          <div class="mock-nums">
-            <div class="mock-num"><span>Cum. Delta</span><strong class="green">+412.5K</strong></div>
-            <div class="mock-num"><span>Imbalances</span><strong>14</strong></div>
-          </div>
-        
-          <div class="mock-row" style="margin-top: 18px;">
-            <span>Institutional Liquidity Pool</span>
-            <span class="ok" style="color: var(--gold);">● $52.4M Detected</span>
-          </div>
-        </div>
-
-        <div class="feature-module">
-          <div class="fm-tag">Psychology</div>
-          <h3 class="fm-title">The trade behind the trade.</h3>
-          <p class="fm-desc">Log your mindset every entry. Watch the emotional patterns that quietly control your results.</p>
-          <div class="mood-row">
-            <span class="mood-chip on">Happy</span>
-            <span class="mood-chip">Neutral</span>
-            <span class="mood-chip">Fear</span>
-            <span class="mood-chip">Greed</span>
-            <span class="mood-chip on">Discipline</span>
-          </div>
-        </div>
-
-        <div class="feature-module">
-          <div class="fm-tag">Edge AI</div>
-          <div class="fm-live"><span class="pulse-dot"></span><span>LIVE ANALYSIS</span></div>
-          <h3 class="fm-title">It notices what you don't.</h3>
-          <div class="ai-quote">
-            "You overtrade after three consecutive wins. Your win rate drops 18%."
-            <div class="rec">Recommendation — Stop trading after 3 consecutive wins.</div>
-          </div>
-        </div>
-
-        <div class="feature-module">
-          <div class="fm-tag">Performance</div>
-          <h3 class="fm-title">Growth you can prove.</h3>
-          <p class="fm-desc">Monthly and yearly equity curves, plus a consistency score that shows if you're actually improving.</p>
-          <div class="mock-nums">
-            <div class="mock-num"><span>Equity Curve</span><strong class="green">+248%</strong></div>
-            <div class="mock-num"><span>Consistency Score</span><strong>91</strong></div>
-          </div>
-        </div>
-      </div>
+    <div class="feats-grid">
+      <div class="feat"><div class="feat-icon">🔗</div><h3 class="feat-title">Auto Broker Sync</h3><p class="feat-desc">Connect Binance, Bybit, Exness, Zerodha and 50+ more. Trades appear automatically.</p></div>
+      <div class="feat"><div class="feat-icon">🧠</div><h3 class="feat-title">Psychology Tracking</h3><p class="feat-desc">Record mindset and emotions every trade. Discover patterns that affect your performance.</p></div>
+      <div class="feat"><div class="feat-icon">📊</div><h3 class="feat-title">Deep Analytics</h3><p class="feat-desc">Session analysis, day-of-week patterns, win streaks, drawdown curves — your complete trading DNA.</p></div>
+      <div class="feat"><div class="feat-icon">📅</div><h3 class="feat-title">Calendar View</h3><p class="feat-desc">See every trading day as green or red. Spot your worst months, best weeks instantly.</p></div>
+      <div class="feat"><div class="feat-icon">⚡</div><h3 class="feat-title">Your Weak Points</h3><p class="feat-desc">System auto-identifies what is hurting your performance. "Friday win rate 28% — avoid Fridays."</p></div>
+      <div class="feat"><div class="feat-icon">🌍</div><h3 class="feat-title">All Markets</h3><p class="feat-desc">Crypto, Forex, Indian Stocks, Commodities. Auto currency — ₹ for India, $ for Crypto & Forex.</p></div>
     </div>
   </section>
 
-  <div class="gold-line" style="height:1px;max-width:200px;margin:0 auto;background:linear-gradient(90deg,transparent,var(--gold-line),transparent);"></div>
-
-  <section class="how-section" id="how" style="padding:80px 6%;background:var(--bg2);border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);">
-    <div class="sec-center reveal"><span class="sec-tag">Simple Process</span><h2 class="sec-title">Three steps to <em>trading clarity</em></h2></div>
-    <div class="steps" style="max-width:980px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:40px;">
-      <div class="step reveal" style="text-align:center;"><div class="step-n" style="font-family:var(--serif);font-size:44px;color:var(--gold);opacity:.7;margin-bottom:14px;">I</div><h3 class="step-title" style="font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:10px;">Create Free Account</h3><p class="step-desc" style="font-size:14px;color:var(--muted);line-height:1.65;">Sign up with email and password. No OTP, no credit card. Inside in 30 seconds.</p></div>
-      <div class="step reveal" style="text-align:center;"><div class="step-n" style="font-family:var(--serif);font-size:44px;color:var(--gold);opacity:.7;margin-bottom:14px;">II</div><h3 class="step-title" style="font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:10px;">Connect Your Broker</h3><p class="step-desc" style="font-size:14px;color:var(--muted);line-height:1.65;">Select your exchange. Add your API key. Trades begin syncing automatically.</p></div>
-      <div class="step reveal" style="text-align:center;"><div class="step-n" style="font-family:var(--serif);font-size:44px;color:var(--gold);opacity:.7;margin-bottom:14px;">III</div><h3 class="step-title" style="font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:10px;">Journal &amp; Improve</h3><p class="step-desc" style="font-size:14px;color:var(--muted);line-height:1.65;">Add strategy, psychology, notes. Watch analytics build. Discover your edge.</p></div>
+  <div class="gold-line"></div>
+  <section class="how-section" id="how">
+    <div class="sec-center"><span class="sec-tag">Simple Process</span><h2 class="sec-title">Three steps to <em>trading clarity</em></h2></div>
+    <div class="steps">
+      <div class="step"><div class="step-n">I</div><h3 class="step-title">Create Free Account</h3><p class="step-desc">Sign up with email and password. No OTP, no credit card. Inside in 30 seconds.</p></div>
+      <div class="step"><div class="step-n">II</div><h3 class="step-title">Connect Your Broker</h3><p class="step-desc">Select your exchange. Add your API key. Trades begin syncing automatically.</p></div>
+      <div class="step"><div class="step-n">III</div><h3 class="step-title">Journal & Improve</h3><p class="step-desc">Add strategy, psychology, notes. Watch analytics build. Discover your edge.</p></div>
     </div>
   </section>
 
   <section class="brokers-sec" id="brokers">
-    <div class="sec-center reveal">
-      <span class="sec-tag">Trusted Connections</span>
-      <h2 class="sec-title">Connect once. <em>Trade everywhere.</em></h2>
-      <p class="sec-desc">No deposits. No transfers. No platform switching.</p>
-    </div>
-
-    <div class="brokers-layout">
-      <div class="brokers-left reveal">
-        <h2>Your broker stays exactly where it is.</h2>
-        <p>EdgeTrade never holds your money. We only analyze your trading performance.</p>
-        <div class="trust-box"><div class="tb-title">Encrypted API</div><div class="tb-sub">AES-256 · Read-only access</div></div>
-        <div class="trust-box"><div class="tb-title">No Asset Access</div><div class="tb-sub">Cannot trade · Cannot withdraw · Cannot transfer</div></div>
-        <div class="trust-box"><div class="tb-title">Automatic Sync</div><div class="tb-sub">24/7 background import</div></div>
-      </div>
-
-      <div class="integration-panel reveal">
-        <div class="integration-network"></div>
-        <div class="ip-title">Connected Brokers</div>
-        <div class="panel-meta">Read-only encrypted connections</div>
-        <div class="integration-wall" id="integrationWall">
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=binance.com" onerror="this.parentElement.style.display='none'"></span><span>Binance</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Bybit_Logo.svg" onerror="this.parentElement.style.display='none'"></span><span>Bybit</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=delta.exchange" onerror="this.parentElement.style.display='none'"></span><span>Delta</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=zerodha.com" onerror="this.parentElement.style.display='none'"></span><span>Zerodha</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=okx.com" onerror="this.parentElement.style.display='none'"></span><span>OKX</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=kucoin.com" onerror="this.parentElement.style.display='none'"></span><span>KuCoin</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=bitget.com" onerror="this.parentElement.style.display='none'"></span><span>Bitget</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=exness.com" onerror="this.parentElement.style.display='none'"></span><span>Exness</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=upstox.com" onerror="this.parentElement.style.display='none'"></span><span>Upstox</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=angelone.in" onerror="this.parentElement.style.display='none'"></span><span>Angel One</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=metatrader5.com" onerror="this.parentElement.style.display='none'"></span><span>MetaTrader 5</span><em>Connected</em></div>
-          <div class="integration-card"><span class="ic-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=tradingview.com" onerror="this.parentElement.style.display='none'"></span><span>TradingView</span><em>Connected</em></div>
-        </div>
-        <div class="integration-summary">
-          <div><strong>24</strong>Supported Platforms</div>
-          <div><strong>99.98%</strong>Sync Reliability</div>
-          <div><strong>AES-256</strong>Encryption</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="brokers-divider reveal">
-      <div class="line"></div>
-      <p>More integrations are continuously being added.</p>
-      <div class="trust-note">EdgeTrade never stores funds, executes trades, or requests withdrawal permissions.</div>
+    <span class="sec-tag">Supported Platforms</span>
+    <h2 class="sec-title">Connects with your <em>broker</em></h2>
+    <div class="brokers-grid">
+      <div class="b-chip">Binance</div><div class="b-chip">Bybit</div><div class="b-chip">OKX</div>
+      <div class="b-chip">Delta Exchange</div><div class="b-chip">Coinswitch</div><div class="b-chip">KuCoin</div>
+      <div class="b-chip">Bitget</div><div class="b-chip">Exness (MT5)</div><div class="b-chip">XM (MT5)</div>
+      <div class="b-chip">IC Markets</div><div class="b-chip">Pepperstone</div><div class="b-chip">Zerodha</div>
+      <div class="b-chip">Angel One</div><div class="b-chip">Upstox</div><div class="b-chip">MetaTrader 5</div>
+      <div class="b-chip">TradingView</div><div class="b-chip">Groww</div><div class="b-chip">+ Manual Entry</div>
     </div>
   </section>
 
-  <section class="cta-sec" id="ctaSection">
-    <div class="cta-background"></div>
-    <h2 class="cta-title reveal">Every professional keeps a journal.<br>The best ones use <span class="gold">EdgeTrade</span>.</h2>
-    <p class="cta-sub reveal">No subscriptions. No hidden charges. No limits. Just better trading.</p>
-    <button class="cta-btn reveal" onclick="showAuth('signup')">Create Free Account</button>
+  <section class="cta-sec">
+    <div class="gold-line" style="margin-bottom:70px;"></div>
+    <span class="sec-tag">Begin Today</span>
+    <h2 class="cta-title">Your edge is already there.<br>Let us help you <em style="color:var(--gold);font-style:italic;">find it.</em></h2>
+    <p class="cta-sub">Free forever. No credit card. No limits.</p>
+    <button class="btn-hp btn-hp-primary" onclick="showAuth('signup')" style="font-size:15px;padding:15px 44px;">Start Journaling Free →</button>
+    <div class="gold-line" style="margin-top:70px;"></div>
   </section>
 
   <footer>
-    <div>
-      <div class="footer-logo">EDGE<span>TRADE</span></div>
-      <p class="footer-desc">Built for traders who refuse to stay average. The professional trading journal — free, forever.</p>
-    </div>
+    <div class="footer-logo">EDGE<span>TRADE</span></div>
+    <div class="footer-copy">© 2026 EdgeTrade. Built for traders who refuse to stay average.</div>
     <div class="footer-links">
-      <a href="#features" class="footer-link">Features</a>
-      <a href="#brokers" class="footer-link">Brokers</a>
-      <a href="#" class="footer-link" onclick="return false;">Documentation</a>
-      <a href="#" class="footer-link" onclick="showSection('support');return false;">Support</a>
-      <a href="/privacy.html" target="_blank" rel="noopener" class="footer-link">Privacy</a>
+      <a href="/privacy.html" target="_blank" rel="noopener" class="footer-link">Privacy Policy</a>
       <a href="/terms.html" target="_blank" rel="noopener" class="footer-link">Terms</a>
+      <a href="#" class="footer-link" onclick="showSection('support');return false;">Support</a>
     </div>
-    <div class="footer-version">v1.0 · 2026</div>
   </footer>
 </div>
 
@@ -496,6 +347,11 @@
                       <div id="klineMainChart" style="width:100%;height:520px;"><!-- chart-engine.js mounts the klinecharts candle canvas here --></div>
                     </div>
                   </section>
+
+                  <div class="terminal-ad-slot">
+                    <div class="sponsored-label">Sponsored</div>
+                    <div class="adsense-placeholder">Google Adsense</div>
+                  </div>
                 </div>
 
                 <div class="terminal-right">
