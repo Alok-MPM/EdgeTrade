@@ -47,6 +47,8 @@
        the chart's own container (not just an ancestor) means there's never
        a gap to show through, regardless of canvas resize timing. */
     #klineMainChart,#klineChart2{background:var(--bg2,#111317);}
+    .cs-pane{cursor:pointer;}
+    .cs-pane.cs-pane-active{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;}
     .cs-pane-hidden{display:none;}
     .cs-pane-label{position:absolute;top:6px;left:8px;z-index:5;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#8a8f98);background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;}
 
@@ -100,12 +102,37 @@
 
   // ── State ────────────────────────────────────────────────────────────
   let layout = '1'; // '1' | '2h' | '2v'
-  let sync = { symbol: true, interval: true, crosshair: true };
+  let sync = { symbol: false, interval: false, crosshair: false };
 
   let pane2Instance = null;
   let pane2Socket = null;
+  let pane2DepthSocket = null;
   let pane2Symbol = 'ETHUSDT';
   let pane2Interval = '1m';
+
+  // ── Active-pane bridge ────────────────────────────────────────────────
+  // Which pane is "selected" for trading purposes. Defaults to pane 1.
+  // order-book.js / trade-terminal.js subscribe here instead of reading
+  // pane2's data directly — this file stays the only thing that ever
+  // touches pane2's Binance connection.
+  let activePane = 1;
+  const activeChangeListeners = [];
+  const pane2DepthListeners = [];
+  const pane2PriceListeners = [];
+
+  function getActiveSymbol() {
+    return activePane === 2 ? pane2Symbol : marketStore.getState().symbol;
+  }
+
+  function setActivePane(n) {
+    if (activePane === n) return;
+    activePane = n;
+    const p1 = document.getElementById('cs-pane-1');
+    const p2 = document.getElementById('cs-pane-2');
+    if (p1) p1.classList.toggle('cs-pane-active', n === 1);
+    if (p2) p2.classList.toggle('cs-pane-active', n === 2);
+    activeChangeListeners.forEach(cb => cb({ pane: activePane, symbol: getActiveSymbol() }));
+  }
 
   let paneStackEl = null; // the pre-existing container the main chart lives in
 
@@ -265,16 +292,18 @@
     parent.insertBefore(stack, mainChartEl);
 
     const pane1 = document.createElement('div');
-    pane1.className = 'cs-pane';
+    pane1.className = 'cs-pane cs-pane-active';
     pane1.id = 'cs-pane-1';
     pane1.innerHTML = `<div class="cs-pane-label">${marketStore.getState().symbol}</div>`;
     pane1.appendChild(mainChartEl);
+    pane1.addEventListener('click', () => setActivePane(1));
     stack.appendChild(pane1);
 
     const pane2 = document.createElement('div');
     pane2.className = 'cs-pane cs-pane-hidden';
     pane2.id = 'cs-pane-2';
     pane2.innerHTML = `<div class="cs-pane-label">${pane2Symbol}</div><div id="klineChart2" style="width:100%;height:100%;"></div>`;
+    pane2.addEventListener('click', () => setActivePane(2));
     stack.appendChild(pane2);
 
     paneStackEl = stack;
@@ -301,6 +330,7 @@
     if (mode === '1') {
       pane2.classList.add('cs-pane-hidden');
       teardownPane2();
+      setActivePane(1);
     } else {
       pane2.classList.remove('cs-pane-hidden');
       if (!pane2Instance) initPane2();
@@ -328,6 +358,7 @@
     pane2Interval = interval;
     const label = document.querySelector('#cs-pane-2 .cs-pane-label');
     if (label) label.textContent = symbol;
+    if (activePane === 2) activeChangeListeners.forEach(cb => cb({ pane: 2, symbol: pane2Symbol }));
 
     try {
       const res = await fetch(`${BINANCE_REST}/klines?symbol=${symbol}&interval=${interval}&limit=300`);
@@ -342,14 +373,28 @@
     pane2Socket = new WebSocket(`${BINANCE_WS}/ws/${symbol.toLowerCase()}@kline_${interval}`);
     pane2Socket.onmessage = (event) => {
       const k = JSON.parse(event.data).k;
+      const close = parseFloat(k.c);
       if (pane2Instance) {
-        pane2Instance.updateData({ timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v) });
+        pane2Instance.updateData({ timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close, volume: parseFloat(k.v) });
       }
+      pane2PriceListeners.forEach(cb => cb(close));
+    };
+
+    // Order-book depth for pane 2 — mirrors what market-store.js does for
+    // pane 1, kept fully separate so pane 1's own connection is untouched.
+    if (pane2DepthSocket) { pane2DepthSocket.onclose = null; pane2DepthSocket.close(); }
+    pane2DepthSocket = new WebSocket(`${BINANCE_WS}/ws/${symbol.toLowerCase()}@depth20@100ms`);
+    pane2DepthSocket.onmessage = (event) => {
+      const d = JSON.parse(event.data);
+      const bids = (d.bids || []).map(([price, qty]) => { price = parseFloat(price); qty = parseFloat(qty); return { price, qty, total: price * qty }; });
+      const asks = (d.asks || []).map(([price, qty]) => { price = parseFloat(price); qty = parseFloat(qty); return { price, qty, total: price * qty }; });
+      pane2DepthListeners.forEach(cb => cb({ bids, asks }));
     };
   }
 
   function teardownPane2() {
     if (pane2Socket) { pane2Socket.onclose = null; pane2Socket.close(); pane2Socket = null; }
+    if (pane2DepthSocket) { pane2DepthSocket.onclose = null; pane2DepthSocket.close(); pane2DepthSocket = null; }
     if (pane2Instance && typeof klinecharts.dispose === 'function') klinecharts.dispose('klineChart2');
     pane2Instance = null;
   }
@@ -395,7 +440,7 @@
     } else {
       // Brand-new tab — always starts single-pane with just its own symbol,
       // regardless of what layout was active on the tab we came from.
-      sync = { symbol: true, interval: true, crosshair: true };
+      sync = { symbol: false, interval: false, crosshair: false };
       pane2Symbol = activeTab.symbol;
       pane2Interval = activeTab.interval;
       updateSyncTogglesUI();
@@ -438,7 +483,14 @@
   }
 
   // ── Expose ───────────────────────────────────────────────────────────
-  window.chartSplit = { init, setLayout, getLayout: () => layout, getSync: () => ({ ...sync }), handleTabChangeIfNeeded };
+  window.chartSplit = {
+    init, setLayout, getLayout: () => layout, getSync: () => ({ ...sync }), handleTabChangeIfNeeded,
+    getActivePane: () => activePane,
+    getActiveSymbol,
+    onActiveChange: (cb) => activeChangeListeners.push(cb),
+    onPane2Depth: (cb) => pane2DepthListeners.push(cb),
+    onPane2Price: (cb) => pane2PriceListeners.push(cb),
+  };
 
 })();
 

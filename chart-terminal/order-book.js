@@ -47,6 +47,11 @@
   document.head.appendChild(style);
 
   let mountEl = null;
+  // Which source is currently driving the panel — 'marketStore' (pane 1,
+  // the normal/default case) or 'pane2' (split-screen, pane 2 selected).
+  // Set via chart-split.js's bridge; this file still never talks to
+  // Binance directly, it just chooses which already-arriving stream to draw.
+  let activeSource = 'marketStore';
 
   // ── Public init ─────────────────────────────────────────────────────
   function init(opts = {}) {
@@ -55,8 +60,18 @@
 
     render(marketStore.getState().symbol);
 
-    marketStore.onDepth(({ bids, asks }) => renderRows(bids, asks));
-    marketStore.onSymbolChange(({ symbol }) => updateSymbolLabel(symbol));
+    marketStore.onDepth(({ bids, asks }) => { if (activeSource === 'marketStore') renderRows(bids, asks); });
+    marketStore.onSymbolChange(({ symbol }) => { if (activeSource === 'marketStore') updateSymbolLabel(symbol); });
+
+    // Split-screen bridge (chart-split.js) — optional, only present when
+    // that file has loaded. Absent entirely on pages without split-screen.
+    if (typeof window.chartSplit !== 'undefined') {
+      window.chartSplit.onActiveChange(({ pane, symbol }) => {
+        activeSource = pane === 2 ? 'pane2' : 'marketStore';
+        updateSymbolLabel(symbol); // already resets to "Loading order book..." until the new source's next tick
+      });
+      window.chartSplit.onPane2Depth(({ bids, asks }) => { if (activeSource === 'pane2') renderRows(bids, asks); });
+    }
   }
 
   function render(symbol) {

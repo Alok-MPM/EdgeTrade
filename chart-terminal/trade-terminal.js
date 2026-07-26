@@ -34,8 +34,10 @@
   const style = document.createElement('style');
   style.textContent = `
     .tt-panel{background:var(--bg2);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}
-    .tt-balance{display:flex;justify-content:space-between;align-items:baseline;font-family:'Outfit',sans-serif;}
+    .tt-balance{display:flex;align-items:baseline;gap:6px;font-family:'Outfit',sans-serif;}
     .tt-balance-label{font-size:12px;color:var(--muted,#8a8f98);}
+    .tt-symbol-label{font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;}
+    .tt-balance-value{margin-left:auto;}
     .tt-balance-value{font-size:16px;font-weight:600;color:var(--text,#EAECEF);font-family:'JetBrains Mono',monospace;}
 
     .tt-side-toggle{display:flex;gap:8px;}
@@ -85,18 +87,25 @@
   let closingInProgress = {};
 
   // ── Public init ─────────────────────────────────────────────────────
+  // Which source is currently "on screen" for the order form — 'marketStore'
+  // (pane 1, default) or 'pane2' (split-screen, pane 2 selected). Same
+  // pattern as order-book.js; this file still never opens its own socket.
+  let tradeActiveSource = 'marketStore';
+  let tradeActiveSymbol = null; // pane 2's symbol, tracked locally since onPane2Price only gives a price
+
   function init(opts = {}) {
     mountEl = document.getElementById(opts.mountId || 'trade-terminal-root');
     if (!mountEl) { console.error('[trade-terminal] mount element not found'); return; }
     if (typeof db === 'undefined') { console.error('[trade-terminal] global Supabase client `db` not found — is index.js loaded?'); return; }
 
     render();
+    updateActiveSymbolLabel(marketStore.getState().symbol);
     ensureDemoAccount().then(loadDemoPositions);
 
     marketStore.onKline((candle) => {
-      const activeSymbol = marketStore.getState().symbol;
-      latestPrice = candle.close;
-      priceMap[activeSymbol] = candle.close;
+      const symbol = marketStore.getState().symbol;
+      priceMap[symbol] = candle.close;
+      if (tradeActiveSource === 'marketStore') { latestPrice = candle.close; updateActiveSymbolLabel(symbol); }
       updateLiqPreview();
       updateOpenPositionsPnL();
       checkTpSlLiquidation();
@@ -111,13 +120,44 @@
       updateOpenPositionsPnL();
       checkTpSlLiquidation();
     });
+
+    // Split-screen bridge (chart-split.js) — optional, only present once
+    // that file has loaded and only meaningfully used once pane 2 exists.
+    if (typeof window.chartSplit !== 'undefined') {
+      window.chartSplit.onActiveChange(({ pane, symbol }) => {
+        tradeActiveSource = pane === 2 ? 'pane2' : 'marketStore';
+        tradeActiveSymbol = symbol;
+        updateActiveSymbolLabel(symbol);
+        if (tradeActiveSource === 'marketStore') latestPrice = priceMap[symbol] || latestPrice;
+      });
+      window.chartSplit.onPane2Price((price) => {
+        if (tradeActiveSource !== 'pane2' || !tradeActiveSymbol) return;
+        latestPrice = price;
+        priceMap[tradeActiveSymbol] = price;
+        updateLiqPreview();
+        updateOpenPositionsPnL();
+        checkTpSlLiquidation();
+      });
+    }
   }
+
+  function updateActiveSymbolLabel(symbol) {
+    const el = document.getElementById('tt-symbol-label');
+    if (!el) return;
+    // Only worth showing once split-screen is actually in play — stays
+    // blank/hidden the rest of the time so the normal single-chart panel
+    // looks exactly as it always has.
+    const inSplit = typeof window.chartSplit !== 'undefined' && window.chartSplit.getLayout() !== '1';
+    el.textContent = inSplit ? formatSymbolLabel(symbol) : '';
+  }
+
+  function formatSymbolLabel(sym) { return sym ? sym.replace(/USDT$/, '') + '/USDT' : ''; }
 
   // ── Render ──────────────────────────────────────────────────────────
   function render() {
     mountEl.innerHTML = `
       <div class="tt-panel">
-        <div class="tt-balance"><span class="tt-balance-label">Demo Balance</span><span class="tt-balance-value" id="tt-balance">$0.00</span></div>
+        <div class="tt-balance"><span class="tt-balance-label">Demo Balance</span><span class="tt-symbol-label" id="tt-symbol-label"></span><span class="tt-balance-value" id="tt-balance">$0.00</span></div>
 
         <div class="tt-side-toggle">
           <button class="tt-side-btn long-active" id="tt-btn-long">Long</button>
@@ -249,7 +289,7 @@
   // ── Submit order ────────────────────────────────────────────────────
   async function submitDemoOrder() {
     if (!state.user) { notify('Please sign in first', 'error'); return; }
-    const symbol = marketStore.getState().symbol;
+    const symbol = tradeActiveSource === 'pane2' && tradeActiveSymbol ? tradeActiveSymbol : marketStore.getState().symbol;
     const entryPrice = priceMap[symbol] || latestPrice;
     if (!symbol || !entryPrice) { notify('Waiting for live price, try again in a sec', 'error'); return; }
     priceMap[symbol] = entryPrice; // seed immediately — don't wait for the next tick to know this symbol's price
