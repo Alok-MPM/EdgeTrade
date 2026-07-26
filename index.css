@@ -213,7 +213,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   --d1:200ms; --d2:400ms; --d3:800ms; --d4:1600ms; --d5:3200ms;
   --shadow-premium:0 40px 100px rgba(0,0,0,.55);
   --shadow-deep:0 80px 180px rgba(0,0,0,.75);
-  background:var(--bg);color:var(--ink);font-family:var(--sans);overflow-x:hidden;position:relative;
+  background:var(--bg);color:var(--ink);font-family:var(--sans);position:relative;
 }
 #page-landing::before{
   content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
@@ -1474,7 +1474,6 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .market-watch-panel,
 .trade-panel,
 .ai-panel,
-.terminal-ad-slot,
 .terminal-bottom .bottom-dock{
   background:linear-gradient(180deg, rgba(21,34,53,.72), rgba(16,27,42,.72));
   backdrop-filter:blur(var(--ct-blur));
@@ -1489,7 +1488,6 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .market-watch-panel:hover,
 .trade-panel:hover,
 .ai-panel:hover,
-.terminal-ad-slot:hover,
 .terminal-bottom .bottom-dock:hover{
   transform:translateY(-2px);
   border-color:rgba(212,175,55,.35);
@@ -1520,12 +1518,21 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   gap:14px;
 }
 .chart-workspace{
+  flex:1 1 auto;
+  min-height:0;
   box-shadow:0 0 0 1px rgba(212,175,55,.06), 0 0 40px rgba(212,175,55,.05), 0 8px 30px rgba(0,0,0,.28);
+}
+
+.chart-container{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
 }
 
 /* ── STEP 5: Toolbar — premium pill buttons ── */
 .chart-toolbar{
   min-height:48px;
+  flex-shrink:0;
   display:flex;
   align-items:center;
   gap:6px;
@@ -1612,47 +1619,6 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   background:rgba(255,255,255,.03);
 }
 
-/* ── STEP 9: "Market Insight" ad card ── */
-.terminal-ad-slot{
-  position:relative;
-  padding:14px 16px;
-  overflow:hidden;
-  background:linear-gradient(135deg, rgba(212,175,55,.08), rgba(16,27,42,.75));
-}
-.terminal-ad-slot::before{
-  content:"Market Insight";
-  display:block;
-  font-family:'Outfit',sans-serif;
-  font-size:12px;
-  font-weight:600;
-  color:var(--ct-text);
-  margin-bottom:8px;
-}
-.terminal-ad-slot .sponsored-label{
-  position:absolute;
-  top:10px;
-  right:14px;
-  font-size:9px;
-  letter-spacing:.6px;
-  text-transform:uppercase;
-  color:var(--ct-gold);
-  background:rgba(212,175,55,.12);
-  border:1px solid rgba(212,175,55,.3);
-  border-radius:999px;
-  padding:2px 8px;
-}
-.terminal-ad-slot .adsense-placeholder{
-  min-height:70px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:var(--ct-muted);
-  font-size:12px;
-  border:1px dashed rgba(255,255,255,.08);
-  border-radius:10px;
-  animation:ctGlowPulse 3s ease-in-out infinite;
-}
-
 /* ── STEP 10: AI Dock — floating bottom right ── */
 .floating-ai-button{
   position:fixed;
@@ -1693,10 +1659,6 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   from{ opacity:0; transform:translateX(-10px); }
   to{ opacity:1; transform:translateX(0); }
 }
-@keyframes ctGlowPulse{
-  0%,100%{ opacity:.55; filter:brightness(1); }
-  50%{ opacity:.9; filter:brightness(1.15); }
-}
 @keyframes ctFloat{
   0%,100%{ transform:translateY(0); }
   50%{ transform:translateY(-4px); }
@@ -1717,7 +1679,6 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .market-watch-panel,
 .trade-panel,
 .ai-panel,
-.terminal-ad-slot,
 .terminal-bottom .bottom-dock{
   animation:ctPanelAppear .3s ease both;
 }
@@ -1755,7 +1716,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 @media(max-width:900px){
   /* Flatten terminal-left/right so every panel becomes an orderable
      flex item of terminal-shell — lets us match the requested mobile
-     stack order (Chart → Trade → History → Ads → AI) without touching
+     stack order (Chart → Trade → History → AI) without touching
      the HTML. Market-watch is placed right after Trade by default;
      ai-panel is hidden on mobile since the floating AI button already
      covers that role there — flag this assumption if you want it shown instead. */
@@ -1767,7 +1728,6 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   .trade-panel{ order:2; }
   .market-watch-panel{ order:3; }
   .terminal-bottom{ order:4; }
-  .terminal-ad-slot{ order:5; }
   .ai-panel{ display:none; }
 }
 
@@ -1875,14 +1835,8 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .ct-typing-dots span:nth-child(3){ animation-delay:.3s; }
 @keyframes ctTypingDot{ 0%,60%,100%{ opacity:.3; transform:translateY(0); } 30%{ opacity:1; transform:translateY(-3px); } }
 
-/* ── Ad fade-in (Module 9), zero CLS ── */
-.adsense-placeholder{ transition:opacity .2s ease; }
-.adsense-placeholder.ct-fade-out{ opacity:0; }
-.adsense-placeholder.ct-fade-in{ opacity:1; }
-
 /* ── Focus Mode (Module 10 / Phase 4 §2) ── */
 .terminal-shell.ct-focus-mode .terminal-right,
-.terminal-shell.ct-focus-mode .terminal-ad-slot,
 .terminal-shell.ct-focus-mode .terminal-bottom{
   opacity:.45;
   filter:saturate(.7);
