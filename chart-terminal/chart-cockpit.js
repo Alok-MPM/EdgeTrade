@@ -44,10 +44,17 @@
     .ctc-dd{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--bg3);border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:10px;padding:6px;z-index:40;box-shadow:0 12px 30px rgba(0,0,0,0.35);min-width:150px;}
     .ctc-dd.open{display:block;}
     .ctc-dd-search{width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg);color:var(--text,#EAECEF);font-size:12px;margin-bottom:6px;box-sizing:border-box;}
-    .ctc-dd-item{padding:8px 10px;border-radius:6px;font-size:12.5px;color:var(--text,#EAECEF);cursor:pointer;font-family:'JetBrains Mono',monospace;}
+    .ctc-dd-item{padding:8px 10px;border-radius:6px;font-size:12.5px;color:var(--text,#EAECEF);cursor:pointer;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:space-between;gap:10px;}
     .ctc-dd-item:hover{background:var(--bg4);}
     .ctc-dd-item.active{color:var(--gold);background:var(--gold-dim);}
     .ctc-dd-list{max-height:260px;overflow-y:auto;}
+
+    .ctc-dd-tabs{display:flex;gap:4px;margin-bottom:6px;padding:2px;background:var(--bg);border-radius:6px;}
+    .ctc-dd-tab{flex:1;text-align:center;padding:6px 4px;border-radius:5px;font-size:11.5px;font-family:'Outfit',sans-serif;font-weight:500;color:var(--muted,#8a8f98);cursor:pointer;}
+    .ctc-dd-tab.active{background:var(--gold-dim);color:var(--gold);}
+    .ctc-dd-broker-tag{font-family:'Outfit',sans-serif;font-size:11px;color:var(--muted,#8a8f98);flex-shrink:0;}
+    .ctc-dd-item.active .ctc-dd-broker-tag{color:var(--gold);}
+    .ctc-source-tag{font-family:'Outfit',sans-serif;font-size:10.5px;color:var(--muted,#8a8f98);background:var(--bg4);border-radius:5px;padding:2px 6px;}
 
     .ctc-ai-btn{background:var(--gold);color:var(--gold-text);}
     .ctc-ai-btn:hover{filter:brightness(1.1);}
@@ -55,15 +62,16 @@
   document.head.appendChild(style);
 
   // ── State ────────────────────────────────────────────────────────────
-  let tabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', marketType: 'spot', indicators: [] }];
+  let tabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', indicators: [], source: 'edge' }];
   let activeTabId = 1;
   let nextTabId = 2;
-  let binanceMarkets = null; // cached top-150 USDT pair list, for the market search dropdown
+  let binanceMarkets = null; // cached top-150 USDT pair list — the searchable symbol universe for ALL 3 dropdown tabs (Edge/Spot/Perp); Spot/Perp tabs filter this list down to whichever brokers actually carry each symbol, via marketStore.getBrokersForSymbol()
+  let dropdownMarketTab = 'edge'; // which of the 3 dropdown tabs (Edge/Spot/Perpetual) is currently open
+  let marketSearchQuery = ''; // last-typed search text, kept so re-renders (e.g. when symbol lists finish loading) preserve it
 
   let mountEl = null;
 
   const CHART_TYPE_LABELS = { candle_solid: 'Candle', candle_stroke: 'Hollow', ohlc: 'OHLC', area: 'Area' };
-  const MARKET_TYPE_LABELS = { spot: 'Spot', perp: 'Perp', combined: 'Combined' };
   const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
   const INDICATORS = [
     { name: 'MA', overlay: true }, { name: 'EMA', overlay: true }, { name: 'BOLL', overlay: true },
@@ -77,9 +85,15 @@
 
     render();
     chartEngine.init({ containerId: opts.chartContainerId || 'klineMainChart' });
-    marketStore.init({ symbol: tabs[0].symbol, interval: tabs[0].interval, marketType: tabs[0].marketType });
+    marketStore.init({ symbol: tabs[0].symbol, interval: tabs[0].interval });
 
     loadBinanceMarkets(); // fire and forget, populates dropdown when ready
+
+    // Spot/Perp dropdown rows depend on marketStore's per-broker symbol
+    // availability cache (Phase 3) — that loads async in the background,
+    // so re-render the currently-open list once it's ready (harmless no-op
+    // if the dropdown isn't open or the Edge tab is active).
+    marketStore.onSymbolListsReady(() => renderCurrentMarketList());
 
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.ctc-wrap')) closeAllDropdowns();
@@ -97,9 +111,15 @@
         <div class="ctc-wrap" id="ctc-market-wrap">
           <button class="ctc-pill" id="ctc-market-btn" style="font-family:'JetBrains Mono',monospace;">
             <span id="ctc-market-label">${formatSymbol(activeTab().symbol)}</span>
+            <span class="ctc-source-tag" id="ctc-market-source">${brokerDisplayName(activeTab().source)}</span>
             <svg class="ctc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="ctc-dd" id="ctc-market-dd">
+            <div class="ctc-dd-tabs" id="ctc-dd-tabs">
+              <div class="ctc-dd-tab active" data-dd-tab="edge">Edge</div>
+              <div class="ctc-dd-tab" data-dd-tab="spot">Spot</div>
+              <div class="ctc-dd-tab" data-dd-tab="perp">Perpetual</div>
+            </div>
             <input type="text" class="ctc-dd-search" id="ctc-market-search" placeholder="Search market...">
             <div class="ctc-dd-list" id="ctc-market-list"><div style="padding:8px;color:var(--muted,#8a8f98);font-size:12px;">Loading markets...</div></div>
           </div>
@@ -113,15 +133,6 @@
           </button>
           <div class="ctc-dd" id="ctc-tf-dd">
             <div class="ctc-dd-list">${TIMEFRAMES.map(tf => `<div class="ctc-dd-item${tf === activeTab().interval ? ' active' : ''}" data-tf="${tf}">${tf}</div>`).join('')}</div>
-          </div>
-        </div>
-
-        <div class="ctc-wrap" id="ctc-mt-wrap">
-          <button class="ctc-pill" id="ctc-mt-btn"><span id="ctc-mt-label">${MARKET_TYPE_LABELS[activeTab().marketType]}</span>
-            <svg class="ctc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="ctc-dd" id="ctc-mt-dd">
-            <div class="ctc-dd-list">${Object.keys(MARKET_TYPE_LABELS).map(m => `<div class="ctc-dd-item${m === activeTab().marketType ? ' active' : ''}" data-mt="${m}">${MARKET_TYPE_LABELS[m]}</div>`).join('')}</div>
           </div>
         </div>
 
@@ -182,17 +193,17 @@
 
     document.getElementById('ctc-market-btn').onclick = () => toggleDropdown('ctc-market-dd');
     document.getElementById('ctc-tf-btn').onclick = () => toggleDropdown('ctc-tf-dd');
-    document.getElementById('ctc-mt-btn').onclick = () => toggleDropdown('ctc-mt-dd');
     document.getElementById('ctc-ct-btn').onclick = () => toggleDropdown('ctc-ct-dd');
     document.getElementById('ctc-ind-btn').onclick = () => toggleDropdown('ctc-ind-dd');
+
+    document.getElementById('ctc-dd-tabs').addEventListener('click', (e) => {
+      const tabName = e.target.getAttribute('data-dd-tab');
+      if (tabName) selectDropdownTab(tabName);
+    });
 
     document.getElementById('ctc-tf-dd').addEventListener('click', (e) => {
       const tf = e.target.getAttribute('data-tf');
       if (tf) selectTimeframe(tf);
-    });
-    document.getElementById('ctc-mt-dd').addEventListener('click', (e) => {
-      const mt = e.target.getAttribute('data-mt');
-      if (mt) selectMarketType(mt);
     });
     document.getElementById('ctc-ct-dd').addEventListener('click', (e) => {
       const ct = e.target.getAttribute('data-ct');
@@ -257,16 +268,6 @@
     await marketStore.setInterval(tf);
   }
 
-  async function selectMarketType(mode) {
-    closeAllDropdowns();
-    const tab = activeTab();
-    if (mode === tab.marketType) return;
-    tab.marketType = mode;
-    document.getElementById('ctc-mt-label').textContent = MARKET_TYPE_LABELS[mode];
-    document.querySelectorAll('#ctc-mt-dd .ctc-dd-item').forEach(el => el.classList.toggle('active', el.getAttribute('data-mt') === mode));
-    await marketStore.setMarketType(mode);
-  }
-
   function selectChartType(type) {
     closeAllDropdowns();
     const tab = activeTab();
@@ -286,20 +287,27 @@
     else { tab.indicators = tab.indicators.filter(n => n !== name); }
   }
 
-  async function selectMarket(symbol) {
+  async function selectMarket(symbol, source) {
     closeAllDropdowns();
     const tab = activeTab();
-    if (symbol === tab.symbol) return;
+    if (symbol === tab.symbol && source === tab.source) return;
     tab.symbol = symbol;
+    tab.source = source;
     document.getElementById('ctc-market-label').textContent = formatSymbol(symbol);
+    document.getElementById('ctc-market-source').textContent = brokerDisplayName(source);
     renderTabs();
+    // Source first (so the aggregate/single-broker active-set is correct),
+    // then symbol — marketStore.setSource() re-fetches with whatever symbol
+    // is current at that moment, so either order converges correctly; this
+    // order just reads more naturally (pick the source, then the market).
+    await marketStore.setSource(source);
     await marketStore.setSymbol(symbol, tab.interval);
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────
   async function addTab() {
     const fromSymbol = activeTab().symbol;
-    const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', marketType: 'spot', indicators: [] };
+    const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', indicators: [], source: 'edge' };
     tabs.push(tab);
     await switchTab(tab.id);
 
@@ -318,8 +326,8 @@
 
     // Restore this tab's saved config into market-store + chart-engine.
     document.getElementById('ctc-market-label').textContent = formatSymbol(tab.symbol);
+    document.getElementById('ctc-market-source').textContent = brokerDisplayName(tab.source);
     document.getElementById('ctc-tf-label').textContent = tab.interval;
-    document.getElementById('ctc-mt-label').textContent = MARKET_TYPE_LABELS[tab.marketType];
     document.getElementById('ctc-ct-label').textContent = CHART_TYPE_LABELS[tab.chartType];
     chartEngine.setChartType(tab.chartType);
 
@@ -343,9 +351,7 @@
       window.chartSplit.handleTabChangeIfNeeded();
     }
 
-    if (marketStore.getMarketType() !== tab.marketType) {
-      await marketStore.setMarketType(tab.marketType);
-    }
+    await marketStore.setSource(tab.source);
     await marketStore.setSymbol(tab.symbol, tab.interval);
   }
 
@@ -363,6 +369,15 @@
   }
 
   // ── Market list (search dropdown) ──────────────────────────────────
+  // Candidate symbol universe for ALL 3 dropdown tabs (Edge/Spot/Perpetual)
+  // — Binance's top-150-by-volume USDT pairs, same list the dropdown has
+  // always used. Spot/Perp tabs don't change this candidate list; they
+  // just filter it down, per symbol, to whichever brokers actually carry
+  // it (marketStore.getBrokersForSymbol). A symbol that exists on a broker
+  // but isn't in Binance's top-150 (e.g. a small-cap only on Bybit spot)
+  // won't surface here yet — acceptable for now since it matches today's
+  // existing scope; can be widened later with a broker-agnostic candidate
+  // list if that gap turns out to matter in practice.
   async function loadBinanceMarkets() {
     try {
       const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
@@ -376,22 +391,101 @@
       console.error('[chart-cockpit] failed to load market list:', err);
       binanceMarkets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT'];
     }
-    renderMarketList(binanceMarkets);
+    renderCurrentMarketList();
   }
 
-  function renderMarketList(symbols) {
+  // Switches which dropdown tab (Edge/Spot/Perpetual) is showing, re-renders
+  // the list under the CURRENT search query (search text is preserved across
+  // tab switches, same as TradingView's picker).
+  function selectDropdownTab(tabName) {
+    if (tabName === dropdownMarketTab) return;
+    dropdownMarketTab = tabName;
+    document.querySelectorAll('#ctc-dd-tabs .ctc-dd-tab').forEach(el => el.classList.toggle('active', el.getAttribute('data-dd-tab') === tabName));
+    renderCurrentMarketList();
+  }
+
+  // Single entry point that (re-)renders the list for whichever dropdown
+  // tab is active, under the current search query. Called on: initial load,
+  // search input, dropdown-tab switch, and once symbol-availability data
+  // finishes loading (marketStore's 'symbolListsReady' event).
+  function renderCurrentMarketList() {
+    if (!binanceMarkets) return; // still loading Binance's list — nothing to render yet
+    const q = marketSearchQuery.toUpperCase();
+    const matches = q ? binanceMarkets.filter(s => s.includes(q)) : binanceMarkets;
+
+    if (dropdownMarketTab === 'edge') {
+      renderEdgeRows(matches);
+    } else {
+      renderBrokerRows(matches, dropdownMarketTab);
+    }
+  }
+
+  // Edge tab: one row per symbol, always labeled 'EdgeTrade' — selecting
+  // one sets source='edge' (the existing combined/aggregate mode).
+  function renderEdgeRows(symbols) {
     const el = document.getElementById('ctc-market-list');
     if (!el) return;
-    el.innerHTML = symbols.map(s => `<div class="ctc-dd-item" data-symbol="${s}">${formatSymbol(s)}</div>`).join('');
+    const tab = activeTab();
+    el.innerHTML = symbols.map(s => `
+      <div class="ctc-dd-item${s === tab.symbol && tab.source === 'edge' ? ' active' : ''}" data-symbol="${s}" data-source="edge">
+        <span>${formatSymbol(s)}</span><span class="ctc-dd-broker-tag">EdgeTrade</span>
+      </div>
+    `).join('');
     el.querySelectorAll('[data-symbol]').forEach(item => {
-      item.onclick = () => selectMarket(item.getAttribute('data-symbol'));
+      item.onclick = () => selectMarket(item.getAttribute('data-symbol'), item.getAttribute('data-source'));
+    });
+  }
+
+  // Spot/Perpetual tabs: expands each matching symbol into one row PER
+  // broker that actually carries it on that market type — e.g. searching
+  // "BTC" under Spot shows "BTC/USDT — Binance" AND "BTC/USDT — Bybit" as
+  // two separate, individually-selectable rows (TradingView-style).
+  function renderBrokerRows(symbols, marketType) {
+    const el = document.getElementById('ctc-market-list');
+    if (!el) return;
+
+    if (!marketStore.areSymbolListsReady()) {
+      el.innerHTML = `<div style="padding:8px;color:var(--muted,#8a8f98);font-size:12px;">Loading ${marketType === 'spot' ? 'Spot' : 'Perpetual'} brokers...</div>`;
+      return;
+    }
+
+    const tab = activeTab();
+    const rows = [];
+    symbols.forEach(sym => {
+      marketStore.getBrokersForSymbol(sym, marketType).forEach(broker => {
+        rows.push({ symbol: sym, brokerId: broker.id, displayName: broker.displayName });
+      });
+    });
+
+    if (!rows.length) {
+      el.innerHTML = `<div style="padding:8px;color:var(--muted,#8a8f98);font-size:12px;">No ${marketType === 'spot' ? 'Spot' : 'Perpetual'} listings found.</div>`;
+      return;
+    }
+
+    el.innerHTML = rows.map(r => `
+      <div class="ctc-dd-item${r.symbol === tab.symbol && r.brokerId === tab.source ? ' active' : ''}" data-symbol="${r.symbol}" data-source="${r.brokerId}">
+        <span>${formatSymbol(r.symbol)}</span><span class="ctc-dd-broker-tag">${r.displayName}</span>
+      </div>
+    `).join('');
+    el.querySelectorAll('[data-symbol]').forEach(item => {
+      item.onclick = () => selectMarket(item.getAttribute('data-symbol'), item.getAttribute('data-source'));
     });
   }
 
   function filterMarketList(query) {
-    if (!binanceMarkets) return;
-    const q = query.toUpperCase();
-    renderMarketList(q ? binanceMarkets.filter(s => s.includes(q)) : binanceMarkets);
+    marketSearchQuery = query;
+    renderCurrentMarketList();
+  }
+
+  // Resolves a tab's `source` ('edge' or a specific broker id) into the
+  // label shown in the market pill / dropdown rows — reads the REAL
+  // displayName from market-store's broker registry (Phase 1), never
+  // hardcoded, so a future new broker's name shows up correctly automatically.
+  function brokerDisplayName(source) {
+    if (source === 'edge') return 'EdgeTrade';
+    const marketType = source.endsWith('-perp') ? 'perp' : 'spot';
+    const found = marketStore.getBrokersForMarketType(marketType).find(b => b.id === source);
+    return found ? found.displayName : source;
   }
 
   function formatSymbol(sym) {
