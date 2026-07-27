@@ -2614,8 +2614,7 @@ document.addEventListener("DOMContentLoaded", () => {
     theme: 'dark',
     layout: { historyCollapsed: false, marketWatchWidth: null },
     sidebarState: 'expanded',
-    aiOpen: false,
-    adLoaded: false
+    aiOpen: false
   };
   function loadState(){
     try {
@@ -2663,8 +2662,6 @@ document.addEventListener("DOMContentLoaded", () => {
     dom.marketWatch   = document.querySelector('.market-watch-panel');
     dom.tradePanel    = document.querySelector('.trade-panel');
     dom.aiPanel       = document.querySelector('.ai-panel');
-    dom.adSlot        = document.querySelector('.terminal-ad-slot');
-    dom.adPlaceholder = document.querySelector('.adsense-placeholder');
     dom.bottomDock    = document.querySelector('.bottom-dock');
     dom.dockHeader    = document.querySelector('.dock-header');
     dom.dockContent   = document.querySelector('.dock-content');
@@ -2688,7 +2685,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (startupPlayed) return;
     startupPlayed = true;
     if (reducedMotion) { // just show everything, no stagger
-      [dom.chartWorkspace, dom.marketWatch, dom.tradePanel, dom.aiPanel, dom.adSlot, dom.bottomDock]
+      [dom.chartWorkspace, dom.marketWatch, dom.tradePanel, dom.aiPanel, dom.bottomDock]
         .forEach(el => el && el.classList.add('ct-ready'));
       return;
     }
@@ -2831,22 +2828,6 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.aiPanel.appendChild(dots);
       }
     } else if (dots) dots.remove();
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // PHASE 3 · MODULE 9  +  PHASE 5 §5 — ad placeholder → ad, zero CLS
-  // Height is reserved by CSS (.adsense-placeholder min-height), so
-  // swapping content never shifts layout.
-  // ══════════════════════════════════════════════════════════════════
-  function markAdLoaded(html){
-    if (!dom.adPlaceholder || terminalState.adLoaded) return;
-    dom.adPlaceholder.classList.add('ct-fade-out');
-    setTimeout(() => {
-      if (html) dom.adPlaceholder.innerHTML = html; // caller-provided ad markup only
-      dom.adPlaceholder.classList.remove('ct-fade-out');
-      dom.adPlaceholder.classList.add('ct-fade-in');
-      terminalState.adLoaded = true;
-    }, reducedMotion ? 0 : 200);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -3288,7 +3269,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── public API ───────────────────────────────────────────────────
   window.EdgeTerminal = {
     state: terminalState,
-    notify, flashPrice, animateNumber, markAdLoaded,
+    notify, flashPrice, animateNumber,
     setAITyping, focusOnTradeConfirm,
     checkConsecutiveLosses, checkLeverageRisk,
     setTheme, sound
