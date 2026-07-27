@@ -2065,158 +2065,139 @@ function toggleStratDetail(id){
   if(!isOpen) el.classList.add('open');
 }
 // ═══════════════════════════════════
-// CANDLE RAIN ANIMATION — TAGDA VERSION
+// LANDING PAGE — ambient particles, scroll motion, feature timeline,
+// AI insight rotation, broker sync wall (all scoped inside an IIFE so
+// nothing here touches global scope or other pages)
 // ═══════════════════════════════════
-(function initCandleRain(){
-  const canvas = document.getElementById('candle-rain');
-  if(!canvas) return;
-  const ctx = canvas.getContext('2d');
+(function initLandingPage(){
+  const pageParticles = document.getElementById('pageParticles');
+  if(!pageParticles) return;
 
-  function resize(){
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-  }
-  resize();
-  window.addEventListener('resize', resize);
-
-  // Candle factory
-  function newCandle(spreadY){
-    const bull = Math.random() > 0.44;
-    const bH = 18 + Math.random() * 52;
-    const bW = 6 + Math.random() * 7;
-    return {
-      x: Math.random() * canvas.width,
-      y: spreadY ? Math.random() * canvas.height : -100 - Math.random() * 400,
-      speed: 0.6 + Math.random() * 1.4,
-      bH, bW,
-      wickT: 6 + Math.random() * 22,
-      wickB: 6 + Math.random() * 16,
-      bull,
-      alpha: 0.08 + Math.random() * 0.38,
-      drift: (Math.random() - 0.5) * 0.25,
-      rot: (Math.random() - 0.5) * 0.22,
-      rotSpeed: (Math.random() - 0.5) * 0.0012,
-      scale: 0.55 + Math.random() * 1.0,
-      // Glow pulse
-      pulse: Math.random() * Math.PI * 2,
-      pulseSpeed: 0.02 + Math.random() * 0.03,
-    };
+  /* ===== Full-page ambient particles (behind cards, travel bottom to top) ===== */
+  const dotCount = window.innerWidth <= 760 ? 18 : (window.innerWidth <= 1024 ? 24 : 40);
+  for(let i=0;i<dotCount;i++){
+    const d = document.createElement('span');
+    d.className = 'p-dot';
+    d.style.left = Math.random()*100+'%';
+    d.style.top = Math.random()*100+'%';
+    d.style.animationDuration = (16+Math.random()*14)+'s';
+    d.style.animationDelay = (Math.random()*20)+'s';
+    pageParticles.appendChild(d);
   }
 
-  const COUNT = 55;
-  const candles = [];
-  for(let i = 0; i < COUNT; i++) candles.push(newCandle(true));
+  /* ===== Navbar scroll state + progress bar =====
+     rAF-throttled so the main thread only does this work once per
+     animation frame instead of once per scroll event. */
+  const nav = document.getElementById('nav');
+  const scrollProgress = document.getElementById('scrollProgress');
+  const docEl = document.documentElement;
 
-  function drawCandle(c){
-    ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(c.rot);
-    ctx.scale(c.scale, c.scale);
+  let scrollTicking = false;
+  function onScrollFrame(){
+    const y = window.scrollY;
 
-    // Pulsing glow effect
-    const glowPulse = 0.7 + 0.3 * Math.sin(c.pulse);
-    ctx.globalAlpha = c.alpha * glowPulse;
-
-    const col = c.bull ? '#4CAF7D' : '#E05252';
-    const glowCol = c.bull ? 'rgba(76,175,125,0.15)' : 'rgba(224,82,82,0.15)';
-    const hw = c.bW / 2;
-
-    // Outer glow
-    const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, c.bW * 2.5);
-    grd.addColorStop(0, glowCol);
-    grd.addColorStop(1, 'transparent');
-    ctx.fillStyle = grd;
-    ctx.fillRect(-c.bW * 2.5, -c.bH / 2 - c.wickT, c.bW * 5, c.bH + c.wickT + c.wickB);
-
-    // Wick
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 1.4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, -c.bH / 2 - c.wickT);
-    ctx.lineTo(0, c.bH / 2 + c.wickB);
-    ctx.stroke();
-
-    // Candle body
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    if(ctx.roundRect){
-      ctx.roundRect(-hw, -c.bH / 2, c.bW, c.bH, 2);
-    } else {
-      ctx.rect(-hw, -c.bH / 2, c.bW, c.bH);
+    if(nav){
+      if(y>40) nav.classList.add('scrolled');
+      else nav.classList.remove('scrolled');
     }
-    ctx.fill();
 
-    // Shine on body
-    const shine = ctx.createLinearGradient(-hw, -c.bH/2, hw, c.bH/2);
-    shine.addColorStop(0, 'rgba(255,255,255,0.18)');
-    shine.addColorStop(0.4, 'rgba(255,255,255,0.06)');
-    shine.addColorStop(1, 'rgba(0,0,0,0.1)');
-    ctx.fillStyle = shine;
-    ctx.beginPath();
-    if(ctx.roundRect){
-      ctx.roundRect(-hw, -c.bH / 2, c.bW, c.bH, 2);
-    } else {
-      ctx.rect(-hw, -c.bH / 2, c.bW, c.bH);
+    if(scrollProgress){
+      const scrolled = (docEl.scrollTop/(docEl.scrollHeight-docEl.clientHeight))*100;
+      scrollProgress.style.width = scrolled+'%';
     }
-    ctx.fill();
 
-    ctx.restore();
+    scrollTicking = false;
   }
+  window.addEventListener('scroll',()=>{
+    if(!scrollTicking){
+      requestAnimationFrame(onScrollFrame);
+      scrollTicking = true;
+    }
+  },{passive:true});
 
-  let animId;
-  let lastTime = 0;
-
-  function animate(timestamp){
-    const delta = Math.min((timestamp - lastTime) / 16, 3);
-    lastTime = timestamp;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    candles.forEach(c => {
-      c.y += c.speed * delta;
-      c.x += c.drift * delta;
-      c.rot += c.rotSpeed * delta;
-      c.pulse += c.pulseSpeed * delta;
-
-      // Reset when off screen
-      if(c.y > canvas.height + 120){
-        Object.assign(c, newCandle(false));
-      }
-      // Keep x in bounds loosely
-      if(c.x < -60) c.drift = Math.abs(c.drift);
-      if(c.x > canvas.width + 60) c.drift = -Math.abs(c.drift);
-
-      drawCandle(c);
+  /* ===== Scroll reveal (section enter) ===== */
+  const revealEls = document.querySelectorAll('#page-landing .reveal');
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting) en.target.classList.add('in');
     });
+  },{threshold:.15});
+  revealEls.forEach(el=>io.observe(el));
 
-    animId = requestAnimationFrame(animate);
+  /* ===== Stat counters ===== */
+  const counters = document.querySelectorAll('#page-landing [data-count]');
+  const cIo = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting) return;
+      const el = en.target;
+      const end = parseFloat(el.dataset.count);
+      const suffix = el.dataset.suffix || '';
+      let cur = 0;
+      const step = Math.max(end/60,0.5);
+      function tick(){
+        cur += step;
+        if(cur < end){ el.textContent = Math.floor(cur)+suffix; requestAnimationFrame(tick); }
+        else{ el.textContent = end+suffix; }
+      }
+      tick();
+      cIo.unobserve(el);
+    });
+  },{threshold:.6});
+  counters.forEach(c=>cIo.observe(c));
+
+  /* ===== Feature modules — scroll activation + timeline sync ===== */
+  const modules = document.querySelectorAll('#page-landing .feature-module');
+  const timelineItems = document.querySelectorAll('#page-landing .timeline-item');
+  const timelineProgress = document.getElementById('timelineProgress');
+  const moduleObserver = new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        modules.forEach(card=>card.classList.remove('active'));
+        entry.target.classList.add('active');
+        const index = [...modules].indexOf(entry.target);
+        timelineItems.forEach(item=>item.classList.remove('active'));
+        if(timelineItems[index]) timelineItems[index].classList.add('active');
+        if(timelineProgress) timelineProgress.style.height = (((index+1)/modules.length)*100)+'%';
+      }
+    });
+  },{threshold:.55});
+  modules.forEach(card=>moduleObserver.observe(card));
+
+  /* ===== Edge AI insight — fades between messages every 12s ===== */
+  const aiMessages = [
+    "Avoid revenge trading. Losses spike 32% after a red trade.",
+    "Friday is your weakest day — win rate drops to 28%.",
+    "Risk too high after 3 consecutive wins. Consider sizing down.",
+    "Morning sessions outperform your afternoon trades by 19%."
+  ];
+  const aiText = document.getElementById('aiText');
+  if(aiText){
+    let aiIndex = 0;
+    setInterval(()=>{
+      aiIndex = (aiIndex+1) % aiMessages.length;
+      aiText.style.opacity = 0;
+      setTimeout(()=>{
+        aiText.textContent = aiMessages[aiIndex];
+        aiText.style.opacity = .9;
+      },400);
+    },12000);
   }
 
-  animId = requestAnimationFrame(animate);
-
-  // Pause when tab hidden — save battery
-  document.addEventListener('visibilitychange', () => {
-    if(document.hidden){
-      cancelAnimationFrame(animId);
-    } else {
-      lastTime = 0;
-      animId = requestAnimationFrame(animate);
-    }
-  });
-
-  // Pause when scrolled past hero
-  const heroSection = document.querySelector('.hero');
-  if(heroSection){
-    const obs = new IntersectionObserver(entries => {
-      if(entries[0].isIntersecting){
-        lastTime = 0;
-        animId = requestAnimationFrame(animate);
-      } else {
-        cancelAnimationFrame(animId);
-      }
-    }, {threshold: 0.01});
-    obs.observe(heroSection);
+  /* ===== Integration wall — quiet background-sync pulse ===== */
+  const integrations = document.querySelectorAll('#page-landing .integration-card');
+  if(integrations.length){
+    integrations.forEach(card=>{
+      const status = document.createElement('div');
+      status.className = 'sync-status';
+      status.innerHTML = '<span class="sync-dot"></span>Synced';
+      card.appendChild(status);
+    });
+    let activeIdx = 0;
+    setInterval(()=>{
+      integrations.forEach(card=>card.classList.remove('active'));
+      integrations[activeIdx].classList.add('active');
+      activeIdx = (activeIdx+1) % integrations.length;
+    },5000);
   }
 })();
 
@@ -2520,19 +2501,6 @@ document.addEventListener("DOMContentLoaded", () => {
     card.addEventListener('touchcancel', handleReset);
   });
 
-  const revealElements = document.querySelectorAll('.section, .how-section, .brokers-sec, .cta-sec');
-  revealElements.forEach(el => el.classList.add('reveal-up'));
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target); 
-      }
-    });
-  }, { threshold: 0.15 });
-
-  revealElements.forEach(el => observer.observe(el));
 });
 
 // --- GENTLE 3D HOVER FOR TRADE CARDS (dynamically created, event delegation) ---
