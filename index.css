@@ -1407,7 +1407,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 
 /* — Order book / trade terminal side columns (widths only — order-book.js
      and trade-terminal.js already draw their own white-card look) — */
-.ct-terminal-side-col{width:320px;flex-shrink:0;}
+.ct-terminal-side-col{flex:1 1 0;min-width:0;width:auto;max-width:340px;}
 
 /* — Bottom Dock (Trade Information: Open Positions / Trade History) — */
 .bottom-dock{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
@@ -1442,8 +1442,8 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 
 /* ── STEP 1: Design tokens (scoped) ── */
 .chart-terminal-layout{
-  --ct-bg:#071018;
-  --ct-bg-secondary:#0d1623;
+  --ct-bg:#f3ecd8;
+  --ct-bg-secondary:#ebe0c2;
   --ct-panel:#101b2a;
   --ct-panel-light:#152235;
   --ct-border:rgba(255,255,255,.06);
@@ -1462,10 +1462,10 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .chart-terminal-layout{
   background-color:var(--ct-bg);
   background-image:
-    radial-gradient(1100px 550px at 12% -8%, rgba(212,175,55,.07), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(59,130,246,.055), transparent 55%),
-    repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 46px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 1px, transparent 1px 46px),
+    radial-gradient(1100px 550px at 12% -8%, rgba(212,175,55,.10), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(59,130,246,.04), transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.02) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 1px, transparent 1px 46px),
     linear-gradient(180deg, var(--ct-bg) 0%, var(--ct-bg-secondary) 100%);
   background-attachment:fixed;
 }
@@ -1510,7 +1510,8 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   gap:14px;
 }
 .terminal-right{
-  flex:0 0 auto;
+  flex:0 0 38%;
+  max-width:38%;
   min-width:0;
   display:flex;
   flex-direction:row;
