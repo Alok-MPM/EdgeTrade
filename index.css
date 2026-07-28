@@ -1470,12 +1470,11 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   background-attachment:fixed;
 }
 
-/* ── STEP 3: Panel style — glass, blur, thin border, floating depth ── */
+/* ── STEP 3: Panel style — glass, blur, thin border, floating depth ──
+   (chart-workspace only — order-book/trade-panel/bottom-dock draw
+   their own light card look and must never show a dark wrapper bg) ── */
 .chart-workspace,
-.market-watch-panel,
-.trade-panel,
-.ai-panel,
-.terminal-bottom .bottom-dock{
+.ai-panel{
   background:linear-gradient(180deg, rgba(21,34,53,.72), rgba(16,27,42,.72));
   backdrop-filter:blur(var(--ct-blur));
   -webkit-backdrop-filter:blur(var(--ct-blur));
@@ -1486,14 +1485,40 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   will-change:transform;
 }
 .chart-workspace:hover,
-.market-watch-panel:hover,
-.trade-panel:hover,
-.ai-panel:hover,
-.terminal-bottom .bottom-dock:hover{
+.ai-panel:hover{
   transform:translateY(-2px);
   border-color:rgba(212,175,55,.35);
   box-shadow:0 14px 40px rgba(0,0,0,.35), 0 0 0 1px rgba(212,175,55,.08);
 }
+
+/* — Order book / trade panel wrapper: no dark bg of its own. The JS
+   draws a white card inside; whatever isn't covered by that card
+   should just show the creamy page background behind it — */
+.market-watch-panel,
+.trade-panel{
+  background:transparent;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  border:none;
+  box-shadow:none;
+}
+
+/* — Bottom dock (Trade Information / Open Positions / Trade History):
+   forced light card regardless of the app's global dark theme, so
+   it never reads as a black box — */
+.terminal-bottom .bottom-dock{
+  background:#ffffff;
+  border:1px solid rgba(10,41,71,0.10);
+  border-radius:var(--ct-radius);
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+  color:#1f2937;
+}
+.terminal-bottom .dock-title,
+.terminal-bottom .bottom-tab-item{ color:#6b7280; }
+.terminal-bottom .bottom-tab-item.active{ color:var(--ct-gold); border-bottom-color:var(--ct-gold); }
+.terminal-bottom .dock-tabs{ border-bottom-color:rgba(10,41,71,0.10); }
+.terminal-bottom .tt-empty{ color:#8a93a3; }
+
 
 /* ── STEP 4: Chart as hero — width split + soft glow border ── */
 .terminal-main{
@@ -1510,8 +1535,8 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   gap:14px;
 }
 .terminal-right{
-  flex:0 0 38%;
-  max-width:38%;
+  flex:0 0 43%;
+  max-width:43%;
   min-width:0;
   display:flex;
   flex-direction:row;
@@ -1711,8 +1736,8 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 
 /* ── STEP 14: Responsive — 72/28 desktop, 65/35 tablet, stacked mobile ── */
 @media(max-width:1200px){
-  .terminal-left{ flex-basis:65%; max-width:65%; }
-  .terminal-right{ flex-basis:35%; max-width:35%; }
+  .terminal-left{ flex-basis:60%; max-width:60%; }
+  .terminal-right{ flex-basis:40%; max-width:40%; }
 }
 @media(max-width:900px){
   /* Flatten terminal-left/right so every panel becomes an orderable
@@ -1963,13 +1988,13 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
    Responsive refinement (Phase 5 §1)
    ══════════════════════════════════════════════════════════════ */
 @media(min-width:1600px){
-  .terminal-left{ flex-basis:74%; max-width:74%; }
-  .terminal-right{ flex-basis:26%; max-width:26%; }
+  .terminal-left{ flex-basis:69%; max-width:69%; }
+  .terminal-right{ flex-basis:31%; max-width:31%; }
   .terminal-main{ gap:20px; }
 }
 @media(min-width:1366px) and (max-width:1599px){
-  .terminal-left{ flex-basis:72%; max-width:72%; }
-  .terminal-right{ flex-basis:28%; max-width:28%; }
+  .terminal-left{ flex-basis:67%; max-width:67%; }
+  .terminal-right{ flex-basis:33%; max-width:33%; }
 }
 @media(max-width:1024px){
   .market-watch-panel{ max-height:260px; overflow:auto; }
