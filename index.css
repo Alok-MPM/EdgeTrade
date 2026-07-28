@@ -1503,19 +1503,18 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   min-height:0;
 }
 .terminal-left{
-  flex:0 0 72%;
-  max-width:72%;
+  flex:1 1 auto;
   min-width:0;
   display:flex;
   flex-direction:column;
   gap:14px;
 }
 .terminal-right{
-  flex:0 0 28%;
-  max-width:28%;
+  flex:0 0 auto;
   min-width:0;
   display:flex;
-  flex-direction:column;
+  flex-direction:row;
+  align-items:stretch;
   gap:14px;
 }
 .chart-workspace{
