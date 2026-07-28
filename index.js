@@ -2115,13 +2115,17 @@ function toggleStratDetail(id){
     }
   },{passive:true});
 
-  /* ===== Scroll reveal (section enter) ===== */
+  /* ===== Scroll reveal (section enter) =====
+     rootMargin extends the trigger zone 400px below the viewport so the
+     800ms fade-in has time to finish before a fast swipe/fling on touch
+     devices actually scrolls the element into view — otherwise content
+     can still be at opacity:0 when it flies past, looking like it "skipped". */
   const revealEls = document.querySelectorAll('#page-landing .reveal');
   const io = new IntersectionObserver(entries=>{
     entries.forEach(en=>{
       if(en.isIntersecting) en.target.classList.add('in');
     });
-  },{threshold:.15});
+  },{threshold:.01, rootMargin:'0px 0px 400px 0px'});
   revealEls.forEach(el=>io.observe(el));
 
   /* ===== Stat counters ===== */

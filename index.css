@@ -213,7 +213,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   --d1:200ms; --d2:400ms; --d3:800ms; --d4:1600ms; --d5:3200ms;
   --shadow-premium:0 40px 100px rgba(0,0,0,.55);
   --shadow-deep:0 80px 180px rgba(0,0,0,.75);
-  background:var(--bg);color:var(--ink);font-family:var(--sans);position:relative;
+  background:var(--bg);color:var(--ink);font-family:var(--sans);position:relative;z-index:0;
 }
 #page-landing::before{
   content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
