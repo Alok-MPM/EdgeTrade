@@ -4,68 +4,348 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Privacy Policy — EdgeTrade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  body{background:#0a0a0a;color:#e8e8e8;font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.7;max-width:820px;margin:0 auto;padding:40px 24px 80px}
-  h1{color:#d4af37;font-size:28px;margin-bottom:4px}
-  .updated{color:#888;font-size:13px;margin-bottom:32px}
-  h2{color:#d4af37;font-size:19px;margin-top:36px;border-bottom:1px solid #2a2a2a;padding-bottom:8px}
-  p,li{color:#c8c8c8;font-size:15px}
-  a{color:#d4af37}
-  ul{padding-left:20px}
-  .back{display:inline-block;margin-bottom:24px;color:#d4af37;text-decoration:none}
+:root{
+  --bg:#0D0F13; --bg2:#15181E; --bg3:#1B1F27;
+  --gold:#D4B886; --gold-soft:rgba(212,184,134,.13); --gold-line:rgba(212,184,134,.28); --gold-glow:rgba(212,184,134,.22);
+  --navy:#2A6496; --purple:#6B4FA0;
+  --ink:#EDEFF2; --muted:#8B949E;
+  --green:#4CAF7D;
+  --border:rgba(212,184,134,.10); --border2:rgba(255,255,255,.06);
+  --serif:'Cormorant Garamond',serif; --sans:'Outfit',sans-serif; --mono:'JetBrains Mono',monospace;
+  --motion:cubic-bezier(.22,1,.36,1);
+  --d1:200ms; --d2:400ms; --d3:800ms; --d4:1600ms;
+  --shadow-premium:0 40px 100px rgba(0,0,0,.55);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);overflow-x:hidden;position:relative;}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(circle at 12% 8%,rgba(212,184,134,.05),transparent 28%),
+    radial-gradient(circle at 88% 92%,rgba(42,100,150,.20),transparent 48%);
+}
+.page-particles{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:-1;}
+.p-dot{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--gold);opacity:0;animation:riseUp linear infinite;}
+@keyframes riseUp{0%{transform:translateY(0);opacity:0;}8%{opacity:.55;}92%{opacity:.55;}100%{transform:translateY(-115vh);opacity:0;}}
+a{text-decoration:none;color:inherit;}
+button{font-family:var(--sans);cursor:pointer;border:none;}
+.wrap{max-width:1200px;margin:0 auto;padding:0 6%;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;padding:22px 6%;background:rgba(13,15,19,.82);backdrop-filter:blur(28px);border-bottom:1px solid rgba(255,255,255,.05);}
+.nav-logo{display:flex;align-items:center;gap:10px;}
+.doc-back{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:500;color:var(--muted);letter-spacing:.3px;transition:color .3s;margin-bottom:56px;position:relative;z-index:2;width:max-content;}
+.doc-back:hover{color:var(--gold);}
+.logo-text{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:3px;color:var(--ink);}
+.logo-text span{color:var(--gold);}
+.nav-cta button{padding:10px 22px;border-radius:10px;font-size:13.5px;}
+.btn-gold{background:var(--gold);color:#151006;font-weight:600;box-shadow:0 8px 24px var(--gold-glow);}
+
+/* HERO / DOC HEADER */
+.doc-hero{padding:36px 6% 60px;position:relative;overflow:hidden;
+  background:radial-gradient(circle at 20% 20%,rgba(42,100,150,.14),transparent 45%),radial-gradient(circle at 80% 10%,rgba(212,184,134,.08),transparent 45%),#0D0F13;}
+.doc-hero-inner{max-width:820px;margin:0 auto;text-align:center;position:relative;z-index:2;}
+.doc-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:30px;border:1px solid var(--border);background:var(--gold-soft);font-size:11px;color:var(--gold);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:24px;}
+.doc-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);}
+.doc-title{font-family:var(--serif);font-size:clamp(38px,5vw,60px);font-weight:500;letter-spacing:-1px;margin-bottom:16px;}
+.doc-title em{color:var(--gold);font-style:italic;}
+.doc-sub{color:var(--muted);font-size:15.5px;line-height:1.8;max-width:620px;margin:0 auto;}
+.doc-meta{display:flex;justify-content:center;margin-top:26px;}
+.doc-domain{font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.5px;padding:8px 16px;border:1px solid var(--border2);border-radius:100px;transition:color .3s,border-color .3s;}
+.doc-domain:hover{color:var(--gold);border-color:var(--gold-line);}
+
+/* LAYOUT */
+.doc-layout{display:grid;grid-template-columns:260px 1fr;gap:64px;max-width:1200px;margin:0 auto;padding:70px 6% 100px;align-items:start;}
+.toc{position:sticky;top:110px;}
+.toc-label{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:18px;}
+.timeline{display:flex;flex-direction:column;gap:26px;margin-top:10px;position:relative;padding-left:22px;}
+.timeline::before{content:"";position:absolute;left:3px;top:5px;width:2px;height:calc(100% - 10px);background:rgba(255,255,255,.08);}
+.timeline-progress{position:absolute;left:3px;top:5px;width:2px;height:0%;background:linear-gradient(180deg,var(--gold),rgba(212,184,134,.25));transition:height .8s var(--motion);}
+.timeline-item{display:flex;gap:14px;align-items:center;opacity:.35;transition:opacity var(--d3) var(--motion),color .3s;color:var(--muted);}
+.timeline-item.active{opacity:1;color:var(--gold);}
+.timeline-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+.timeline-item span{font-size:13.5px;letter-spacing:.3px;}
+@media(max-width:900px){.doc-layout{grid-template-columns:1fr;}.toc{position:static;}}
+
+/* CONTENT CARDS */
+.doc-section{scroll-margin-top:110px;margin-bottom:36px;position:relative;overflow:hidden;padding:36px 38px;border-radius:24px;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.025));
+  border:1px solid rgba(255,255,255,.06);box-shadow:var(--shadow-premium),inset 0 1px rgba(255,255,255,.05);}
+.doc-section::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(212,184,134,.35),transparent);}
+.ds-num{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:14px;}
+.ds-title{font-family:var(--serif);font-size:25px;font-weight:600;margin-bottom:16px;letter-spacing:-.3px;}
+.ds-body p{color:var(--muted);font-size:14.5px;line-height:1.85;margin-bottom:12px;}
+.ds-body p:last-child{margin-bottom:0;}
+.ds-body ul{padding-left:0;list-style:none;display:flex;flex-direction:column;gap:10px;}
+.ds-body li{color:var(--muted);font-size:14.5px;line-height:1.75;padding:12px 16px;background:rgba(255,255,255,.025);border:1px solid var(--border2);border-radius:12px;}
+.ds-body li strong{color:var(--ink);font-weight:600;}
+.ds-body strong{color:var(--ink);}
+
+/* BROKER LOGO STRIP */
+.broker-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:18px;}
+.broker-chip{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px;background:rgba(255,255,255,.025);border:1px solid var(--border2);border-radius:14px;}
+.broker-chip .bc-logo{width:26px;height:26px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.broker-chip .bc-logo img{width:16px;height:16px;object-fit:contain;}
+.broker-chip span{font-size:10.5px;color:var(--muted);text-align:center;}
+@media(max-width:700px){.broker-strip{grid-template-columns:repeat(3,1fr);}}
+
+/* TRUST BADGES */
+.trust-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px;}
+.trust-chip{padding:18px;border-radius:16px;background:rgba(255,255,255,.025);border:1px solid var(--border2);}
+.trust-chip .tc-title{font-size:13.5px;font-weight:600;margin-bottom:5px;}
+.trust-chip .tc-sub{font-size:12px;color:var(--muted);}
+@media(max-width:700px){.trust-row{grid-template-columns:1fr;}}
+
+/* FOOTER */
+footer{padding:70px 6% 50px;border-top:1px solid rgba(255,255,255,.05);display:grid;grid-template-columns:1.5fr 1fr;gap:120px;position:relative;}
+footer::before{content:"";position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:180px;height:1px;background:linear-gradient(90deg,transparent,rgba(212,184,134,.4),transparent);}
+.footer-logo{font-family:var(--serif);font-size:20px;letter-spacing:3px;margin-bottom:14px;}
+.footer-logo span{color:var(--gold);}
+.footer-desc{font-size:13.5px;color:var(--muted);line-height:1.7;max-width:340px;}
+.footer-links{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;align-content:start;}
+.footer-link{font-size:13px;color:var(--muted);transition:color .3s;}
+.footer-link:hover{color:var(--gold);}
+.footer-version{position:absolute;right:6%;bottom:22px;font-family:var(--mono);font-size:11px;color:var(--ink);opacity:.4;}
+@media(max-width:760px){footer{grid-template-columns:1fr;gap:40px;}}
+
+.reveal{opacity:0;transform:translateY(40px);transition:opacity var(--d3) var(--motion),transform var(--d3) var(--motion);}
+.reveal.in{opacity:1;transform:translateY(0);}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 </style>
 </head>
 <body>
-<a href="/" class="back">← Back to EdgeTrade</a>
-<h1>Privacy Policy</h1>
-<div class="updated">Last updated: July 15, 2026</div>
 
-<p>EdgeTrade ("we", "our", "us") operates a free trading journal platform at edge-trade-sigma.vercel.app. This policy explains what data we collect, how we use it, and how we protect it.</p>
+<div class="page-particles" id="pageParticles"></div>
 
-<h2>1. Information We Collect</h2>
-<ul>
-<li><strong>Account data:</strong> name, email address, and encrypted password when you register.</li>
-<li><strong>Trading data:</strong> trades you log manually or that sync from a connected broker — entry/exit price, direction, P&L, strategy, psychology notes, and screenshots you upload.</li>
-<li><strong>Broker API credentials:</strong> if you connect a broker, your API key and secret are encrypted (AES-GCM) before storage. We request read-only permissions only and never place, modify, or cancel trades on your behalf.</li>
-<li><strong>Usage data:</strong> basic technical logs (device type, browser) for debugging and security.</li>
-</ul>
+<nav class="nav">
+  <a href="/" class="nav-logo">
+    <svg width="26" height="26" viewBox="0 0 38 38" fill="none"><rect width="38" height="38" rx="6" fill="rgba(212,184,134,.08)" stroke="#D4B886" stroke-width="0.8"/><line x1="10" y1="9" x2="28" y2="9" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="9" x2="10" y2="29" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="19" x2="24" y2="19" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/><line x1="10" y1="29" x2="26" y2="29" stroke="#D4B886" stroke-width="2.2" stroke-linecap="square"/></svg>
+    <span class="logo-text">EDGE<span>TRADE</span></span>
+  </a>
+</nav>
 
-<h2>2. How We Use Your Information</h2>
-<ul>
-<li>To operate your journal — display trades, calculate statistics, and sync broker data.</li>
-<li>To power the AI Assistant, AI Statistics Analyst, and AI Calculator features, which analyze your journal data (and, if you choose to upload one, a chart screenshot) to generate insights. These features never receive your broker API keys.</li>
-<li>To maintain account security and prevent unauthorized access.</li>
-</ul>
+<section class="doc-hero">
+  <a href="/" class="doc-back">← Back to EdgeTrade</a>
+  <div class="doc-hero-inner">
+    <span class="doc-badge">Legal &amp; Trust</span>
+    <h1 class="doc-title">Privacy <em>Policy</em></h1>
+    <p class="doc-sub">How EdgeTrade collects, uses, secures, and lets you control your data — in plain language, with nothing hidden.</p>
+    <div class="doc-meta">
+      <a href="/" class="doc-domain">edgetrade.abrdns.com</a>
+    </div>
+  </div>
+</section>
 
-<h2>3. How We Store Your Data</h2>
-<p>Data is stored using Supabase (PostgreSQL) with row-level security, meaning your data is only accessible to your own authenticated account. Broker API keys are encrypted at rest and decrypted only in memory, server-side, when syncing trades.</p>
+<div class="doc-layout">
+  <div class="toc reveal">
+    <div class="toc-label">On This Page</div>
+    <div class="timeline" id="timeline">
+      <div class="timeline-progress" id="timelineProgress"></div>
+      <a href="#s1" class="timeline-item active"><span class="timeline-dot"></span><span>Information We Collect</span></a>
+      <a href="#s2" class="timeline-item"><span class="timeline-dot"></span><span>How We Use Your Data</span></a>
+      <a href="#s3" class="timeline-item"><span class="timeline-dot"></span><span>Storage &amp; Security</span></a>
+      <a href="#s4" class="timeline-item"><span class="timeline-dot"></span><span>Broker Connections</span></a>
+      <a href="#s5" class="timeline-item"><span class="timeline-dot"></span><span>Demo Trading Data</span></a>
+      <a href="#s6" class="timeline-item"><span class="timeline-dot"></span><span>Third-Party Services</span></a>
+      <a href="#s7" class="timeline-item"><span class="timeline-dot"></span><span>Data Retention &amp; Deletion</span></a>
+      <a href="#s8" class="timeline-item"><span class="timeline-dot"></span><span>Your Rights</span></a>
+      <a href="#s9" class="timeline-item"><span class="timeline-dot"></span><span>Cookies</span></a>
+      <a href="#s10" class="timeline-item"><span class="timeline-dot"></span><span>Children's Privacy</span></a>
+      <a href="#s11" class="timeline-item"><span class="timeline-dot"></span><span>Changes to This Policy</span></a>
+      <a href="#s12" class="timeline-item"><span class="timeline-dot"></span><span>Contact</span></a>
+    </div>
+  </div>
 
-<h2>4. Third-Party Services</h2>
-<ul>
-<li><strong>Supabase</strong> — database, authentication, and backend functions.</li>
-<li><strong>Vercel</strong> — website hosting.</li>
-<li><strong>Broker/Exchange APIs</strong> (Binance, Delta Exchange, Zerodha, etc.) — read-only trade history sync, only for brokers you explicitly connect.</li>
-<li><strong>AI providers</strong> (e.g. Google Gemini, Groq) — process journal text you submit to the AI Assistant/Analyst to generate responses. No broker credentials are ever sent to these providers.</li>
-<li><strong>TradingView</strong> — charting library used to display market charts.</li>
-</ul>
+  <div class="doc-content">
 
-<h2>5. Data Retention & Deletion</h2>
-<p>We retain your data as long as your account is active. You can disconnect a broker or delete your account at any time from Settings; this permanently removes your stored trades and credentials.</p>
+    <div class="doc-section reveal" id="s1">
+      <div class="ds-num">Section 01</div>
+      <h2 class="ds-title">Information We Collect</h2>
+      <div class="ds-body">
+        <ul>
+          <li><strong>Account data:</strong> name, email address, and encrypted password when you register.</li>
+          <li><strong>Trading data:</strong> trades you log manually or that sync from a connected broker — entry/exit price, direction, P&amp;L, strategy tags, psychology notes, and screenshots you choose to upload.</li>
+          <li><strong>Broker API credentials:</strong> if you connect a broker, your API key and secret are encrypted (AES-256-GCM) before storage. We request read-only permissions only and never place, modify, or cancel trades on your behalf.</li>
+          <li><strong>Demo trading data:</strong> virtual balance, simulated positions, and paper-trade history from the built-in Demo Terminal. This never touches real funds or a real broker account.</li>
+          <li><strong>Usage data:</strong> basic technical logs (device type, browser) used for debugging and security monitoring.</li>
+        </ul>
+      </div>
+    </div>
 
-<h2>6. Your Rights</h2>
-<p>You may access, correct, export, or delete your data at any time through the app, or by contacting us.</p>
+    <div class="doc-section reveal" id="s2">
+      <div class="ds-num">Section 02</div>
+      <h2 class="ds-title">How We Use Your Data</h2>
+      <div class="ds-body">
+        <ul>
+          <li>To operate your journal — display trades, calculate statistics, and sync broker data.</li>
+          <li>To power the AI Assistant, AI Statistics Analyst, and AI Calculator, which analyze your journal data (and, if you choose to upload one, a chart screenshot) to generate insights. These features never receive your broker API keys.</li>
+          <li>To run the Demo Trading Terminal — live floating P&amp;L, TP/SL, and liquidation simulation on your virtual balance.</li>
+          <li>To maintain account security and prevent unauthorized access.</li>
+        </ul>
+      </div>
+    </div>
 
-<h2>7. Cookies</h2>
-<p>We use minimal essential cookies/local storage strictly for session authentication — no third-party advertising trackers.</p>
+    <div class="doc-section reveal" id="s3">
+      <div class="ds-num">Section 03</div>
+      <h2 class="ds-title">Storage &amp; Security</h2>
+      <div class="ds-body">
+        <p>Data is stored using Supabase (PostgreSQL) with row-level security, meaning your data is only accessible to your own authenticated account. Broker API keys are encrypted at rest and decrypted only in memory, server-side, when syncing trades. All traffic between your device and EdgeTrade is encrypted in transit over HTTPS/TLS.</p>
+        <div class="trust-row">
+          <div class="trust-chip"><div class="tc-title">Encrypted API</div><div class="tc-sub">AES-256-GCM · Read-only access</div></div>
+          <div class="trust-chip"><div class="tc-title">No Asset Access</div><div class="tc-sub">Cannot trade · Cannot withdraw · Cannot transfer</div></div>
+          <div class="trust-chip"><div class="tc-title">Row-Level Security</div><div class="tc-sub">Your data, isolated per account</div></div>
+        </div>
+      </div>
+    </div>
 
-<h2>8. Children's Privacy</h2>
-<p>EdgeTrade is not directed at individuals under 18 and we do not knowingly collect data from minors.</p>
+    <div class="doc-section reveal" id="s4">
+      <div class="ds-num">Section 04</div>
+      <h2 class="ds-title">Broker Connections</h2>
+      <div class="ds-body">
+        <p>EdgeTrade never holds your money and never has withdrawal permissions. We only read your trade history for the brokers you explicitly connect, including:</p>
+        <div class="broker-strip">
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=binance.com" onerror="this.parentElement.style.display='none'"></span><span>Binance</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://cdn.simpleicons.org/bybit" onerror="this.parentElement.style.display='none'"></span><span>Bybit</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=delta.exchange" onerror="this.parentElement.style.display='none'"></span><span>Delta</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=zerodha.com" onerror="this.parentElement.style.display='none'"></span><span>Zerodha</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=okx.com" onerror="this.parentElement.style.display='none'"></span><span>OKX</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=kucoin.com" onerror="this.parentElement.style.display='none'"></span><span>KuCoin</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=bitget.com" onerror="this.parentElement.style.display='none'"></span><span>Bitget</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=exness.com" onerror="this.parentElement.style.display='none'"></span><span>Exness</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=upstox.com" onerror="this.parentElement.style.display='none'"></span><span>Upstox</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=angelone.in" onerror="this.parentElement.style.display='none'"></span><span>Angel One</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=metatrader5.com" onerror="this.parentElement.style.display='none'"></span><span>MetaTrader 5</span></div>
+          <div class="broker-chip"><span class="bc-logo"><img src="https://www.google.com/s2/favicons?sz=128&domain=tradingview.com" onerror="this.parentElement.style.display='none'"></span><span>TradingView</span></div>
+        </div>
+        <p style="margin-top:16px">More broker and exchange integrations are added on an ongoing basis.</p>
+      </div>
+    </div>
 
-<h2>9. Changes to This Policy</h2>
-<p>We may update this policy as EdgeTrade evolves. Material changes will be reflected here with an updated date.</p>
+    <div class="doc-section reveal" id="s5">
+      <div class="ds-num">Section 05</div>
+      <h2 class="ds-title">Demo Trading Data</h2>
+      <div class="ds-body">
+        <p>EdgeTrade's Demo Terminal lets you practice with a simulated virtual balance — no real money, no live broker order, and no market execution ever occurs. Positions, take-profit/stop-loss levels, and simulated liquidations are stored only to power your dashboard and history, and are clearly separated from your real broker-synced trades at all times.</p>
+      </div>
+    </div>
 
-<h2>10. Contact</h2>
-<p>Questions about this policy? Reach out via the in-app Support option.</p>
+    <div class="doc-section reveal" id="s6">
+      <div class="ds-num">Section 06</div>
+      <h2 class="ds-title">Third-Party Services</h2>
+      <div class="ds-body">
+        <ul>
+          <li><strong>Supabase</strong> — database, authentication, and backend functions.</li>
+          <li><strong>Netlify</strong> — website hosting and deployment.</li>
+          <li><strong>Broker/Exchange APIs</strong> — read-only trade history sync, only for brokers you explicitly connect.</li>
+          <li><strong>AI providers</strong> (e.g. Google Gemini, Groq) — process journal text you submit to the AI Assistant/Analyst to generate responses. No broker credentials are ever sent to these providers.</li>
+          <li><strong>TradingView</strong> — charting library used to display market charts.</li>
+        </ul>
+      </div>
+    </div>
 
+    <div class="doc-section reveal" id="s7">
+      <div class="ds-num">Section 07</div>
+      <h2 class="ds-title">Data Retention &amp; Deletion</h2>
+      <div class="ds-body">
+        <p>We retain your data for as long as your account is active. You can disconnect a broker or delete your account at any time from Settings — this permanently removes your stored trades, journal entries, and encrypted credentials from our systems.</p>
+      </div>
+    </div>
+
+    <div class="doc-section reveal" id="s8">
+      <div class="ds-num">Section 08</div>
+      <h2 class="ds-title">Your Rights</h2>
+      <div class="ds-body">
+        <p>You may access, correct, export, or delete your data at any time through the app, or by contacting us through the in-app Support option.</p>
+      </div>
+    </div>
+
+    <div class="doc-section reveal" id="s9">
+      <div class="ds-num">Section 09</div>
+      <h2 class="ds-title">Cookies</h2>
+      <div class="ds-body">
+        <p>We use minimal essential cookies and local storage strictly for session authentication — no third-party advertising trackers.</p>
+      </div>
+    </div>
+
+    <div class="doc-section reveal" id="s10">
+      <div class="ds-num">Section 10</div>
+      <h2 class="ds-title">Children's Privacy</h2>
+      <div class="ds-body">
+        <p>EdgeTrade is not directed at individuals under 18, and we do not knowingly collect data from minors.</p>
+      </div>
+    </div>
+
+    <div class="doc-section reveal" id="s11">
+      <div class="ds-num">Section 11</div>
+      <h2 class="ds-title">Changes to This Policy</h2>
+      <div class="ds-body">
+        <p>We may update this policy as EdgeTrade evolves. Material changes will be reflected on this page with an updated date above.</p>
+      </div>
+    </div>
+
+    <div class="doc-section reveal" id="s12">
+      <div class="ds-num">Section 12</div>
+      <h2 class="ds-title">Contact</h2>
+      <div class="ds-body">
+        <p>Questions about this policy? Reach out any time via the in-app Support option.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <div>
+    <div class="footer-logo">EDGE<span>TRADE</span></div>
+    <p class="footer-desc">Built for traders who refuse to stay average. The professional trading journal — free, forever.</p>
+  </div>
+  <div class="footer-links">
+    <a href="/#features" class="footer-link">Features</a>
+    <a href="/#brokers" class="footer-link">Brokers</a>
+    <a href="/" class="footer-link">Documentation</a>
+    <a href="/" class="footer-link">Support</a>
+    <a href="/privacy.html" class="footer-link">Privacy</a>
+    <a href="/terms.html" class="footer-link">Terms</a>
+  </div>
+  <div class="footer-version">v1.0 · 2026</div>
+</footer>
+
+<script>
+const pageParticles = document.getElementById('pageParticles');
+const dotCount = window.innerWidth <= 760 ? 14 : 28;
+for(let i=0;i<dotCount;i++){
+  const d = document.createElement('span');
+  d.className = 'p-dot';
+  d.style.left = Math.random()*100+'%';
+  d.style.top = Math.random()*100+'%';
+  d.style.animationDuration = (16+Math.random()*14)+'s';
+  d.style.animationDelay = (Math.random()*20)+'s';
+  pageParticles.appendChild(d);
+}
+const revealEls = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver(entries=>{
+  entries.forEach(en=>{ if(en.isIntersecting) en.target.classList.add('in'); });
+},{threshold:.1});
+revealEls.forEach(el=>io.observe(el));
+
+const docSections = document.querySelectorAll('.doc-section');
+const timelineItems = document.querySelectorAll('.timeline-item');
+const timelineProgress = document.getElementById('timelineProgress');
+const sectionObserver = new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      const index = [...docSections].indexOf(entry.target);
+      timelineItems.forEach(item=>item.classList.remove('active'));
+      if(timelineItems[index]) timelineItems[index].classList.add('active');
+      if(timelineProgress) timelineProgress.style.height = (((index+1)/docSections.length)*100)+'%';
+    }
+  });
+},{threshold:.3,rootMargin:'-100px 0px -55% 0px'});
+docSections.forEach(sec=>sectionObserver.observe(sec));
+</script>
 </body>
 </html>
