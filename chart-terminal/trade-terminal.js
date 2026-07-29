@@ -33,7 +33,7 @@
   // ── Style ────────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
-    .tt-panel{background:var(--bg2);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}
+    .tt-panel{background:var(--bg2);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;height:100%;overflow-y:auto;}
     .tt-balance{display:flex;align-items:baseline;gap:6px;font-family:'Outfit',sans-serif;}
     .tt-balance-label{font-size:12px;color:var(--muted,#8a8f98);}
     .tt-symbol-label{font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;}
