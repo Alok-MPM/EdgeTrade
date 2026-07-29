@@ -2074,7 +2074,7 @@ function toggleStratDetail(id){
   if(!pageParticles) return;
 
   /* ===== Full-page ambient particles (behind cards, travel bottom to top) ===== */
-  const dotCount = window.innerWidth <= 760 ? 18 : (window.innerWidth <= 1024 ? 24 : 40);
+  const dotCount = window.innerWidth <= 760 ? 14 : (window.innerWidth <= 1024 ? 20 : 28);
   for(let i=0;i<dotCount;i++){
     const d = document.createElement('span');
     d.className = 'p-dot';
@@ -2085,35 +2085,22 @@ function toggleStratDetail(id){
     pageParticles.appendChild(d);
   }
 
-  /* ===== Navbar scroll state + progress bar =====
-     rAF-throttled so the main thread only does this work once per
-     animation frame instead of once per scroll event. */
+  /* ===== Navbar scroll state =====
+     Uses IntersectionObserver on a 1px sentinel instead of a `scroll`
+     event listener — this runs off the main thread and never forces a
+     synchronous layout read on every scroll frame like the old
+     scrollY/scrollHeight-based version did. The progress bar itself is
+     now pure CSS (animation-timeline:scroll) with zero JS involvement. */
   const nav = document.getElementById('nav');
-  const scrollProgress = document.getElementById('scrollProgress');
-  const docEl = document.documentElement;
-
-  let scrollTicking = false;
-  function onScrollFrame(){
-    const y = window.scrollY;
-
-    if(nav){
-      if(y>40) nav.classList.add('scrolled');
-      else nav.classList.remove('scrolled');
-    }
-
-    if(scrollProgress){
-      const scrolled = (docEl.scrollTop/(docEl.scrollHeight-docEl.clientHeight))*100;
-      scrollProgress.style.width = scrolled+'%';
-    }
-
-    scrollTicking = false;
+  const navSentinel = document.getElementById('navSentinel');
+  if(nav && navSentinel){
+    const navIo = new IntersectionObserver(entries=>{
+      entries.forEach(en=>{
+        nav.classList.toggle('scrolled', !en.isIntersecting);
+      });
+    },{threshold:0});
+    navIo.observe(navSentinel);
   }
-  window.addEventListener('scroll',()=>{
-    if(!scrollTicking){
-      requestAnimationFrame(onScrollFrame);
-      scrollTicking = true;
-    }
-  },{passive:true});
 
   /* ===== Scroll reveal (section enter) =====
      rootMargin extends the trigger zone 400px below the viewport so the
@@ -2128,26 +2115,9 @@ function toggleStratDetail(id){
   },{threshold:.01, rootMargin:'0px 0px 400px 0px'});
   revealEls.forEach(el=>io.observe(el));
 
-  /* ===== Stat counters ===== */
-  const counters = document.querySelectorAll('#page-landing [data-count]');
-  const cIo = new IntersectionObserver(entries=>{
-    entries.forEach(en=>{
-      if(!en.isIntersecting) return;
-      const el = en.target;
-      const end = parseFloat(el.dataset.count);
-      const suffix = el.dataset.suffix || '';
-      let cur = 0;
-      const step = Math.max(end/60,0.5);
-      function tick(){
-        cur += step;
-        if(cur < end){ el.textContent = Math.floor(cur)+suffix; requestAnimationFrame(tick); }
-        else{ el.textContent = end+suffix; }
-      }
-      tick();
-      cIo.unobserve(el);
-    });
-  },{threshold:.6});
-  counters.forEach(c=>cIo.observe(c));
+  /* ===== Stat counters removed — numbers now render as static final
+     values directly in the HTML (data-count/JS tick loop deleted per
+     request; counting from 0 on every scroll-into-view read as gimmicky). ===== */
 
   /* ===== Feature modules — scroll activation + timeline sync ===== */
   const modules = document.querySelectorAll('#page-landing .feature-module');
