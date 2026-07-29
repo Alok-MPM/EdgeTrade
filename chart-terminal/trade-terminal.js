@@ -61,6 +61,7 @@
     .tt-submit.long{background:var(--green,#4CAF7D);color:#0D0F13;}
     .tt-submit.short{background:var(--red,#E05252);color:#fff;}
     .tt-submit-note{text-align:center;font-size:11px;color:var(--muted,#8a8f98);}
+    .tt-spacer{flex:1 1 auto;min-height:8px;}
 
     .tt-positions{margin-top:4px;}
     .tt-pos-row{display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--border,rgba(255,255,255,0.06));font-size:12px;font-family:'Outfit',sans-serif;}
@@ -195,6 +196,7 @@
           <div class="tt-est-row"><span>Potential PnL</span><span id="tt-est-pnl">—</span></div>
         </div>
 
+        <div class="tt-spacer"></div>
         <button class="tt-submit long" id="tt-submit">Buy / Long</button>
         <div class="tt-submit-note">Demo mode — no real funds</div>
       </div>
