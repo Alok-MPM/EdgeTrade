@@ -2091,6 +2091,27 @@ function toggleStratDetail(id){
      synchronous layout read on every scroll frame like the old
      scrollY/scrollHeight-based version did. The progress bar itself is
      now pure CSS (animation-timeline:scroll) with zero JS involvement. */
+  /* ===== Pause expensive infinite CSS animations while off-screen =====
+     .hero-grid (mask-image + infinite translateY) and .integration-network
+     (radial-gradient dot field + infinite translateY) were found via CDP
+     trace profiling to be the two biggest ongoing RasterTask/compositor
+     costs on this page — and both kept animating even after the user
+     scrolled far away from them. Pausing them off-screen removes that
+     competing work during scroll without changing how they look on-screen. */
+  const motionEls = [
+    {el: document.getElementById('heroSection'), target: document.querySelector('.hero-grid')},
+    {el: document.getElementById('brokers'), target: document.querySelector('.integration-network')}
+  ].filter(m => m.el && m.target);
+  if(motionEls.length){
+    const motionIo = new IntersectionObserver(entries=>{
+      entries.forEach(en=>{
+        const match = motionEls.find(m => m.el === en.target);
+        if(match) match.target.classList.toggle('motion-paused', !en.isIntersecting);
+      });
+    },{threshold:0, rootMargin:'200px 0px 200px 0px'});
+    motionEls.forEach(m => motionIo.observe(m.el));
+  }
+
   const nav = document.getElementById('nav');
   const navSentinel = document.getElementById('navSentinel');
   if(nav && navSentinel){

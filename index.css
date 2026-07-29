@@ -238,6 +238,15 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 #page-landing .term,#page-landing .feature-module,#page-landing .integration-panel,#page-landing .integration-card,#page-landing .tstat,#page-landing button,#page-landing img,#page-landing svg{
   transform:translateZ(0);backface-visibility:hidden;
 }
+/* Below-the-fold sections: skip layout/style/paint work entirely until the
+   section is near the viewport. contain-intrinsic-size keeps a placeholder
+   size (updated to the real size after first render via "auto") so the page
+   doesn't jump/reflow when a section pops in or out of the skipped state.
+   Scoped to #page-landing only — must never affect the app pages. */
+#page-landing #features,#page-landing #how,#page-landing #brokers,#page-landing #ctaSection{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 1000px;
+}
 .feature-module,.reveal,.hero-aurora{
   will-change:transform,opacity;transform:translateZ(0);
 }
@@ -281,7 +290,12 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   background-size:72px 72px;
   mask-image:radial-gradient(circle at 50% 40%,#fff 10%,transparent 75%);
   animation:gridMove 90s linear infinite;
+  will-change:transform;
 }
+/* mask-image + infinite animation is compositor-expensive; once the hero
+   scrolls out of view there's no visual reason to keep rasterizing it every
+   frame, so JS pauses it via this class (see initLandingPage in index.js) */
+.hero-grid.motion-paused{animation-play-state:paused;}
 @keyframes gridMove{0%{transform:translateY(0);}100%{transform:translateY(72px);}}
 .hero-aurora{position:absolute;border-radius:50%;animation:auroraFloat 40s ease-in-out infinite;will-change:transform;transform:translateZ(0);}
 .hero-aurora.a{width:640px;height:640px;left:-200px;top:-160px;background:radial-gradient(circle,var(--gold) 0%,transparent 70%);opacity:.11;}
@@ -469,7 +483,11 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
   position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.18;
   background-image:radial-gradient(rgba(212,184,134,.4) 1px,transparent 1px);
   background-size:34px 34px;animation:networkMove 80s linear infinite;
+  will-change:transform;
 }
+/* same idea as .hero-grid — pause the compositor work while this panel is
+   off-screen instead of rasterizing it on every scroll frame regardless */
+.integration-network.motion-paused{animation-play-state:paused;}
 @keyframes networkMove{from{transform:translateY(0);}to{transform:translateY(34px);}}
 .ip-title{position:relative;z-index:1;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
 .panel-meta{position:relative;z-index:1;font-size:13px;letter-spacing:.5px;opacity:.62;margin-bottom:22px;}
