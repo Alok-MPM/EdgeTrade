@@ -242,8 +242,13 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
    section is near the viewport. contain-intrinsic-size keeps a placeholder
    size (updated to the real size after first render via "auto") so the page
    doesn't jump/reflow when a section pops in or out of the skipped state.
-   Scoped to #page-landing only — must never affect the app pages. */
-#page-landing #features,#page-landing #how,#page-landing #brokers,#page-landing #ctaSection{
+   Scoped to #page-landing only — must never affect the app pages.
+   NOTE: #brokers was removed from this list — its actual rendered height
+   (13 broker cards + stats bar) was far bigger than the 1000px placeholder
+   guess, so on a fast scroll-up the section had to snap-layout in one frame
+   right as it entered view, causing a visible jump/jank. The other sections
+   keep content-visibility since no such issue was reported for them. */
+#page-landing #features,#page-landing #how,#page-landing #ctaSection{
   content-visibility:auto;
   contain-intrinsic-size:auto 1000px;
 }
