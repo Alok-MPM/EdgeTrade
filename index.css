@@ -749,7 +749,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .empty-sub{font-size:13px;color:rgba(107,114,128,0.7);}
 
 .day-card{background:var(--bg2);border-radius:14px;overflow:hidden;border:1px solid var(--border);cursor:pointer;position:relative;transition:all 0.25s;}
-.day-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,0.3);}
+.day-card:hover{border-color:rgba(201,168,76,0.15);}
 .day-card::before,.day-card::after{content:'';position:absolute;left:10%;right:10%;height:2px;}
 .day-card::before{top:0;border-radius:0 0 3px 3px;}
 .day-card::after{bottom:0;border-radius:3px 3px 0 0;}
@@ -799,7 +799,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .tc-profit::before{background:var(--green);}
 .tc-loss::before{background:var(--red);}
 .tc-be::before{background:var(--gold);}
-.trade-card:hover{border-color:rgba(201,168,76,0.2);transform:translateX(2px);}
+.trade-card:hover{border-color:rgba(201,168,76,0.2);}
 .tc-num{width:40px;height:40px;border-radius:9px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:var(--gold);background:var(--gold-dim);flex-shrink:0;}
 .tc-dir{flex-shrink:0;width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;}
 .tc-dir-l{background:var(--green-dim);color:var(--green);}
@@ -1179,9 +1179,9 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .kw-field{position:relative;}
 .kw-dd{
   display:none;position:fixed;z-index:600;
-  background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;
   max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
-  box-shadow:0 14px 34px rgba(0,0,0,0.55);
+  box-shadow:0 6px 16px rgba(0,0,0,0.3);
 }
 .kw-dd.open{display:block;animation:fadeIn 0.15s ease;}
 .kw-item{
@@ -1261,16 +1261,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .calc-msg-user{background:var(--gold-dim);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;align-self:flex-end;max-width:85%;}
 .calc-msg-ai{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--white);max-width:90%;line-height:1.6;}
 .calc-msg-loading{color:var(--muted);font-size:13px;font-style:italic;}
-/* --- 3D & FLUID ANIMATIONS --- */
-.glass-3d {
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-.glass-3d:active {
-  transform: scale3d(0.96, 0.96, 1) !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
-}
+/* --- 3D & FLUID ANIMATIONS (glass-3d tilt removed — looked cheap) --- */
 .reveal-up {
   opacity: 0;
   transform: translateY(40px);
