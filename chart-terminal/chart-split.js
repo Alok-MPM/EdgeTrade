@@ -3,8 +3,8 @@
 //
 // Split-screen layout (1 / 2-horizontal / 2-vertical panes) + sync toggles
 // (Symbol, Interval, Crosshair) between Pane 1 (the main chart owned by
-// chart-engine.js) and Pane 2 (a second, independent klinecharts instance +
-// its own Binance connection, owned entirely by this file).
+// chart-engine.js) and Pane 2 (a second, independent Lightweight Charts
+// instance + its own Binance connection, owned entirely by this file).
 //
 // IMPORTANT: this file does NOT modify chart-cockpit.js. It injects its own
 // "Layout" button into the existing #ctc-cockpit toolbar at init() time.
@@ -39,8 +39,8 @@
     .cs-panes.layout-2h{flex-direction:row;}
     .cs-panes.layout-2v{flex-direction:column;}
     .cs-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column;background:var(--bg2,#111317);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden;}
-    /* KLineCharts' own canvas is transparent by design (chart-engine.js never
-       sets a pane background) — it always relied on this container's CSS
+    /* Lightweight Charts' own canvas is transparent by design (chart-engine.js
+       never sets a pane background) — it always relied on this container's CSS
        background showing through. That's fine at normal size, but on the
        big, sudden resize into fullscreen the canvas can lag a beat behind,
        exposing whatever's underneath. Forcing the background directly on
@@ -104,7 +104,8 @@
   let layout = '1'; // '1' | '2h' | '2v'
   let sync = { symbol: false, interval: false, crosshair: false };
 
-  let pane2Instance = null;
+  let pane2Instance = null; // LightweightCharts chart object for pane 2
+  let pane2Series = null;   // its candlestick series
   let pane2Socket = null;
   let pane2DepthSocket = null;
   let pane2Symbol = 'ETHUSDT';
@@ -234,17 +235,25 @@
       fsBtn.classList.toggle('on', isFs);
       fsBtn.title = isFs ? 'Exit fullscreen' : 'Fullscreen chart';
 
-      // The .cs-panes container CSS resizes correctly right away, but
-      // KLineCharts' own canvas doesn't reliably pick up a sudden,
-      // class-toggle-driven jump this large on its own — it can stay
-      // drawn at its old size, leaving the (correctly-sized) container
-      // looking empty below it. requestAnimationFrame waits one frame so
-      // the browser has actually applied the new CSS box size before we
-      // tell each chart instance to redraw at it.
+      // The .cs-panes container CSS resizes correctly right away, but on a
+      // sudden, class-toggle-driven jump this large, the chart canvas can
+      // lag a beat behind autoSize's own ResizeObserver on some mobile
+      // browsers — it can stay drawn at its old size, leaving the
+      // (correctly-sized) container looking empty below it.
+      // requestAnimationFrame waits one frame so the browser has actually
+      // applied the new CSS box size before we force each chart to resize
+      // at it explicitly (Lightweight Charts' resize() needs width/height,
+      // unlike klinecharts' old no-arg resize()).
       requestAnimationFrame(() => {
         const mainInstance = chartEngine.getInstance ? chartEngine.getInstance() : null;
-        if (mainInstance && typeof mainInstance.resize === 'function') mainInstance.resize();
-        if (pane2Instance && typeof pane2Instance.resize === 'function') pane2Instance.resize();
+        const mainEl = document.getElementById('klineMainChart');
+        if (mainInstance && mainEl && typeof mainInstance.resize === 'function') {
+          mainInstance.resize(mainEl.clientWidth, mainEl.clientHeight);
+        }
+        const pane2El = document.getElementById('klineChart2');
+        if (pane2Instance && pane2El && typeof pane2Instance.resize === 'function') {
+          pane2Instance.resize(pane2El.clientWidth, pane2El.clientHeight);
+        }
       });
     };
     cockpit.appendChild(fsBtn);
@@ -339,12 +348,28 @@
 
   // ── Pane 2: fully independent chart + Binance connection ─────────────
   function initPane2() {
-    if (typeof klinecharts === 'undefined') return;
-    pane2Instance = klinecharts.init('klineChart2');
-    if (!pane2Instance) { console.error('[chart-split] failed to init pane 2 chart'); return; }
-    pane2Instance.setStyles({
-      grid: { show: true, horizontal: { color: '#2a2a2a' }, vertical: { color: '#2a2a2a' } },
-      candle: { bar: { upColor: '#4CAF7D', downColor: '#E05252', noChangeColor: '#888888' } },
+    if (typeof LightweightCharts === 'undefined') return;
+    const el = document.getElementById('klineChart2');
+    if (!el) { console.error('[chart-split] pane 2 container not found'); return; }
+
+    pane2Instance = LightweightCharts.createChart(el, {
+      layout: {
+        background: { type: 'solid', color: 'transparent' },
+        textColor: '#B0B4BB',
+      },
+      grid: {
+        vertLines: { color: '#2a2a2a' },
+        horzLines: { color: '#2a2a2a' },
+      },
+      autoSize: true,
+      timeScale: { timeVisible: true, secondsVisible: false },
+    });
+    pane2Series = pane2Instance.addSeries(LightweightCharts.CandlestickSeries, {
+      upColor: '#4CAF7D',
+      downColor: '#E05252',
+      borderVisible: false,
+      wickUpColor: '#4CAF7D',
+      wickDownColor: '#E05252',
     });
 
     if (sync.symbol) { pane2Symbol = marketStore.getState().symbol; }
@@ -363,8 +388,11 @@
     try {
       const res = await fetch(`${BINANCE_REST}/klines?symbol=${symbol}&interval=${interval}&limit=300`);
       const raw = await res.json();
-      const data = raw.map(k => ({ timestamp: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5]) }));
-      if (pane2Instance) pane2Instance.applyNewData(data);
+      const data = raw.map(k => ({
+        time: Math.floor(k[0] / 1000),
+        open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]),
+      }));
+      if (pane2Series) pane2Series.setData(data);
     } catch (err) {
       console.error('[chart-split] pane 2 history fetch failed:', err);
     }
@@ -374,8 +402,8 @@
     pane2Socket.onmessage = (event) => {
       const k = JSON.parse(event.data).k;
       const close = parseFloat(k.c);
-      if (pane2Instance) {
-        pane2Instance.updateData({ timestamp: k.t, open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close, volume: parseFloat(k.v) });
+      if (pane2Series) {
+        pane2Series.update({ time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close });
       }
       pane2PriceListeners.forEach(cb => cb(close));
     };
@@ -395,8 +423,9 @@
   function teardownPane2() {
     if (pane2Socket) { pane2Socket.onclose = null; pane2Socket.close(); pane2Socket = null; }
     if (pane2DepthSocket) { pane2DepthSocket.onclose = null; pane2DepthSocket.close(); pane2DepthSocket = null; }
-    if (pane2Instance && typeof klinecharts.dispose === 'function') klinecharts.dispose('klineChart2');
+    if (pane2Instance) pane2Instance.remove();
     pane2Instance = null;
+    pane2Series = null;
   }
 
   // ── Sync: symbol + interval (Pane 1 → Pane 2, one direction only) ────
@@ -461,24 +490,31 @@
     loadPane2(st.symbol, sync.interval ? st.interval : pane2Interval);
   }
 
-  // ── Sync: crosshair (best-effort — wrapped in try/catch since exact
-  // klinecharts v9.8.5 event-subscription method name should be confirmed
-  // against the installed version; this fails silently rather than breaking
-  // the chart if the API differs). ──────────────────────────────────────
+  // ── Sync: crosshair (Lightweight Charts has a real API for this —
+  // subscribeCrosshairMove() to read the hovered point on pane 1, and
+  // setCrosshairPosition()/clearCrosshairPosition() to mirror it onto
+  // pane 2. Still wrapped in try/catch as a safety net in case a future
+  // library version changes these method names). ───────────────────────
   function setupCrosshairSync() {
     try {
       const mainInstance = chartEngine.getInstance();
-      if (!mainInstance || !pane2Instance) return;
-      mainInstance.subscribeAction('onCrosshairChange', (data) => {
-        if (!sync.crosshair || !pane2Instance) return;
-        // Mirrors the hovered timestamp onto pane 2. Adjust the exact call
-        // below if klinecharts' API differs from this signature.
-        if (data && data.kLineData && typeof pane2Instance.setCrosshair === 'function') {
-          pane2Instance.setCrosshair({ x: data.x, y: data.y }, false);
+      const mainSeries = chartEngine.getSeries ? chartEngine.getSeries() : null;
+      if (!mainInstance || !mainSeries || !pane2Instance || !pane2Series) return;
+
+      mainInstance.subscribeCrosshairMove((param) => {
+        if (!sync.crosshair || !pane2Instance || !pane2Series) return;
+
+        if (!param || param.time === undefined) {
+          pane2Instance.clearCrosshairPosition();
+          return;
         }
+        const point = param.seriesData ? param.seriesData.get(mainSeries) : null;
+        if (!point) return;
+        const price = point.close !== undefined ? point.close : point.value;
+        pane2Instance.setCrosshairPosition(price, param.time, pane2Series);
       });
     } catch (err) {
-      console.warn('[chart-split] crosshair sync not available for this klinecharts version:', err);
+      console.warn('[chart-split] crosshair sync not available for this Lightweight Charts version:', err);
     }
   }
 
@@ -505,6 +541,7 @@
 // the user actually picks a 2-pane layout (no wasted sockets on page load).
 //
 // TODO (future, not in this version): Time range / date-range sync between
-// panes — needs klinecharts' scroll/zoom action hooks, kept out for now to
-// keep this file focused. Add as a small addition here when needed.
+// panes — needs Lightweight Charts' subscribeVisibleTimeRangeChange /
+// setVisibleRange hooks, kept out for now to keep this file focused. Add as
+// a small addition here when needed.
 // ══════════════════════════════════════════════════════════════════════════

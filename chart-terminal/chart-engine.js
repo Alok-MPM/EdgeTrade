@@ -1,18 +1,30 @@
 // ══════════════════════════════════════════════════════════════════════════
 // chart-terminal/chart-engine.js
 //
-// Owns the klinecharts instance. Responsible for:
+// Owns the TradingView Lightweight Charts instance. Responsible for:
 //   - Initializing the chart into a container
 //   - Feeding it historical + live candle data (from market-store.js ONLY —
 //     this file never touches Binance or a WebSocket directly)
 //   - Chart type switching (candle / hollow / ohlc / area)
-//   - Indicator create/remove (MA, EMA, BOLL, VOL, MACD, RSI, KDJ)
+//
+// Indicators (MA/EMA/BOLL/VOL/MACD/RSI/KDJ) and drawing tools are NOT
+// available in Lightweight Charts — no built-in indicator/drawing engine.
+// This file keeps the same public API (toggleIndicator / isIndicatorActive /
+// getActiveIndicators) as safe no-ops so chart-cockpit.js's existing buttons
+// don't throw or get stuck "active" — hide/disable those buttons in
+// chart-cockpit.js's UI itself; this is just the data-layer fallback.
 //
 // This file does NOT own any toolbar buttons or dropdown UI — that belongs
 // to chart-cockpit.js, which calls the public functions exposed below.
 //
-// Depends on: market-store.js (must be loaded first) and the klinecharts
-// CDN script (already loaded in index.html <head>).
+// Depends on: market-store.js (must be loaded first) and the Lightweight
+// Charts CDN script, which MUST be swapped in index.html BEFORE this file
+// loads. Replace the old klinecharts <script> tag with:
+//
+//   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+//
+// which exposes the global `LightweightCharts` namespace (v5 API — uses
+// chart.addSeries(LightweightCharts.CandlestickSeries, opts) style calls).
 // ══════════════════════════════════════════════════════════════════════════
 
 (function () {
@@ -30,10 +42,15 @@
   document.head.appendChild(style);
 
   // ── Internal state ────────────────────────────────────────────────────
-  let chartInstance = null;
+  let chartInstance = null;   // LightweightCharts chart object
+  let seriesInstance = null;  // current active series (candlestick/bar/area)
   let containerId = 'klineMainChart';
   let currentChartType = 'candle_solid';
-  let activeIndicators = {}; // { MA: paneId, RSI: paneId, ... }
+
+  // Our own copy of the data — needed because Lightweight Charts can't morph
+  // a series' type in place. To change chart type we remove the old series
+  // and add a new one, then replay this buffer onto it.
+  let candleBuffer = []; // [{ timestamp, open, high, low, close, volume }, ...]
 
   // Duration of each interval in milliseconds — used to compute the next
   // candle's close time for the countdown badge.
@@ -49,25 +66,24 @@
   let currentCandleTimestamp = null; // start time (ms) of the currently forming candle
   let currentIntervalMs = INTERVAL_MS['1m'];
 
-  // Indicators that render as an overlay on the candle pane itself, vs. ones
-  // that get their own separate pane below the chart.
-  const OVERLAY_ON_CANDLE = { MA: true, EMA: true, BOLL: true, VOL: false, MACD: false, RSI: false, KDJ: false };
-
+  // Kept identical to the old chart-engine so chart-cockpit.js's dropdown
+  // doesn't need to change which string values it sends in.
   const CHART_TYPE_STYLE_MAP = {
     candle_solid: 'candle_solid',
-    candle_stroke: 'candle_stroke',
+    candle_stroke: 'candle_stroke', // hollow candle
     ohlc: 'ohlc',
     area: 'area',
   };
 
+  const UP_COLOR = '#4CAF7D';
+  const DOWN_COLOR = '#E05252';
+
   // ── Init ────────────────────────────────────────────────────────────────
-  // Call once the DOM container exists. Wires itself to market-store so it
-  // automatically re-renders whenever the active symbol/interval changes.
   function init(opts = {}) {
     containerId = opts.containerId || containerId;
 
-    if (typeof klinecharts === 'undefined') {
-      console.error('[chart-engine] klinecharts library not found — check the CDN <script> tag in index.html');
+    if (typeof LightweightCharts === 'undefined') {
+      console.error('[chart-engine] LightweightCharts library not found — check the CDN <script> tag in index.html');
       return null;
     }
 
@@ -79,19 +95,22 @@
 
     if (chartInstance) return chartInstance; // already initialized, don't double-init
 
-    chartInstance = klinecharts.init(containerId);
-    if (!chartInstance) {
-      console.error('[chart-engine] klinecharts.init() returned null');
-      return null;
-    }
-
-    chartInstance.setStyles({
-      grid: { show: true, horizontal: { color: '#2a2a2a' }, vertical: { color: '#2a2a2a' } },
-      candle: { bar: { upColor: '#4CAF7D', downColor: '#E05252', noChangeColor: '#888888' }, type: currentChartType },
+    chartInstance = LightweightCharts.createChart(container, {
+      layout: {
+        background: { type: 'solid', color: 'transparent' },
+        textColor: '#B0B4BB',
+      },
+      grid: {
+        vertLines: { color: '#2a2a2a' },
+        horzLines: { color: '#2a2a2a' },
+      },
+      autoSize: true,
+      timeScale: { timeVisible: true, secondsVisible: false },
     });
 
-    // Countdown badge — a plain DOM overlay, NOT a klinecharts overlay, so it
-    // never interferes with chart pan/zoom (pointer-events: none).
+    createSeries(currentChartType);
+
+    // Countdown badge — a plain DOM overlay, sits on top of the chart canvas.
     if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     countdownEl = document.createElement('div');
     countdownEl.className = 'ce-countdown';
@@ -103,11 +122,10 @@
     marketStore.onKline(applyLiveCandle);
     marketStore.onSymbolChange(({ interval }) => {
       currentIntervalMs = INTERVAL_MS[interval] || INTERVAL_MS['1m'];
-      currentCandleTimestamp = null; // old candle's timestamp is stale for the new interval/symbol
+      currentCandleTimestamp = null;
+      candleBuffer = [];
     });
 
-    // Seed interval from whatever market-store is already set to (covers the
-    // case where marketStore.init() ran before chartEngine.init()).
     const initialState = marketStore.getState();
     currentIntervalMs = INTERVAL_MS[initialState.interval] || INTERVAL_MS['1m'];
 
@@ -116,15 +134,93 @@
     return chartInstance;
   }
 
-  function applyHistory(candles) {
+  // ── Series creation per chart type ──────────────────────────────────────
+  function createSeries(type) {
     if (!chartInstance) return;
-    chartInstance.applyNewData(candles);
+    if (seriesInstance) {
+      chartInstance.removeSeries(seriesInstance);
+      seriesInstance = null;
+    }
+
+    switch (type) {
+      case 'candle_stroke': // hollow candle — up candles outlined only, down candles solid
+        seriesInstance = chartInstance.addSeries(LightweightCharts.CandlestickSeries, {
+          upColor: 'rgba(0,0,0,0)',
+          downColor: DOWN_COLOR,
+          borderVisible: true,
+          borderUpColor: UP_COLOR,
+          borderDownColor: DOWN_COLOR,
+          wickUpColor: UP_COLOR,
+          wickDownColor: DOWN_COLOR,
+        });
+        break;
+      case 'ohlc':
+        seriesInstance = chartInstance.addSeries(LightweightCharts.BarSeries, {
+          upColor: UP_COLOR,
+          downColor: DOWN_COLOR,
+        });
+        break;
+      case 'area':
+        seriesInstance = chartInstance.addSeries(LightweightCharts.AreaSeries, {
+          lineColor: '#D4B886',
+          topColor: 'rgba(212,184,134,0.35)',
+          bottomColor: 'rgba(212,184,134,0.02)',
+        });
+        break;
+      case 'candle_solid':
+      default:
+        seriesInstance = chartInstance.addSeries(LightweightCharts.CandlestickSeries, {
+          upColor: UP_COLOR,
+          downColor: DOWN_COLOR,
+          borderVisible: false,
+          wickUpColor: UP_COLOR,
+          wickDownColor: DOWN_COLOR,
+        });
+        break;
+    }
+
+    // Re-apply whatever data we already have onto the fresh series.
+    if (candleBuffer.length) seriesInstance.setData(toSeriesData(candleBuffer, type));
+  }
+
+  // ── Data shaping ─────────────────────────────────────────────────────────
+  // market-store candles look like { timestamp (ms), open, high, low, close, volume }.
+  // Lightweight Charts wants `time` in seconds; area series wants a single
+  // `value` instead of OHLC.
+  function toSeriesData(candles, type) {
+    if (type === 'area') {
+      return candles.map(c => ({ time: Math.floor(c.timestamp / 1000), value: c.close }));
+    }
+    return candles.map(c => ({
+      time: Math.floor(c.timestamp / 1000),
+      open: c.open, high: c.high, low: c.low, close: c.close,
+    }));
+  }
+
+  function toSeriesPoint(c, type) {
+    if (type === 'area') return { time: Math.floor(c.timestamp / 1000), value: c.close };
+    return { time: Math.floor(c.timestamp / 1000), open: c.open, high: c.high, low: c.low, close: c.close };
+  }
+
+  function applyHistory(candles) {
+    if (!chartInstance || !seriesInstance) return;
+    candleBuffer = candles.slice();
+    seriesInstance.setData(toSeriesData(candleBuffer, currentChartType));
     if (candles.length) currentCandleTimestamp = candles[candles.length - 1].timestamp;
   }
 
   function applyLiveCandle(candle) {
-    if (!chartInstance) return;
-    chartInstance.updateData(candle);
+    if (!chartInstance || !seriesInstance) return;
+
+    // Keep our buffer in sync (replace last candle if same timestamp, else push).
+    const last = candleBuffer[candleBuffer.length - 1];
+    if (last && last.timestamp === candle.timestamp) {
+      candleBuffer[candleBuffer.length - 1] = candle;
+    } else {
+      candleBuffer.push(candle);
+    }
+
+    seriesInstance.update(toSeriesPoint(candle, currentChartType));
     currentCandleTimestamp = candle.timestamp;
   }
 
@@ -154,41 +250,29 @@
   // ── Chart type ─────────────────────────────────────────────────────────
   function setChartType(type) {
     if (!chartInstance || !CHART_TYPE_STYLE_MAP[type] || type === currentChartType) return;
-    chartInstance.setStyles({ candle: { type } });
     currentChartType = type;
+    createSeries(type);
   }
 
   function getChartType() {
     return currentChartType;
   }
 
-  // ── Indicators ─────────────────────────────────────────────────────────
-  // Toggle on/off. overlayOnCandle can be passed explicitly, otherwise falls
-  // back to the sensible default per indicator name.
-  function toggleIndicator(name, overlayOnCandle) {
-    if (!chartInstance) return;
-
-    if (activeIndicators[name]) {
-      chartInstance.removeIndicator(activeIndicators[name], name);
-      delete activeIndicators[name];
-      return false; // now inactive
-    }
-
-    const overlay = overlayOnCandle !== undefined ? overlayOnCandle : !!OVERLAY_ON_CANDLE[name];
-    const paneId = overlay
-      ? chartInstance.createIndicator(name, true, { id: 'candle_pane' })
-      : chartInstance.createIndicator(name);
-
-    activeIndicators[name] = paneId;
-    return true; // now active
+  // ── Indicators — NOT AVAILABLE in Lightweight Charts yet ────────────────
+  // Kept as safe no-ops (same function names/signatures as before) so
+  // chart-cockpit.js's existing indicator buttons don't error out or get
+  // stuck in a fake "active" state.
+  function toggleIndicator(name) {
+    console.info(`[chart-engine] Indicators not available yet on Lightweight Charts (${name}). Coming in a later pass.`);
+    return false;
   }
 
-  function isIndicatorActive(name) {
-    return !!activeIndicators[name];
+  function isIndicatorActive() {
+    return false;
   }
 
   function getActiveIndicators() {
-    return { ...activeIndicators };
+    return {};
   }
 
   // ── Access / cleanup ──────────────────────────────────────────────────
@@ -196,12 +280,17 @@
     return chartInstance;
   }
 
+  function getSeries() {
+    return seriesInstance;
+  }
+
   function destroy() {
-    if (chartInstance && typeof klinecharts.dispose === 'function') {
-      klinecharts.dispose(containerId);
+    if (chartInstance) {
+      chartInstance.remove();
     }
     chartInstance = null;
-    activeIndicators = {};
+    seriesInstance = null;
+    candleBuffer = [];
 
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     if (countdownEl && countdownEl.parentNode) { countdownEl.parentNode.removeChild(countdownEl); }
@@ -218,26 +307,25 @@
     isIndicatorActive,
     getActiveIndicators,
     getInstance,
+    getSeries,
     destroy,
   };
 
 })();
 
 // ══════════════════════════════════════════════════════════════════════════
-// USAGE (for chart-cockpit.js):
+// USAGE (for chart-cockpit.js) — UNCHANGED from the klinecharts version:
 //
 //   chartEngine.init({ containerId: 'klineMainChart' });
-//   marketStore.init({ symbol: 'BTCUSDT', interval: '1m' }); // any order is fine,
-//                                                              // engine binds its
-//                                                              // listeners in init()
+//   marketStore.init({ symbol: 'BTCUSDT', interval: '1m' });
 //
 //   // timeframe dropdown click:
-//   marketStore.setInterval('5m');   // engine auto re-renders via its market-store listeners
+//   marketStore.setInterval('5m');
 //
 //   // chart type dropdown click:
 //   chartEngine.setChartType('area');
 //
-//   // indicator toggle click:
+//   // indicator toggle click — now a safe no-op, always returns false:
 //   const isNowOn = chartEngine.toggleIndicator('MA');
-//   button.classList.toggle('active-tool', isNowOn);
+//   button.classList.toggle('active-tool', isNowOn); // will just stay off
 // ══════════════════════════════════════════════════════════════════════════

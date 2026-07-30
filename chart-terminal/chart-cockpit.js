@@ -4,7 +4,14 @@
 // Renders the chart toolbar ("cockpit") and the Chrome-style tabs row above
 // it. Fully self-contained: injects its own <style>, builds its own HTML,
 // and wires every button. Talks to marketStore + chartEngine only — never
-// touches Binance or klinecharts directly.
+// touches Binance or the chart library directly.
+//
+// Indicators button (ƒx) was removed (Jul 2026) along with the TradingView
+// Lightweight Charts migration — no built-in indicator engine on that
+// library yet, so the dropdown, its state, and chartEngine.toggleIndicator
+// call-sites were all pulled out rather than left disabled. Re-add as its
+// own module later once a custom indicator layer is built on top of
+// Lightweight Charts.
 //
 // SCOPE NOTE: this file does NOT yet include the old split-screen "Layout /
 // Sync" popup from the previous monolith — that's a separate, more complex
@@ -62,7 +69,7 @@
   document.head.appendChild(style);
 
   // ── State ────────────────────────────────────────────────────────────
-  let tabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', indicators: [], source: 'edge' }];
+  let tabs = [{ id: 1, symbol: 'BTCUSDT', interval: '1m', chartType: 'candle_solid', source: 'edge' }];
   let activeTabId = 1;
   let nextTabId = 2;
   let binanceMarkets = null; // cached top-150 USDT pair list — the searchable symbol universe for ALL 3 dropdown tabs (Edge/Spot/Perp); Spot/Perp tabs filter this list down to whichever brokers actually carry each symbol, via marketStore.getBrokersForSymbol()
@@ -73,10 +80,6 @@
 
   const CHART_TYPE_LABELS = { candle_solid: 'Candle', candle_stroke: 'Hollow', ohlc: 'OHLC', area: 'Area' };
   const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
-  const INDICATORS = [
-    { name: 'MA', overlay: true }, { name: 'EMA', overlay: true }, { name: 'BOLL', overlay: true },
-    { name: 'VOL', overlay: false }, { name: 'MACD', overlay: false }, { name: 'RSI', overlay: false }, { name: 'KDJ', overlay: false },
-  ];
 
   // ── Public init ─────────────────────────────────────────────────────
   function init(opts = {}) {
@@ -145,15 +148,6 @@
           </div>
         </div>
 
-        <div class="ctc-wrap" id="ctc-ind-wrap">
-          <button class="ctc-pill" id="ctc-ind-btn">ƒx
-            <svg class="ctc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="ctc-dd" id="ctc-ind-dd">
-            <div class="ctc-dd-list">${INDICATORS.map(i => `<div class="ctc-dd-item" data-ind="${i.name}" data-overlay="${i.overlay}">${i.name}</div>`).join('')}</div>
-          </div>
-        </div>
-
         <div class="ctc-divider"></div>
 
         <button class="ctc-pill" id="ctc-footprint-btn" title="Footprint chart">Footprint</button>
@@ -194,7 +188,6 @@
     document.getElementById('ctc-market-btn').onclick = () => toggleDropdown('ctc-market-dd');
     document.getElementById('ctc-tf-btn').onclick = () => toggleDropdown('ctc-tf-dd');
     document.getElementById('ctc-ct-btn').onclick = () => toggleDropdown('ctc-ct-dd');
-    document.getElementById('ctc-ind-btn').onclick = () => toggleDropdown('ctc-ind-dd');
 
     document.getElementById('ctc-dd-tabs').addEventListener('click', (e) => {
       const tabName = e.target.getAttribute('data-dd-tab');
@@ -208,10 +201,6 @@
     document.getElementById('ctc-ct-dd').addEventListener('click', (e) => {
       const ct = e.target.getAttribute('data-ct');
       if (ct) selectChartType(ct);
-    });
-    document.getElementById('ctc-ind-dd').addEventListener('click', (e) => {
-      const name = e.target.getAttribute('data-ind');
-      if (name) selectIndicator(name, e.target.getAttribute('data-overlay') === 'true');
     });
     document.getElementById('ctc-market-search').addEventListener('input', (e) => filterMarketList(e.target.value));
 
@@ -278,15 +267,6 @@
     chartEngine.setChartType(type);
   }
 
-  function selectIndicator(name, overlay) {
-    const tab = activeTab();
-    const isNowOn = chartEngine.toggleIndicator(name, overlay);
-    const el = document.querySelector(`#ctc-ind-dd [data-ind="${name}"]`);
-    if (el) el.classList.toggle('active', isNowOn);
-    if (isNowOn) { if (!tab.indicators.includes(name)) tab.indicators.push(name); }
-    else { tab.indicators = tab.indicators.filter(n => n !== name); }
-  }
-
   async function selectMarket(symbol, source) {
     closeAllDropdowns();
     const tab = activeTab();
@@ -307,7 +287,7 @@
   // ── Tabs ────────────────────────────────────────────────────────────
   async function addTab() {
     const fromSymbol = activeTab().symbol;
-    const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', indicators: [], source: 'edge' };
+    const tab = { id: nextTabId++, symbol: fromSymbol, interval: '1m', chartType: 'candle_solid', source: 'edge' };
     tabs.push(tab);
     await switchTab(tab.id);
 
@@ -330,18 +310,6 @@
     document.getElementById('ctc-tf-label').textContent = tab.interval;
     document.getElementById('ctc-ct-label').textContent = CHART_TYPE_LABELS[tab.chartType];
     chartEngine.setChartType(tab.chartType);
-
-    // Turn off indicators that are on but shouldn't be for this tab, and vice versa.
-    const currentlyActive = chartEngine.getActiveIndicators();
-    Object.keys(currentlyActive).forEach(name => {
-      if (!tab.indicators.includes(name)) chartEngine.toggleIndicator(name);
-    });
-    tab.indicators.forEach(name => {
-      if (!chartEngine.isIndicatorActive(name)) {
-        const meta = INDICATORS.find(i => i.name === name);
-        chartEngine.toggleIndicator(name, meta ? meta.overlay : false);
-      }
-    });
 
     renderTabs();
 
