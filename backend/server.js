@@ -1,13 +1,36 @@
 /**
  * EdgeTrade — Isolated Backend (server.js)
  * -----------------------------------------
- * Cold-Start / Zero-Latency Footprint Engine
+ * Cold-Start / Zero-Latency Footprint Engine — MULTI-SYMBOL
  *
  * Responsibilities:
- *  1. /api/wakeup   -> wakes the server, opens exchange WS connections in background
- *  2. Shadow buffer -> maintains last 200 candles + live tick-by-tick footprint in RAM
- *  3. /ws/footprint -> when frontend connects, instantly pushes pre-buffered data
- *  4. Auto-sleep    -> if idle for 15 minutes, closes exchange connections to save resources
+ *  1. /api/wakeup    -> wakes a specific symbol's market, opens exchange WS in background
+ *  2. Shadow buffer  -> per-symbol: maintains last 200 candles + live tick-by-tick footprint in RAM
+ *  3. /ws/footprint  -> when frontend connects for a symbol, instantly pushes that symbol's buffered data
+ *  4. Auto-sleep     -> per-symbol: if a market has zero connected clients for 15 minutes, closes ITS
+ *                       exchange connections only (other symbols' connections are unaffected)
+ *
+ * ── MULTI-SYMBOL REWRITE (Jul 2026) ─────────────────────────────────────────
+ * The original version kept ONE global symbol + ONE set of exchange sockets,
+ * and broadcast every update to EVERY connected client regardless of which
+ * symbol they were viewing. That breaks the moment two users look at two
+ * different symbols at the same time — both would get a mixed feed.
+ *
+ * Now every symbol gets its own isolated `Market` object (own candles, own
+ * footprint buffer, own Binance/Bybit sockets, own client list, own
+ * awake/sleep lifecycle). A Binance/Bybit connection for a symbol only
+ * exists while at least one frontend client is actually watching it —
+ * this also means we don't blow through exchange WS connection limits by
+ * opening a socket per symbol regardless of demand.
+ *
+ * FRONTEND CONTRACT:
+ *  - Connect to:  wss://<host>/ws/footprint?symbol=btcusdt
+ *  - To switch symbol on an already-open connection (e.g. user changes the
+ *    chart's symbol without a full page reload), send:
+ *      { "type": "subscribe", "symbol": "ethusdt" }
+ *    The server will detach the socket from the old market (unsubscribing
+ *    if it was the last client there) and attach it to the new one,
+ *    immediately sending a fresh snapshot for the new symbol.
  *
  * NOTE: This file is fully standalone. No frontend code included/touched.
  */
@@ -16,6 +39,7 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
+const { URL } = require('url');
 
 // ---------------------------------------------------------------------------
 // CONFIG
@@ -24,9 +48,16 @@ const PORT = process.env.PORT || 4000;
 const DEFAULT_SYMBOL = (process.env.SYMBOL || 'btcusdt').toLowerCase();
 const CANDLE_INTERVAL = '1m';
 const MAX_CANDLE_HISTORY = 200;
-const IDLE_SLEEP_MS = 15 * 60 * 1000;      // 15 minutes
+const IDLE_SLEEP_MS = 15 * 60 * 1000;      // 15 minutes with zero clients on a symbol
 const IDLE_CHECK_INTERVAL_MS = 30 * 1000;  // check every 30s
 const RECONNECT_DELAY_MS = 3000;
+
+// Safety valve — caps how many symbols can be "awake" (holding live exchange
+// sockets) at once. Prevents one server instance from silently opening
+// hundreds of Binance/Bybit connections if traffic spreads across many
+// symbols at once. Tune this once real traffic patterns are known; for now
+// it just stops an unbounded blow-up.
+const MAX_AWAKE_MARKETS = 40;
 
 const BINANCE_REST_KLINES = (symbol, interval, limit) =>
   `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
@@ -37,26 +68,9 @@ const BINANCE_WS_URL = (symbol) =>
 const BYBIT_WS_URL = 'wss://stream.bybit.com/v5/public/linear';
 
 // ---------------------------------------------------------------------------
-// STATE (in-memory — the "Shadow" buffer)
+// STATE — one Market per symbol (the "Shadow" buffer, now per-symbol)
 // ---------------------------------------------------------------------------
-const state = {
-  awake: false,
-  lastActivity: 0,
-  symbol: DEFAULT_SYMBOL,
-
-  candles: [],              // last MAX_CANDLE_HISTORY closed candles
-  footprintHistory: [],     // completed footprint candles (parallel to candles)
-  liveFootprint: makeEmptyFootprintCandle(), // currently-forming candle footprint
-
-  sockets: {
-    binance: null,
-    bybit: null,
-  },
-  reconnectTimers: {
-    binance: null,
-    bybit: null,
-  },
-};
+const markets = new Map(); // symbol (lowercase) -> Market
 
 function makeEmptyFootprintCandle() {
   return {
@@ -70,11 +84,41 @@ function makeEmptyFootprintCandle() {
   };
 }
 
-function touchActivity() {
-  state.lastActivity = Date.now();
+function createMarket(symbol) {
+  return {
+    symbol,
+    awake: false,
+    lastActivity: 0,
+
+    candles: [],              // last MAX_CANDLE_HISTORY closed candles
+    footprintHistory: [],     // completed footprint candles (parallel to candles)
+    liveFootprint: makeEmptyFootprintCandle(), // currently-forming candle footprint
+
+    sockets: { binance: null, bybit: null },
+    reconnectTimers: { binance: null, bybit: null },
+
+    clients: new Set(), // ws connections currently watching this symbol
+  };
+}
+
+function getOrCreateMarket(symbol) {
+  let market = markets.get(symbol);
+  if (!market) {
+    market = createMarket(symbol);
+    markets.set(symbol, market);
+  }
+  return market;
+}
+
+function touchActivity(market) {
+  market.lastActivity = Date.now();
 }
 
 // Round price into a footprint "bucket" (tick size). Kept simple/generic.
+// IMPORTANT: the frontend's live-tick aggregation must mirror this EXACT
+// rounding logic, or its buckets will misalign with footprintHistory (which
+// was bucketed here). If this function ever changes, the frontend's copy
+// must change with it in the same pass.
 function bucketPrice(price) {
   const p = Number(price);
   if (p >= 1000) return Math.round(p).toString();        // $1 buckets for big-priced assets
@@ -102,16 +146,16 @@ async function fetchInitialCandles(symbol) {
 }
 
 // ---------------------------------------------------------------------------
-// EXCHANGE WS — Binance (trade + kline combined stream)
+// EXCHANGE WS — Binance (trade + kline combined stream), scoped to a market
 // ---------------------------------------------------------------------------
-function connectBinance(symbol) {
-  clearTimeout(state.reconnectTimers.binance);
+function connectBinance(market) {
+  clearTimeout(market.reconnectTimers.binance);
 
-  const ws = new WebSocket(BINANCE_WS_URL(symbol));
-  state.sockets.binance = ws;
+  const ws = new WebSocket(BINANCE_WS_URL(market.symbol));
+  market.sockets.binance = ws;
 
   ws.on('open', () => {
-    console.log(`[binance] connected (${symbol})`);
+    console.log(`[binance] connected (${market.symbol})`);
   });
 
   ws.on('message', (raw) => {
@@ -125,26 +169,26 @@ function connectBinance(symbol) {
     if (!payload) return;
 
     if (payload.e === 'trade') {
-      handleTradeTick({
+      handleTradeTick(market, {
         price: payload.p,
         qty: payload.q,
         isBuyerMaker: payload.m, // true = sell-side aggressor
         time: payload.T,
       });
     } else if (payload.e === 'kline') {
-      handleKlineUpdate(payload.k);
+      handleKlineUpdate(market, payload.k);
     }
   });
 
   ws.on('close', () => {
-    console.log('[binance] disconnected, reconnecting...');
-    if (state.awake) {
-      state.reconnectTimers.binance = setTimeout(() => connectBinance(symbol), RECONNECT_DELAY_MS);
+    console.log(`[binance] disconnected (${market.symbol}), reconnecting...`);
+    if (market.awake) {
+      market.reconnectTimers.binance = setTimeout(() => connectBinance(market), RECONNECT_DELAY_MS);
     }
   });
 
   ws.on('error', (err) => {
-    console.error('[binance] error:', err.message);
+    console.error(`[binance] error (${market.symbol}):`, err.message);
     ws.close();
   });
 }
@@ -152,12 +196,12 @@ function connectBinance(symbol) {
 // ---------------------------------------------------------------------------
 // EXCHANGE WS — Bybit (linear perp trade stream, supplementary flow data)
 // ---------------------------------------------------------------------------
-function connectBybit(symbol) {
-  clearTimeout(state.reconnectTimers.bybit);
+function connectBybit(market) {
+  clearTimeout(market.reconnectTimers.bybit);
 
   const ws = new WebSocket(BYBIT_WS_URL);
-  state.sockets.bybit = ws;
-  const bybitSymbol = symbol.toUpperCase().replace('USDT', 'USDT'); // e.g. BTCUSDT
+  market.sockets.bybit = ws;
+  const bybitSymbol = market.symbol.toUpperCase();
 
   ws.on('open', () => {
     console.log(`[bybit] connected (${bybitSymbol})`);
@@ -177,7 +221,7 @@ function connectBybit(symbol) {
     }
     if (msg.topic && msg.topic.startsWith('publicTrade') && Array.isArray(msg.data)) {
       msg.data.forEach((t) => {
-        handleTradeTick({
+        handleTradeTick(market, {
           price: t.p,
           qty: t.v,
           isBuyerMaker: t.S === 'Sell',
@@ -190,26 +234,26 @@ function connectBybit(symbol) {
 
   ws.on('close', () => {
     clearInterval(ws.pingInterval);
-    console.log('[bybit] disconnected, reconnecting...');
-    if (state.awake) {
-      state.reconnectTimers.bybit = setTimeout(() => connectBybit(symbol), RECONNECT_DELAY_MS);
+    console.log(`[bybit] disconnected (${bybitSymbol}), reconnecting...`);
+    if (market.awake) {
+      market.reconnectTimers.bybit = setTimeout(() => connectBybit(market), RECONNECT_DELAY_MS);
     }
   });
 
   ws.on('error', (err) => {
-    console.error('[bybit] error:', err.message);
+    console.error(`[bybit] error (${bybitSymbol}):`, err.message);
     ws.close();
   });
 }
 
 // ---------------------------------------------------------------------------
-// TICK -> FOOTPRINT AGGREGATION
+// TICK -> FOOTPRINT AGGREGATION (per market)
 // ---------------------------------------------------------------------------
-function handleTradeTick({ price, qty, isBuyerMaker, time }) {
-  touchActivity(); // exchange activity keeps the shadow buffer "fresh", not user activity
+function handleTradeTick(market, { price, qty, isBuyerMaker, time }) {
+  touchActivity(market); // exchange activity keeps this market's shadow buffer "fresh", not user activity
 
   const bucket = bucketPrice(price);
-  const level = state.liveFootprint.levels[bucket] || { buy: 0, sell: 0, trades: 0 };
+  const level = market.liveFootprint.levels[bucket] || { buy: 0, sell: 0, trades: 0 };
 
   // isBuyerMaker true => the aggressor was a SELL (hit the bid)
   if (isBuyerMaker) {
@@ -218,10 +262,10 @@ function handleTradeTick({ price, qty, isBuyerMaker, time }) {
     level.buy += parseFloat(qty);
   }
   level.trades += 1;
-  state.liveFootprint.levels[bucket] = level;
-  state.liveFootprint.volume += parseFloat(qty);
+  market.liveFootprint.levels[bucket] = level;
+  market.liveFootprint.volume += parseFloat(qty);
 
-  broadcastToClients({
+  broadcastToMarket(market, {
     type: 'tick',
     price: parseFloat(price),
     qty: parseFloat(qty),
@@ -230,7 +274,7 @@ function handleTradeTick({ price, qty, isBuyerMaker, time }) {
   });
 }
 
-function handleKlineUpdate(k) {
+function handleKlineUpdate(market, k) {
   const candle = {
     time: k.t,
     open: parseFloat(k.o),
@@ -241,75 +285,95 @@ function handleKlineUpdate(k) {
   };
 
   // update the in-progress candle (last one) live
-  if (state.candles.length && state.candles[state.candles.length - 1].time === candle.time) {
-    state.candles[state.candles.length - 1] = candle;
+  if (market.candles.length && market.candles[market.candles.length - 1].time === candle.time) {
+    market.candles[market.candles.length - 1] = candle;
   } else {
-    state.candles.push(candle);
-    if (state.candles.length > MAX_CANDLE_HISTORY) state.candles.shift();
+    market.candles.push(candle);
+    if (market.candles.length > MAX_CANDLE_HISTORY) market.candles.shift();
   }
 
-  state.liveFootprint.time = candle.time;
-  state.liveFootprint.open = candle.open;
-  state.liveFootprint.high = candle.high;
-  state.liveFootprint.low = candle.low;
-  state.liveFootprint.close = candle.close;
+  market.liveFootprint.time = candle.time;
+  market.liveFootprint.open = candle.open;
+  market.liveFootprint.high = candle.high;
+  market.liveFootprint.low = candle.low;
+  market.liveFootprint.close = candle.close;
 
   if (k.x) {
     // candle closed — commit footprint to history, start a fresh one
-    state.footprintHistory.push(state.liveFootprint);
-    if (state.footprintHistory.length > MAX_CANDLE_HISTORY) state.footprintHistory.shift();
-    state.liveFootprint = makeEmptyFootprintCandle();
+    market.footprintHistory.push(market.liveFootprint);
+    if (market.footprintHistory.length > MAX_CANDLE_HISTORY) market.footprintHistory.shift();
+    market.liveFootprint = makeEmptyFootprintCandle();
 
-    broadcastToClients({ type: 'candle_closed', candle });
+    broadcastToMarket(market, { type: 'candle_closed', candle });
   }
 }
 
 // ---------------------------------------------------------------------------
-// WAKE / SLEEP LIFECYCLE
+// WAKE / SLEEP LIFECYCLE (per market)
 // ---------------------------------------------------------------------------
-async function wakeUp(symbol = state.symbol) {
-  touchActivity();
+async function wakeUp(symbol) {
+  const market = getOrCreateMarket(symbol);
+  touchActivity(market);
 
-  if (state.awake) return { alreadyAwake: true };
+  if (market.awake) return { alreadyAwake: true, symbol };
+
+  if (countAwakeMarkets() >= MAX_AWAKE_MARKETS) {
+    console.warn(`[system] MAX_AWAKE_MARKETS (${MAX_AWAKE_MARKETS}) reached — refusing to wake ${symbol}`);
+    return { alreadyAwake: false, symbol, error: 'server_at_capacity', candleCount: 0 };
+  }
 
   console.log(`[system] waking up for ${symbol}...`);
-  state.awake = true;
-  state.symbol = symbol;
+  market.awake = true;
 
   try {
-    state.candles = await fetchInitialCandles(symbol);
+    market.candles = await fetchInitialCandles(symbol);
   } catch (err) {
-    console.error('[system] failed to fetch initial candles:', err.message);
-    state.candles = [];
+    console.error(`[system] failed to fetch initial candles (${symbol}):`, err.message);
+    market.candles = [];
   }
 
-  state.footprintHistory = [];
-  state.liveFootprint = makeEmptyFootprintCandle();
+  market.footprintHistory = [];
+  market.liveFootprint = makeEmptyFootprintCandle();
 
-  connectBinance(symbol);
-  connectBybit(symbol);
+  connectBinance(market);
+  connectBybit(market);
 
-  return { alreadyAwake: false, symbol, candleCount: state.candles.length };
+  return { alreadyAwake: false, symbol, candleCount: market.candles.length };
 }
 
-function sleep() {
-  if (!state.awake) return;
-  console.log('[system] going to sleep (idle timeout reached)');
+function sleep(market) {
+  if (!market.awake) return;
+  console.log(`[system] ${market.symbol} going to sleep (idle timeout reached)`);
 
-  if (state.sockets.binance) state.sockets.binance.close();
-  if (state.sockets.bybit) state.sockets.bybit.close();
-  clearTimeout(state.reconnectTimers.binance);
-  clearTimeout(state.reconnectTimers.bybit);
+  if (market.sockets.binance) market.sockets.binance.close();
+  if (market.sockets.bybit) market.sockets.bybit.close();
+  clearTimeout(market.reconnectTimers.binance);
+  clearTimeout(market.reconnectTimers.bybit);
 
-  state.awake = false;
-  state.candles = [];
-  state.footprintHistory = [];
-  state.liveFootprint = makeEmptyFootprintCandle();
+  market.awake = false;
+  market.candles = [];
+  market.footprintHistory = [];
+  market.liveFootprint = makeEmptyFootprintCandle();
+
+  // Free the market entry entirely once it's asleep AND nobody's watching —
+  // keeps the `markets` Map from growing forever across many symbols over
+  // time. A market only reaches here with clients.size > 0 during shutdown,
+  // where deleting the entry doesn't matter (process is exiting anyway).
+  if (market.clients.size === 0) markets.delete(market.symbol);
+}
+
+function countAwakeMarkets() {
+  let n = 0;
+  for (const m of markets.values()) if (m.awake) n++;
+  return n;
 }
 
 setInterval(() => {
-  if (state.awake && Date.now() - state.lastActivity > IDLE_SLEEP_MS) {
-    sleep();
+  const now = Date.now();
+  for (const market of markets.values()) {
+    if (market.awake && market.clients.size === 0 && now - market.lastActivity > IDLE_SLEEP_MS) {
+      sleep(market);
+    }
   }
 }, IDLE_CHECK_INTERVAL_MS);
 
@@ -331,58 +395,119 @@ app.post('/api/wakeup', async (req, res) => {
 });
 
 app.get('/api/status', (req, res) => {
+  const symbol = req.query.symbol ? String(req.query.symbol).toLowerCase() : null;
+
+  if (symbol) {
+    const market = markets.get(symbol);
+    return res.json(market ? {
+      symbol,
+      awake: market.awake,
+      candleCount: market.candles.length,
+      footprintCandleCount: market.footprintHistory.length,
+      lastActivity: market.lastActivity,
+      idleForMs: market.lastActivity ? Date.now() - market.lastActivity : null,
+      connectedClients: market.clients.size,
+    } : { symbol, awake: false, candleCount: 0, footprintCandleCount: 0, connectedClients: 0 });
+  }
+
+  // No symbol given — summary across all currently-tracked markets.
+  const summary = [...markets.values()].map((m) => ({
+    symbol: m.symbol,
+    awake: m.awake,
+    connectedClients: m.clients.size,
+  }));
   res.json({
-    awake: state.awake,
-    symbol: state.symbol,
-    candleCount: state.candles.length,
-    footprintCandleCount: state.footprintHistory.length,
-    lastActivity: state.lastActivity,
-    idleForMs: state.lastActivity ? Date.now() - state.lastActivity : null,
-    connectedClients: wss ? wss.clients.size : 0,
+    totalMarkets: markets.size,
+    awakeMarkets: countAwakeMarkets(),
+    totalConnectedClients: summary.reduce((sum, m) => sum + m.connectedClients, 0),
+    markets: summary,
   });
 });
 
 const server = http.createServer(app);
 
 // ---------------------------------------------------------------------------
-// WEBSOCKET SERVER — frontend-facing, zero-latency delivery
+// WEBSOCKET SERVER — frontend-facing, zero-latency delivery, per-symbol rooms
 // ---------------------------------------------------------------------------
 const wss = new WebSocket.Server({ server, path: '/ws/footprint' });
 
-wss.on('connection', (ws) => {
-  touchActivity();
-  console.log('[client] connected, sending buffered snapshot');
+function sendSnapshot(ws, market) {
+  ws.send(JSON.stringify({
+    type: 'snapshot',
+    symbol: market.symbol,
+    candles: market.candles,
+    footprintHistory: market.footprintHistory,
+    liveFootprint: market.liveFootprint,
+  }));
+}
 
-  // Auto-wake if a client connects while asleep (e.g. wakeup call was missed)
-  if (!state.awake) {
-    wakeUp().catch((err) => console.error('[system] auto-wake failed:', err.message));
+// Attaches a client socket to a market: joins its client room, auto-wakes
+// the market if needed, and sends an immediate snapshot. Used both on
+// initial connect and when a client sends a `subscribe` message to switch
+// symbols on an already-open socket.
+async function attachToMarket(ws, symbol) {
+  const market = getOrCreateMarket(symbol);
+  touchActivity(market);
+  market.clients.add(ws);
+  ws.symbol = symbol;
+
+  if (!market.awake) {
+    await wakeUp(symbol).catch((err) => console.error(`[system] auto-wake failed (${symbol}):`, err.message));
   }
 
-  // Instantly deliver whatever is already buffered — zero-latency handoff
-  ws.send(
-    JSON.stringify({
-      type: 'snapshot',
-      symbol: state.symbol,
-      candles: state.candles,
-      footprintHistory: state.footprintHistory,
-      liveFootprint: state.liveFootprint,
-    })
-  );
+  sendSnapshot(ws, market);
+}
 
-  ws.on('message', () => {
-    // any message (e.g. a client-side ping) counts as activity
-    touchActivity();
+function detachFromMarket(ws) {
+  if (!ws.symbol) return;
+  const market = markets.get(ws.symbol);
+  if (!market) return;
+  market.clients.delete(ws);
+  touchActivity(market); // client leaving still counts as recent activity — don't sleep instantly on the last disconnect, let the idle timer decide
+}
+
+wss.on('connection', (ws, req) => {
+  const reqUrl = new URL(req.url, 'http://localhost');
+  const symbol = (reqUrl.searchParams.get('symbol') || DEFAULT_SYMBOL).toLowerCase();
+
+  console.log(`[client] connected for ${symbol}, sending buffered snapshot`);
+  attachToMarket(ws, symbol);
+
+  ws.on('message', (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    if (msg && msg.type === 'subscribe' && typeof msg.symbol === 'string') {
+      const newSymbol = msg.symbol.toLowerCase();
+      if (newSymbol !== ws.symbol) {
+        console.log(`[client] switching ${ws.symbol} -> ${newSymbol}`);
+        detachFromMarket(ws);
+        attachToMarket(ws, newSymbol);
+      }
+      return;
+    }
+
+    // any other message (e.g. a client-side ping) counts as activity
+    if (ws.symbol) {
+      const market = markets.get(ws.symbol);
+      if (market) touchActivity(market);
+    }
   });
 
   ws.on('close', () => {
-    console.log('[client] disconnected');
+    console.log(`[client] disconnected (was watching ${ws.symbol})`);
+    detachFromMarket(ws);
   });
 });
 
-function broadcastToClients(payload) {
-  if (!wss.clients.size) return;
+function broadcastToMarket(market, payload) {
+  if (!market.clients.size) return;
   const msg = JSON.stringify(payload);
-  wss.clients.forEach((client) => {
+  market.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) client.send(msg);
   });
 }
@@ -392,7 +517,7 @@ function broadcastToClients(payload) {
 // ---------------------------------------------------------------------------
 function shutdown() {
   console.log('[system] shutting down...');
-  sleep();
+  for (const market of markets.values()) sleep(market);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 2000);
 }
@@ -401,6 +526,5 @@ process.on('SIGTERM', shutdown);
 
 server.listen(PORT, () => {
   console.log(`[system] EdgeTrade backend listening on port ${PORT}`);
-  console.log(`[system] POST /api/wakeup to warm up, connect to ws://<host>/ws/footprint for live data`);
+  console.log(`[system] POST /api/wakeup { symbol } to warm up, connect to ws://<host>/ws/footprint?symbol=<symbol> for live data`);
 });
-
