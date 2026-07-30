@@ -1173,55 +1173,29 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(201,168,76,0.15);border-radius:2px;}
-/* Strategy Modal — broker popup style */
-.strategy-modal-overlay{
-  position:fixed;inset:0;z-index:500;
-  background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);
-  display:none;align-items:flex-end;justify-content:center;
-  overscroll-behavior:contain;
+/* Keyword autocomplete dropdown — inline, non-blocking (Strategy / Market Bias / Psychology) */
+.kw-field{position:relative;}
+.kw-dd{
+  display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:50;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+  max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  box-shadow:0 14px 34px rgba(0,0,0,0.55);
 }
-.strategy-modal-overlay.open{display:flex;animation:fadeIn 0.2s ease;}
-.strategy-modal-panel{
-  background:var(--bg2);border:1px solid var(--border);
-  border-top:1px solid rgba(201,168,76,0.15);
-  border-radius:20px 20px 0 0;
-  width:100%;max-width:100%;
-  height:75vh;display:flex;flex-direction:column;
-  box-shadow:0 -20px 60px rgba(0,0,0,0.8);
-  animation:slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+.kw-dd.open{display:block;animation:fadeIn 0.15s ease;}
+.kw-item{
+  padding:12px 14px;font-size:13.5px;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border-bottom:1px solid var(--border2);transition:background 0.15s;
 }
-@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
-.strategy-modal-handle{
-  width:44px;height:5px;background:rgba(255,255,255,0.18);
-  border-radius:3px;margin:10px auto 0;flex-shrink:0;cursor:grab;
+.kw-item:last-child{border-bottom:none;}
+.kw-item:hover,.kw-item:active{background:var(--gold-dim);color:var(--gold);}
+.kw-item-name{flex:1;font-weight:500;}
+.kw-item-count{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:2px 8px;border:1px solid var(--border2);border-radius:20px;flex-shrink:0;}
+.kw-item:hover .kw-item-count{border-color:var(--gold);color:var(--gold);}
+@media (max-width:600px){
+  .kw-dd{max-height:180px;}
+  .kw-item{padding:13px 14px;font-size:14px;}
 }
-.strategy-modal-header{
-  padding:14px 18px 12px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
-}
-.strategy-modal-title{
-  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--gold);display:flex;align-items:center;gap:6px;
-}
-.strategy-modal-close{
-  width:28px;height:28px;border-radius:7px;border:1px solid var(--border);
-  background:none;color:var(--muted);cursor:pointer;font-size:14px;
-  display:flex;align-items:center;justify-content:center;transition:all 0.2s;
-}
-.strategy-modal-close:hover{border-color:var(--red);color:var(--red);}
-.strategy-modal-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
-.strategy-item{
-  padding:13px 18px;font-size:14px;cursor:pointer;
-  display:flex;align-items:center;justify-content:space-between;
-  transition:background 0.15s;border-bottom:1px solid var(--border2);
-}
-.strategy-item:last-child{border-bottom:none;}
-.strategy-item:active{background:var(--gold-dim);}
-.strategy-item:hover{background:var(--gold-dim);color:var(--gold);}
-.strategy-item-name{flex:1;font-weight:500;}
-.strategy-item-count{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:3px 10px;border:1px solid var(--border2);border-radius:20px;}
-.strategy-item:hover .strategy-item-count{border-color:var(--gold);color:var(--gold);}
-.strategy-dd-empty{padding:20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6;}
 
 /* ════════ STRATEGY STATS CARD ════════ */
 .strat-filter-wrap{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}

@@ -565,6 +565,7 @@ async function saveTrade(){
   btn.disabled=false;btn.textContent='💾 Save Trade Entry';
   if(err){showToast('Error: '+err.message,'error');return;}
   showToast('Trade saved successfully!','success');
+  kwInvalidateAllCaches();
   showSection('trade-list');
 }
 
@@ -1873,109 +1874,138 @@ window.onload=async function(){
   });
 };
 // ══════════════════════════════════════
-// STRATEGY AUTOCOMPLETE SYSTEM
+// KEYWORD AUTOCOMPLETE SYSTEM (Strategy / Market Bias / Psychology)
+// Inline dropdown, no focus-stealing, keyword-only suggestions (not
+// full past sentences) so re-use stays a nudge, not a crutch.
 // ══════════════════════════════════════
-let _strategyCache = [];
-let _stratDDOpen = false;
+const KW_FIELDS = {
+  'e-strategy': { col:'strategy',   cache:[], loaded:false },
+  'e-pov':      { col:'pov',        cache:[], loaded:false },
+  'e-psych':    { col:'psychology', cache:[], loaded:false }
+};
+// delimiters that separate one "keyword/tag" from the next inside a field
+const KW_SPLIT_RE = /[,.;\n\/]+|\s+[-–—]\s+/;
 
-async function loadUserStrategies(){
-  if(!state.user) return;
-  try {
+// Break a full journal sentence into short reusable keyword phrases.
+// e.g. "BOS on 15m, FVG fill, London sweep" -> ["BOS on 15m","FVG fill","London sweep"]
+// Long free-form paragraphs are intentionally NOT kept whole — only short
+// chunks (<=5 words) qualify, so lazy one-click full-sentence reuse can't happen.
+function kwExtract(text){
+  if(!text) return [];
+  const parts = String(text).split(KW_SPLIT_RE);
+  const out=[], seen=new Set();
+  parts.forEach(p=>{
+    const t=p.trim().replace(/\s+/g,' ');
+    if(t.length<3||t.length>40) return;
+    if(t.split(' ').length>5) return;
+    const key=t.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push(t);
+  });
+  return out;
+}
+
+// the fragment currently being typed, after the last delimiter
+function kwCurrentSegment(val){
+  const parts = String(val||'').split(KW_SPLIT_RE);
+  return parts[parts.length-1].trim();
+}
+
+async function kwLoadCache(fieldId){
+  const cfg = KW_FIELDS[fieldId];
+  if(!cfg || !state.user) return;
+  try{
     const {data} = await db.from('trades')
-      .select('strategy')
+      .select(cfg.col)
       .eq('user_id', state.user.id)
-      .not('strategy','is',null)
-      .neq('strategy','');
-    if(!data){_strategyCache=[];return;}
+      .not(cfg.col,'is',null)
+      .neq(cfg.col,'');
     const map={};
-    data.forEach(t=>{
-      const s=(t.strategy||'').trim();
-      if(s) map[s]=(map[s]||0)+1;
+    (data||[]).forEach(row=>{
+      kwExtract(row[cfg.col]||'').forEach(kw=>{
+        const k=kw.toLowerCase();
+        if(!map[k]) map[k]={text:kw,count:0};
+        map[k].count++;
+      });
     });
-    _strategyCache = Object.entries(map)
-      .map(([strategy,usage_count])=>({strategy,usage_count}))
-      .sort((a,b)=>b.usage_count-a.usage_count);
-  } catch(e){_strategyCache=[];}
+    cfg.cache = Object.values(map).sort((a,b)=>b.count-a.count);
+  }catch(e){ cfg.cache=[]; }
+  cfg.loaded=true;
 }
 
-function openStrategyDD(){
-  if(!_strategyCache.length){
-    loadUserStrategies().then(()=>renderStrategyDD(''));
-  } else {
-    renderStrategyDD(document.getElementById('e-strategy').value||'');
-  }
-  const overlay = document.getElementById('strategy-modal-overlay');
-  if(overlay) overlay.classList.add('open');
-  document.body.style.overflow='hidden';
-  _stratDDOpen = true;
-  // Clear search and focus
-  setTimeout(()=>{
-    const si = document.getElementById('strategy-search-inp');
-    if(si){ si.value=''; si.focus(); }
-  }, 100);
-}
-
-function filterStrategyDD(val){
-  renderStrategyDD(val);
-  if(_strategyCache.length>0 && !_stratDDOpen){
-    const overlay = document.getElementById('strategy-modal-overlay');
-    if(overlay) overlay.classList.add('open');
-    document.body.style.overflow='hidden';
-    _stratDDOpen = true;
-  }
-}
-
-function renderStrategyDD(query){
-  const list = document.getElementById('strategy-dd-list');
-  if(!list) return;
+function kwRenderDD(fieldId, query){
+  const cfg = KW_FIELDS[fieldId];
+  const dd = document.getElementById(fieldId+'-dd');
+  if(!cfg || !dd) return;
   const q=(query||'').toLowerCase().trim();
-  const filtered = q ? _strategyCache.filter(s=>s.strategy.toLowerCase().includes(q)) : _strategyCache;
+  const filtered = q ? cfg.cache.filter(k=>k.text.toLowerCase().includes(q)) : cfg.cache;
+  // No match on what the user is typing = they're entering something new.
+  // Stay silent, never show a "no results" message, never block typing.
   if(!filtered.length){
-    list.innerHTML='<div class="strategy-dd-empty">No saved strategies yet.<br>Type a strategy name and save your trade — it will appear here next time!</div>';
+    dd.classList.remove('open');
+    dd.innerHTML='';
     return;
   }
-  list.innerHTML = filtered.map(s=>{
-    const safeName = s.strategy.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return '<div class="strategy-item" onclick="selectStrategy(\'' + safeName + '\')"><span class="strategy-item-name">' + s.strategy + '</span><span class="strategy-item-count">' + s.usage_count + 'x used</span></div>';
+  dd.innerHTML = filtered.slice(0,8).map(k=>{
+    const safe = k.text.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<div class="kw-item" onmousedown="event.preventDefault();kwSelect(\''+fieldId+'\',\''+safe+'\')"><span class="kw-item-name">'+k.text+'</span><span class="kw-item-count">'+k.count+'x</span></div>';
   }).join('');
+  dd.classList.add('open');
 }
 
-function selectStrategy(name){
-  const ta = document.getElementById('e-strategy');
-  if(ta){ ta.value = name; }
-  closeStrategyDD();
+function kwHandleFocus(fieldId){
+  const cfg = KW_FIELDS[fieldId];
+  if(!cfg) return;
+  const show=()=>{
+    if(!cfg.cache.length) return; // first-time user, nothing saved yet — stay out of the way
+    const ta = document.getElementById(fieldId);
+    kwRenderDD(fieldId, kwCurrentSegment(ta?ta.value:''));
+  };
+  if(!cfg.loaded){ kwLoadCache(fieldId).then(show); } else { show(); }
 }
 
-function closeStrategyDD(e){
-  // Called from X button (no event) or overlay background click
-  if(e && e.type==='click' && e.target !== document.getElementById('strategy-modal-overlay')) return;
-  const overlay = document.getElementById('strategy-modal-overlay');
-  if(overlay) overlay.classList.remove('open');
-  document.body.style.overflow='';
-  _stratDDOpen = false;
+function kwHandleInput(fieldId){
+  const cfg = KW_FIELDS[fieldId];
+  if(!cfg || !cfg.cache.length) return; // nothing to suggest — let the user type freely
+  const ta = document.getElementById(fieldId);
+  kwRenderDD(fieldId, kwCurrentSegment(ta?ta.value:''));
 }
 
-function closeStrategyDDBtn(){
-  const overlay = document.getElementById('strategy-modal-overlay');
-  if(overlay) overlay.classList.remove('open');
-  document.body.style.overflow='';
-  _stratDDOpen = false;
+function kwHandleBlur(fieldId){
+  // small delay so a tap on a dropdown item still registers (belt & suspenders
+  // alongside the onmousedown preventDefault on each item)
+  setTimeout(()=>{
+    const dd = document.getElementById(fieldId+'-dd');
+    if(dd) dd.classList.remove('open');
+  }, 150);
 }
 
+function kwSelect(fieldId, text){
+  const ta = document.getElementById(fieldId);
+  if(!ta) return;
+  const val = ta.value;
+  // keep everything up to (and including) the last delimiter exactly as typed,
+  // then swap in the chosen keyword for the in-progress segment, ready to keep typing
+  let cutIdx=0;
+  const re=new RegExp(KW_SPLIT_RE.source,'g');
+  let m;
+  while((m=re.exec(val))!==null){
+    cutIdx=m.index+m[0].length;
+    if(m.index===re.lastIndex) re.lastIndex++;
+  }
+  const prefix = val.slice(0,cutIdx);
+  ta.value = prefix + text + ', ';
+  ta.focus();
+  const dd = document.getElementById(fieldId+'-dd');
+  if(dd) dd.classList.remove('open');
+}
 
-// Hook into initApp to load strategies
-const _origInitApp = window.initApp;
-window.initApp = async function(user){
-  await _origInitApp.call(this, user);
-  await loadUserStrategies();
-};
+// call after a trade is saved so freshly-typed keywords show up next time
+function kwInvalidateAllCaches(){
+  Object.values(KW_FIELDS).forEach(cfg=>{ cfg.loaded=false; });
+}
 
-// Reload strategies after saveTrade
-const _origSaveTrade = window.saveTrade;
-window.saveTrade = async function(){
-  await _origSaveTrade.call(this);
-  await loadUserStrategies();
-};
 
 // ══════════════════════════════════════
 // STRATEGY STATS
@@ -2840,7 +2870,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         case 'Escape':
           exitFocusMode();
-          document.querySelectorAll('.strategy-modal-overlay.open, .chart-nav-popup-overlay.open')
+          document.querySelectorAll('.kw-dd.open, .chart-nav-popup-overlay.open')
             .forEach(el => el.classList.remove('open'));
           break;
         case 'f': case 'F':
