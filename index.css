@@ -1173,12 +1173,14 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(201,168,76,0.15);border-radius:2px;}
-/* Keyword autocomplete dropdown — inline, non-blocking (Strategy / Market Bias / Psychology) */
+/* Keyword autocomplete dropdown — inline, non-blocking (Strategy / Market Bias / Psychology)
+   position:fixed + JS-computed coordinates so the parent card's overflow:hidden
+   (used for its rounded corners) can never clip the dropdown. */
 .kw-field{position:relative;}
 .kw-dd{
-  display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:50;
+  display:none;position:fixed;z-index:600;
   background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
-  max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   box-shadow:0 14px 34px rgba(0,0,0,0.55);
 }
 .kw-dd.open{display:block;animation:fadeIn 0.15s ease;}
@@ -1193,7 +1195,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .kw-item-count{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:2px 8px;border:1px solid var(--border2);border-radius:20px;flex-shrink:0;}
 .kw-item:hover .kw-item-count{border-color:var(--gold);color:var(--gold);}
 @media (max-width:600px){
-  .kw-dd{max-height:180px;}
+  .kw-dd{max-height:200px;}
   .kw-item{padding:13px 14px;font-size:14px;}
 }
 

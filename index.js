@@ -1883,6 +1883,50 @@ const KW_FIELDS = {
   'e-pov':      { col:'pov',        cache:[], loaded:false },
   'e-psych':    { col:'psychology', cache:[], loaded:false }
 };
+
+// The dropdowns start out nested inside cards that use overflow:hidden for
+// their rounded corners, which would silently clip an absolutely-positioned
+// dropdown. Moving them to be direct children of <body> + position:fixed
+// (with coordinates computed from the textarea's live bounding box) guarantees
+// they're never clipped, regardless of where the field lives in the layout.
+function kwReparentDropdowns(){
+  Object.keys(KW_FIELDS).forEach(fieldId=>{
+    const dd = document.getElementById(fieldId+'-dd');
+    if(dd && dd.parentElement !== document.body) document.body.appendChild(dd);
+  });
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', kwReparentDropdowns);
+} else {
+  kwReparentDropdowns();
+}
+
+function kwPositionDD(fieldId){
+  const ta = document.getElementById(fieldId);
+  const dd = document.getElementById(fieldId+'-dd');
+  if(!ta||!dd) return;
+  const r = ta.getBoundingClientRect();
+  dd.style.left = r.left+'px';
+  dd.style.width = r.width+'px';
+  const spaceBelow = window.innerHeight - r.bottom;
+  if(spaceBelow < 160 && r.top > 200){
+    // not enough room below — flip the dropdown above the field instead
+    dd.style.bottom = (window.innerHeight - r.top + 6)+'px';
+    dd.style.top = 'auto';
+  } else {
+    dd.style.top = (r.bottom+6)+'px';
+    dd.style.bottom = 'auto';
+  }
+}
+
+function kwRepositionOpenDropdowns(){
+  Object.keys(KW_FIELDS).forEach(fieldId=>{
+    const dd = document.getElementById(fieldId+'-dd');
+    if(dd && dd.classList.contains('open')) kwPositionDD(fieldId);
+  });
+}
+window.addEventListener('scroll', kwRepositionOpenDropdowns, {passive:true, capture:true});
+window.addEventListener('resize', kwRepositionOpenDropdowns);
 // delimiters that separate one "keyword/tag" from the next inside a field
 const KW_SPLIT_RE = /[,.;\n\/]+|\s+[-–—]\s+/;
 
@@ -1951,6 +1995,7 @@ function kwRenderDD(fieldId, query){
     const safe = k.text.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return '<div class="kw-item" onmousedown="event.preventDefault();kwSelect(\''+fieldId+'\',\''+safe+'\')"><span class="kw-item-name">'+k.text+'</span><span class="kw-item-count">'+k.count+'x</span></div>';
   }).join('');
+  kwPositionDD(fieldId);
   dd.classList.add('open');
 }
 
