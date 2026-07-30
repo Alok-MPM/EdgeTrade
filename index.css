@@ -282,7 +282,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 
 /* ============ HERO ============ */
 .hero{
-  min-height:100vh;padding:120px 6% 120px;position:relative;overflow:hidden;
+  min-height:100vh;padding:clamp(40px,8vh,120px) 6%;position:relative;overflow:hidden;
   display:flex;align-items:center;
   background:
     radial-gradient(circle at 20% 20%,rgba(42,100,150,.16),transparent 45%),
@@ -726,7 +726,7 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 .bal-sub{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;}
 .bal-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500;margin-top:4px;}
 .bb-profit{background:var(--green-dim);color:var(--green);}
-.bb-loss{background:var(--red-dim);color:var(--red);}
+.bb-loss{background:var(--red-dim);color:#EE7676;}
 .bc-profit .bal-val{color:var(--green);}
 .bc-loss .bal-val{color:var(--red);}
 .bc-amount .bal-val{color:var(--gold);}

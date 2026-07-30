@@ -246,9 +246,7 @@ async function initApp(user){
   state.user=user;
   showPage('page-app');
   pingFootprintBackend(); // fire-and-forget — warms the footprint backend as soon as user enters the app
-  await loadProfile();
-  await loadBrokers();
-  await loadDays();
+  await Promise.all([loadProfile(), loadBrokers(), loadDays()]);
   refreshHome();
   showSection('home');
 }
@@ -687,8 +685,11 @@ window.addEventListener('message',function(ev){
 // ══════════════════════════════════════
 function selDir(d){
   state.direction=d;
-  document.getElementById('dir-long').classList.toggle('active',d==='long');
-  document.getElementById('dir-short').classList.toggle('active',d==='short');
+  const l=document.getElementById('dir-long'), s=document.getElementById('dir-short');
+  l.classList.toggle('active',d==='long');
+  s.classList.toggle('active',d==='short');
+  l.setAttribute('aria-pressed', d==='long');
+  s.setAttribute('aria-pressed', d==='short');
 }
 function selConc(v){
   state.conclusion=v;
@@ -770,8 +771,9 @@ function selectChart(c){
   document.getElementById('lot-asset-opt').textContent=c.sym.split('/')[0];
 }
 document.addEventListener('click',e=>{
-  const w=document.querySelector('.chart-wrap');
-  if(w&&!w.contains(e.target)&&chartDDOpen){
+  if(!chartDDOpen) return;
+  const isInteractive = e.target.closest('#e-chart, #chart-search, .chart-cat, .chart-item');
+  if(!isInteractive){
     document.getElementById('chart-dd').classList.remove('open');
     chartDDOpen=false;
   }
@@ -881,9 +883,10 @@ function getBrokerLogoHTML(name, size){
     if(foundKey) raw = BROKER_DOMAINS[foundKey];
   }
   if(!raw) return null;
-  const imgUrl = (typeof raw === 'object' && raw.url) ? raw.url : `https://www.google.com/s2/favicons?sz=128&domain=${typeof raw === 'string' ? raw : raw.domain}`;
   const radius = Math.round(size*0.28)+'px';
   const imgSize = Math.round(size*0.62);
+  const faviconSz = Math.min(128, Math.max(32, imgSize*2)); // 2x for retina, never larger than needed
+  const imgUrl = (typeof raw === 'object' && raw.url) ? raw.url : `https://www.google.com/s2/favicons?sz=${faviconSz}&domain=${typeof raw === 'string' ? raw : raw.domain}`;
   return `<div style="width:${size}px;height:${size}px;border-radius:${radius};background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);flex-shrink:0;overflow:hidden;"><img src="${imgUrl}" width="${imgSize}" height="${imgSize}" style="object-fit:contain;" onerror="this.parentElement.innerHTML='🏦';this.parentElement.style.fontSize='${Math.round(size*0.5)}px';"></div>`;
 }
 
