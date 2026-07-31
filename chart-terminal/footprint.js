@@ -118,11 +118,14 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
     return { time, open: null, high: null, low: null, close: null, volume: 0, levels: {} };
   }
 
-  // ── Toggle button (already exists in chart-cockpit.js's toolbar) ───────
+  // ── Toggle button — event DELEGATION (button doesn't exist in DOM yet
+  // when this script first runs, chart-terminal boots lazily) ────────────
   function bindButton() {
-    const btn = document.getElementById('ctc-footprint-btn');
-    if (!btn) { console.error('[footprint] #ctc-footprint-btn not found'); return; }
-    btn.addEventListener('click', () => (active ? deactivate() : activate()));
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#ctc-footprint-btn');
+      if (!btn) return;
+      active ? deactivate() : activate();
+    });
   }
 
   function activate() {
