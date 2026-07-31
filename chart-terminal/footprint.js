@@ -1,4 +1,3 @@
-const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint';
 // ══════════════════════════════════════════════════════════════════════════
 // chart-terminal/footprint.js
 //
@@ -53,7 +52,7 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
 
   // TODO: fill in the actual Render/Railway backend host before deploying.
   // This is the ONLY thing in this file that needs a manual edit.
-  const FOOTPRINT_WS_BASE = 'wss://YOUR-BACKEND-HOST/ws/footprint';
+  const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint';
 
   const IMBALANCE_RATIO = 3;      // 300% — standard diagonal-imbalance threshold
   const DETAIL_MIN_SPACING = 46;  // px per candle below which we fall back to compact mode
@@ -74,6 +73,13 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
       background:rgba(20,20,20,0.75);border-radius:6px;padding:3px;gap:2px;
       font-family:'Outfit',sans-serif;}
     .fp-type-switch.visible{display:flex;}
+    .fp-status{position:absolute;top:34px;right:8px;z-index:6;display:none;
+      font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;
+      border-radius:6px;background:rgba(20,20,20,0.75);color:#EAECEF;
+      max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .fp-status.visible{display:block;}
+    .fp-status.ok{color:#4CAF7D;}
+    .fp-status.err{color:#E05252;}
     .fp-type-btn{padding:3px 9px;font-size:11px;border-radius:4px;color:#B0B4BB;
       cursor:pointer;user-select:none;background:transparent;}
     .fp-type-btn.active{background:#D4B886;color:#111317;font-weight:600;}
@@ -118,8 +124,15 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
     return { time, open: null, high: null, low: null, close: null, volume: 0, levels: {} };
   }
 
-  // ── Toggle button — event DELEGATION (button doesn't exist in DOM yet
-  // when this script first runs, chart-terminal boots lazily) ────────────
+  // ── Toggle button (already exists in chart-cockpit.js's toolbar) ───────
+  // Uses event DELEGATION on document, not a direct getElementById lookup —
+  // chart-cockpit.js's toolbar HTML doesn't exist in the DOM yet at the
+  // moment footprint.js's script tag runs (chart-terminal boots lazily,
+  // gated by the chartTerminalBooted flag, only once the user actually
+  // opens the Chart tab). A direct lookup here would silently find nothing
+  // and the button would never respond to clicks. Delegation checks at
+  // click-time instead of bind-time, so it works no matter when the
+  // cockpit's HTML actually gets injected.
   function bindButton() {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('#ctc-footprint-btn');
@@ -135,6 +148,7 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
 
     ensureCanvas();
     ensureTypeSwitch();
+    ensureStatusBadge();
     connect(marketStore.getState().symbol);
     subscribeChartRedraws();
     render();
@@ -149,7 +163,32 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
     clearTimeout(wsReconnectTimer);
     if (canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = 'none'; }
     hideTypeSwitch();
+    hideStatusBadge();
     if (unsubscribeTimeRange) { unsubscribeTimeRange(); unsubscribeTimeRange = null; }
+  }
+
+  // ── Status badge — visible, on-screen connection state. Exists so a
+  // connection problem is visible directly on a phone screen, without
+  // needing to open DevTools (not always practical on mobile). ──────────
+  let statusEl = null;
+  function ensureStatusBadge() {
+    const container = document.getElementById('klineMainChart');
+    if (!container) return;
+    if (!statusEl) {
+      statusEl = document.createElement('div');
+      statusEl.className = 'fp-status';
+      container.appendChild(statusEl);
+    }
+    statusEl.classList.add('visible');
+  }
+  function hideStatusBadge() {
+    if (statusEl) statusEl.classList.remove('visible');
+  }
+  function setStatus(text, kind) {
+    if (!statusEl) return;
+    statusEl.textContent = 'FP: ' + text;
+    statusEl.classList.remove('ok', 'err');
+    if (kind) statusEl.classList.add(kind);
   }
 
   // ── WebSocket — connects only while footprint mode is active ──────────
@@ -157,7 +196,21 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
     currentSymbol = symbol;
     if (ws) { ws.onclose = null; ws.close(); }
 
-    ws = new WebSocket(`${FOOTPRINT_WS_BASE}?symbol=${symbol.toLowerCase()}`);
+    setStatus('connecting to ' + FOOTPRINT_WS_BASE.replace('wss://', ''), null);
+
+    try {
+      ws = new WebSocket(`${FOOTPRINT_WS_BASE}?symbol=${symbol.toLowerCase()}`);
+    } catch (err) {
+      // Malformed URL (e.g. still has "YOUR-BACKEND-HOST", a stray space,
+      // or missing wss://) throws synchronously right here — this is the
+      // #1 most common cause of "nothing happens" and would otherwise be
+      // invisible without DevTools.
+      setStatus('bad URL — ' + err.message, 'err');
+      wsReconnectTimer = setTimeout(() => { if (active) connect(currentSymbol); }, RECONNECT_DELAY_MS);
+      return;
+    }
+
+    ws.onopen = () => setStatus('connected (' + symbol.toUpperCase() + ')', 'ok');
 
     ws.onmessage = (event) => {
       let msg;
@@ -166,6 +219,7 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
       if (msg.type === 'snapshot') {
         footprintHistory = msg.footprintHistory || [];
         liveFootprint = msg.liveFootprint || makeEmptyFootprint(null);
+        setStatus('live — ' + footprintHistory.length + ' candles', 'ok');
       } else if (msg.type === 'tick') {
         applyTick(msg);
       } else if (msg.type === 'candle_closed') {
@@ -184,7 +238,11 @@ const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprin
       render();
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      // ev.code tells us WHY it closed — 1006 usually means the connection
+      // never actually reached the server (network/URL/mixed-content
+      // block), which is exactly the failure mode we're chasing.
+      setStatus('closed (code ' + ev.code + ') — retrying...', 'err');
       if (active) wsReconnectTimer = setTimeout(() => connect(currentSymbol), RECONNECT_DELAY_MS);
     };
     ws.onerror = () => ws.close();
