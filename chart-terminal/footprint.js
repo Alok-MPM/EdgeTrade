@@ -407,16 +407,28 @@
   function drawDetailed(x, spacing, candle, levels, series) {
     const boxW = Math.min(spacing - 4, 76);
     const half = boxW / 2;
-    const rowH = 13;
     // Scale the font down as boxes get smaller instead of hiding text
     // outright — stays readable at normal zoom levels instead of forcing
     // an extreme zoom-in just to see any numbers at all.
     const fontSize = Math.max(6, Math.min(9, Math.floor(boxW / 3)));
+    const minRowH = fontSize + 7; // smallest box height a row of this font can hold without colliding into its neighbor
+    const rowGap = 1; // thin visible gap between boxes, like MMT's grouped look
+
+    let lastDrawnY = null; // tracks the last level we actually drew, in pixels
 
     levels.forEach((price) => {
       const y = series.priceToCoordinate(price);
       if (y === null) return;
 
+      // If this level sits too close (in pixels) to the last one we drew,
+      // drawing it would overlap/garble the text — skip it instead. This
+      // is what makes the grid self-adjust to zoom: fewer, cleanly-spaced
+      // rows at normal zoom, more detail automatically as you zoom in —
+      // rather than forcing a fixed set of levels to cram in regardless.
+      if (lastDrawnY !== null && Math.abs(y - lastDrawnY) < minRowH) return;
+      lastDrawnY = y;
+
+      const rowH = minRowH - rowGap;
       const level = candle.levels[price];
       const cur = readLevel(level);
       const size = bucketSize(price);
@@ -433,9 +445,13 @@
 
       ctx.fillStyle = sellImbalanced ? `rgba(${COLOR.sell},0.6)` : `rgba(${COLOR.sell},0.22)`;
       ctx.fillRect(x - half, y - rowH / 2, half - 1, rowH);
-
       ctx.fillStyle = buyImbalanced ? `rgba(${COLOR.buy},0.6)` : `rgba(${COLOR.buy},0.22)`;
       ctx.fillRect(x + 1, y - rowH / 2, half - 1, rowH);
+
+      // Thin border for a defined, grouped-box look instead of flat color
+      // bleeding into the row above/below.
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.strokeRect(x - half, y - rowH / 2, boxW - 1, rowH);
 
       // Only skip text entirely below ~10px — genuinely too small for any
       // legible glyph, regardless of font scaling.
