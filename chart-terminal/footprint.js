@@ -55,7 +55,7 @@
   const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint';
 
   const IMBALANCE_RATIO = 3;      // 300% — standard diagonal-imbalance threshold
-  const DETAIL_MIN_SPACING = 46;  // px per candle below which we fall back to compact mode
+  const DETAIL_MIN_SPACING = 16;  // px per candle below which we fall back to compact mode
   const DELTA_MIN_SPACING = 20;   // px per candle below which delta text is skipped entirely (too tight to fit)
   const MAX_HISTORY = 200;
   const RECONNECT_DELAY_MS = 3000;
@@ -377,7 +377,7 @@
 
     const allCandles = liveFootprint ? [...footprintHistory, liveFootprint] : footprintHistory;
 
-    allCandles.forEach((candle) => {
+    allCandles.forEach((candle, index) => {
       if (!candle || candle.time == null) return;
       const x = timeScale.timeToCoordinate(Math.floor(candle.time / 1000));
       if (x === null || x < -60 || x > canvas.clientWidth + 60) return; // offscreen cull
@@ -395,7 +395,7 @@
       } else {
         drawDetailed(x, barSpacing, candle, levels, series);
       }
-      if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, candle, delta, series, barSpacing);
+      if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, candle, delta, series, barSpacing, index);
     });
   }
 
@@ -408,6 +408,10 @@
     const boxW = Math.min(spacing - 4, 76);
     const half = boxW / 2;
     const rowH = 13;
+    // Scale the font down as boxes get smaller instead of hiding text
+    // outright — stays readable at normal zoom levels instead of forcing
+    // an extreme zoom-in just to see any numbers at all.
+    const fontSize = Math.max(6, Math.min(9, Math.floor(boxW / 3)));
 
     levels.forEach((price) => {
       const y = series.priceToCoordinate(price);
@@ -433,8 +437,10 @@
       ctx.fillStyle = buyImbalanced ? `rgba(${COLOR.buy},0.6)` : `rgba(${COLOR.buy},0.22)`;
       ctx.fillRect(x + 1, y - rowH / 2, half - 1, rowH);
 
-      if (boxW > 34) { // only bother drawing text if there's room to read it
-        ctx.font = '9px JetBrains Mono, monospace';
+      // Only skip text entirely below ~10px — genuinely too small for any
+      // legible glyph, regardless of font scaling.
+      if (boxW > 10) {
+        ctx.font = fontSize + 'px JetBrains Mono, monospace';
         ctx.fillStyle = COLOR.text;
         ctx.textAlign = 'right';
         ctx.fillText(fmt(cur.sell), x - 3, y + 3);
@@ -450,13 +456,11 @@
   // overlapping numbers seen on screen before this fix.
   // Attached to each candle's own low, like every real footprint tool does
   // (ATAS, Bookmap, Sierra Chart) — traders read delta relative to its own
-  // candle, not as a flat detached row. The earlier "scattered/overlapping"
-  // problem wasn't the varying height itself — it was label TEXT WIDTH
-  // exceeding the horizontal room between candles at tight zoom, so one
-  // candle's number ran into its neighbor's. Fixed here by measuring the
-  // actual rendered text width and skipping only that specific label if it
-  // wouldn't fit in its own slot — not by detaching every label from price.
-  function drawDeltaRow(x, candle, delta, series, barSpacing) {
+  // candle, not as a flat detached row. When candles are packed tight
+  // enough that neighboring labels could overlap horizontally, alternate
+  // candles are staggered one line lower — both numbers stay attached to
+  // their own candle, just offset so they don't sit on top of each other.
+  function drawDeltaRow(x, candle, delta, series, barSpacing, index) {
     if (candle.low == null) return;
     const y = series.priceToCoordinate(candle.low);
     if (y === null) return;
@@ -465,16 +469,18 @@
     ctx.font = '10px JetBrains Mono, monospace';
     const textWidth = ctx.measureText(text).width;
 
-    // This candle's own horizontal slot is roughly [x - barSpacing/2, x + barSpacing/2].
-    // If the label is wider than that slot (minus a little breathing room),
-    // drawing it WILL bleed into the neighboring candle's label — skip it
-    // rather than let that happen. This is a per-label check, so wide
-    // numbers get skipped individually instead of the whole row vanishing.
-    if (textWidth > barSpacing - 4) return;
+    // Stagger every other label lower when the label is wider than its own
+    // slot — keeps both numbers visible instead of one overwriting the other.
+    const needsStagger = textWidth > barSpacing - 4;
+    const yOffset = needsStagger && index % 2 === 1 ? 27 : 15;
+
+    // Only give up entirely if there truly isn't room for legible text at
+    // all, even after staggering (extremely tight zoom).
+    if (textWidth > barSpacing * 2.5) return;
 
     ctx.textAlign = 'center';
     ctx.fillStyle = delta >= 0 ? '#4CAF7D' : '#E05252';
-    ctx.fillText(text, x, y + 15);
+    ctx.fillText(text, x, y + yOffset);
   }
 
   function fmt(n) {
