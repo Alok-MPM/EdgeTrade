@@ -56,6 +56,9 @@
 
   const IMBALANCE_RATIO = 3;      // 300% — standard diagonal-imbalance threshold
   const DETAIL_MIN_SPACING = 46;  // px per candle below which we fall back to compact mode
+  const DELTA_MIN_SPACING = 20;   // px per candle below which delta text is skipped entirely (would overlap)
+  const DELTA_STRIP_HEIGHT = 18;  // px — fixed-height band for delta numbers
+  const DELTA_STRIP_BOTTOM_MARGIN = 26; // px reserved for the chart's own time-axis labels below it
   const MAX_HISTORY = 200;
   const RECONNECT_DELAY_MS = 3000;
 
@@ -376,6 +379,8 @@
 
     const allCandles = liveFootprint ? [...footprintHistory, liveFootprint] : footprintHistory;
 
+    if (barSpacing >= DELTA_MIN_SPACING) drawDeltaStripBackground();
+
     allCandles.forEach((candle) => {
       if (!candle || candle.time == null) return;
       const x = timeScale.timeToCoordinate(Math.floor(candle.time / 1000));
@@ -394,7 +399,9 @@
       } else {
         drawDetailed(x, barSpacing, candle, levels, series);
       }
-      drawDeltaRow(x, candle, delta, series);
+      // Skip delta text at very tight spacing — neighboring labels would
+      // overlap and become unreadable rather than useful.
+      if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, delta);
     });
   }
 
@@ -443,14 +450,22 @@
     });
   }
 
-  function drawDeltaRow(x, candle, delta, series) {
-    if (candle.low == null) return;
-    const yLow = series.priceToCoordinate(candle.low);
-    if (yLow === null) return;
+  // Fixed-height band along the bottom of the canvas — deltas line up in a
+  // clean, readable row regardless of price, instead of following each
+  // candle's own (varying) low, which is what was causing the scattered,
+  // overlapping numbers seen on screen before this fix.
+  function drawDeltaStripBackground() {
+    const h = canvas.clientHeight;
+    ctx.fillStyle = 'rgba(20,20,20,0.35)';
+    ctx.fillRect(0, h - DELTA_STRIP_BOTTOM_MARGIN - DELTA_STRIP_HEIGHT, canvas.clientWidth, DELTA_STRIP_HEIGHT);
+  }
+
+  function drawDeltaRow(x, delta) {
+    const y = canvas.clientHeight - DELTA_STRIP_BOTTOM_MARGIN - DELTA_STRIP_HEIGHT / 2 + 3;
     ctx.font = '10px JetBrains Mono, monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = delta >= 0 ? '#4CAF7D' : '#E05252';
-    ctx.fillText((delta >= 0 ? '+' : '') + fmt(delta), x, yLow + 15);
+    ctx.fillText((delta >= 0 ? '+' : '') + fmt(delta), x, y);
   }
 
   function fmt(n) {
