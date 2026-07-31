@@ -1,4 +1,4 @@
-const FOOTPRINT_WS_BASE = 'wss://YOUR-BACKEND-HOST/ws/footprint';
+const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint';
 // ══════════════════════════════════════════════════════════════════════════
 // chart-terminal/footprint.js
 //
