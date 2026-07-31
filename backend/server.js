@@ -32,7 +32,20 @@
  *    if it was the last client there) and attach it to the new one,
  *    immediately sending a fresh snapshot for the new symbol.
  *
- * NOTE: This file is fully standalone. No frontend code included/touched.
+ *  - EVERY price level carries separate `spot` and `perp` sub-buckets
+ *    (Binance spot trades vs Bybit linear-perpetual trades). This backend
+ *    never merges them — "Spot" / "Futures" / "Edge (Aggregate)" are all
+ *    the SAME data read three different ways on the frontend:
+ *      Spot     -> level.spot
+ *      Futures  -> level.perp
+ *      Edge     -> level.spot + level.perp (summed client-side)
+ *    Switching type on the frontend is instant and local — no re-subscribe,
+ *    no extra backend request, because nothing needs to be re-fetched.
+ *
+ *  - NOTE: the candle body itself (open/high/low/close) is still Spot-only
+ *    (from Binance's kline stream) regardless of which footprint type is
+ *    selected — there's no separate perp candle shape. Switching type only
+ *    changes which volume numbers appear inside the boxes, not the candle.
  */
 
 const express = require('express');
@@ -80,7 +93,12 @@ function makeEmptyFootprintCandle() {
     low: null,
     close: null,
     volume: 0,
-    levels: {}, // { priceLevel(string): { buy: number, sell: number, trades: number } }
+    levels: {}, // { priceLevel(string): { spot: {buy,sell,trades}, perp: {buy,sell,trades} } }
+    // "spot" = Binance spot trade stream, "perp" = Bybit linear-perpetual trade
+    // stream. Kept separate (never pre-merged) so the frontend can render
+    // Spot-only, Futures-only, or Edge/Aggregate (spot+perp summed) purely
+    // by choosing how to read this same data — no re-subscribe needed to
+    // switch "type".
   };
 }
 
@@ -174,6 +192,7 @@ function connectBinance(market) {
         qty: payload.q,
         isBuyerMaker: payload.m, // true = sell-side aggressor
         time: payload.T,
+        source: 'spot',
       });
     } else if (payload.e === 'kline') {
       handleKlineUpdate(market, payload.k);
@@ -226,7 +245,7 @@ function connectBybit(market) {
           qty: t.v,
           isBuyerMaker: t.S === 'Sell',
           time: t.T,
-          source: 'bybit',
+          source: 'perp',
         });
       });
     }
@@ -249,19 +268,23 @@ function connectBybit(market) {
 // ---------------------------------------------------------------------------
 // TICK -> FOOTPRINT AGGREGATION (per market)
 // ---------------------------------------------------------------------------
-function handleTradeTick(market, { price, qty, isBuyerMaker, time }) {
+function handleTradeTick(market, { price, qty, isBuyerMaker, time, source }) {
   touchActivity(market); // exchange activity keeps this market's shadow buffer "fresh", not user activity
 
   const bucket = bucketPrice(price);
-  const level = market.liveFootprint.levels[bucket] || { buy: 0, sell: 0, trades: 0 };
+  const level = market.liveFootprint.levels[bucket] || {
+    spot: { buy: 0, sell: 0, trades: 0 },
+    perp: { buy: 0, sell: 0, trades: 0 },
+  };
+  const side = level[source]; // 'spot' or 'perp' sub-bucket
 
   // isBuyerMaker true => the aggressor was a SELL (hit the bid)
   if (isBuyerMaker) {
-    level.sell += parseFloat(qty);
+    side.sell += parseFloat(qty);
   } else {
-    level.buy += parseFloat(qty);
+    side.buy += parseFloat(qty);
   }
-  level.trades += 1;
+  side.trades += 1;
   market.liveFootprint.levels[bucket] = level;
   market.liveFootprint.volume += parseFloat(qty);
 
@@ -270,6 +293,7 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time }) {
     price: parseFloat(price),
     qty: parseFloat(qty),
     side: isBuyerMaker ? 'sell' : 'buy',
+    source, // 'spot' | 'perp' — frontend routes this into the matching sub-bucket
     time,
   });
 }
