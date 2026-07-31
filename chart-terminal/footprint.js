@@ -1,3 +1,4 @@
+const FOOTPRINT_WS_BASE = 'wss://YOUR-BACKEND-HOST/ws/footprint';
 // ══════════════════════════════════════════════════════════════════════════
 // chart-terminal/footprint.js
 //
