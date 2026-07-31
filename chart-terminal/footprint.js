@@ -390,12 +390,24 @@
       });
       const delta = totalBuy - totalSell;
 
+      // Hard containment: everything drawn for this candle — boxes, text,
+      // delta — is clipped to this candle's own horizontal column. No
+      // matter what any width/spacing calculation below does, it is
+      // physically impossible for one candle's footprint to paint into a
+      // neighboring candle's column once this clip is active.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x - barSpacing / 2, 0, barSpacing, canvas.clientHeight);
+      ctx.clip();
+
       if (barSpacing < DETAIL_MIN_SPACING) {
         drawCompact(x, delta);
       } else {
         drawDetailed(x, barSpacing, candle, levels, series);
       }
       if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, candle, delta, series, barSpacing, index);
+
+      ctx.restore();
     });
   }
 
