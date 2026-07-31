@@ -56,9 +56,7 @@
 
   const IMBALANCE_RATIO = 3;      // 300% — standard diagonal-imbalance threshold
   const DETAIL_MIN_SPACING = 46;  // px per candle below which we fall back to compact mode
-  const DELTA_MIN_SPACING = 20;   // px per candle below which delta text is skipped entirely (would overlap)
-  const DELTA_STRIP_HEIGHT = 18;  // px — fixed-height band for delta numbers
-  const DELTA_STRIP_BOTTOM_MARGIN = 26; // px reserved for the chart's own time-axis labels below it
+  const DELTA_MIN_SPACING = 20;   // px per candle below which delta text is skipped entirely (too tight to fit)
   const MAX_HISTORY = 200;
   const RECONNECT_DELAY_MS = 3000;
 
@@ -379,8 +377,6 @@
 
     const allCandles = liveFootprint ? [...footprintHistory, liveFootprint] : footprintHistory;
 
-    if (barSpacing >= DELTA_MIN_SPACING) drawDeltaStripBackground();
-
     allCandles.forEach((candle) => {
       if (!candle || candle.time == null) return;
       const x = timeScale.timeToCoordinate(Math.floor(candle.time / 1000));
@@ -399,9 +395,7 @@
       } else {
         drawDetailed(x, barSpacing, candle, levels, series);
       }
-      // Skip delta text at very tight spacing — neighboring labels would
-      // overlap and become unreadable rather than useful.
-      if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, delta);
+      if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, candle, delta, series, barSpacing);
     });
   }
 
@@ -454,18 +448,33 @@
   // clean, readable row regardless of price, instead of following each
   // candle's own (varying) low, which is what was causing the scattered,
   // overlapping numbers seen on screen before this fix.
-  function drawDeltaStripBackground() {
-    const h = canvas.clientHeight;
-    ctx.fillStyle = 'rgba(20,20,20,0.35)';
-    ctx.fillRect(0, h - DELTA_STRIP_BOTTOM_MARGIN - DELTA_STRIP_HEIGHT, canvas.clientWidth, DELTA_STRIP_HEIGHT);
-  }
+  // Attached to each candle's own low, like every real footprint tool does
+  // (ATAS, Bookmap, Sierra Chart) — traders read delta relative to its own
+  // candle, not as a flat detached row. The earlier "scattered/overlapping"
+  // problem wasn't the varying height itself — it was label TEXT WIDTH
+  // exceeding the horizontal room between candles at tight zoom, so one
+  // candle's number ran into its neighbor's. Fixed here by measuring the
+  // actual rendered text width and skipping only that specific label if it
+  // wouldn't fit in its own slot — not by detaching every label from price.
+  function drawDeltaRow(x, candle, delta, series, barSpacing) {
+    if (candle.low == null) return;
+    const y = series.priceToCoordinate(candle.low);
+    if (y === null) return;
 
-  function drawDeltaRow(x, delta) {
-    const y = canvas.clientHeight - DELTA_STRIP_BOTTOM_MARGIN - DELTA_STRIP_HEIGHT / 2 + 3;
+    const text = (delta >= 0 ? '+' : '') + fmt(delta);
     ctx.font = '10px JetBrains Mono, monospace';
+    const textWidth = ctx.measureText(text).width;
+
+    // This candle's own horizontal slot is roughly [x - barSpacing/2, x + barSpacing/2].
+    // If the label is wider than that slot (minus a little breathing room),
+    // drawing it WILL bleed into the neighboring candle's label — skip it
+    // rather than let that happen. This is a per-label check, so wide
+    // numbers get skipped individually instead of the whole row vanishing.
+    if (textWidth > barSpacing - 4) return;
+
     ctx.textAlign = 'center';
     ctx.fillStyle = delta >= 0 ? '#4CAF7D' : '#E05252';
-    ctx.fillText((delta >= 0 ? '+' : '') + fmt(delta), x, y);
+    ctx.fillText(text, x, y + 15);
   }
 
   function fmt(n) {
