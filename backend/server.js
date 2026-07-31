@@ -85,9 +85,9 @@ const BYBIT_WS_URL = 'wss://stream.bybit.com/v5/public/linear';
 // ---------------------------------------------------------------------------
 const markets = new Map(); // symbol (lowercase) -> Market
 
-function makeEmptyFootprintCandle() {
+function makeEmptyFootprintCandle(time) {
   return {
-    time: null,
+    time: time != null ? time : null,
     open: null,
     high: null,
     low: null,
@@ -161,6 +161,92 @@ async function fetchInitialCandles(symbol) {
     close: parseFloat(k[4]),
     volume: parseFloat(k[5]),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// FOOTPRINT HISTORY BACKFILL — best-effort, bounded lookback
+//
+// Unlike OHLC candles (one REST call gets 200 of them instantly), footprint
+// needs raw trade-level data to rebuild — there's no equivalent "give me
+// 200 candles of price-level detail" endpoint. Binance's aggTrades REST
+// endpoint can supply that, but only for Binance spot (Bybit has no public
+// REST trade-history endpoint we can lean on the same way), and pulling a
+// full 200-candle lookback for a busy pair like BTCUSDT would mean tens of
+// thousands of trades per wake — too slow/heavy to do on every connect.
+//
+// So this is intentionally BOUNDED: only the last BACKFILL_MINUTES get
+// backfilled, spot-side only. Perp (Bybit) levels on backfilled candles
+// stay at 0 until live data starts arriving. This trades completeness for
+// a fast, predictable wake-up — full-session footprint still builds up
+// correctly candle-by-candle as the market runs, same as before.
+// ---------------------------------------------------------------------------
+const BACKFILL_MINUTES = 10;
+const BACKFILL_MAX_TRADES = 8000; // safety cap so a busy pair can't stall wakeup
+
+async function backfillFootprintHistory(market) {
+  const endTime = Date.now();
+  const startTime = endTime - BACKFILL_MINUTES * 60 * 1000;
+  let trades = [];
+  let fromId = null;
+
+  try {
+    while (trades.length < BACKFILL_MAX_TRADES) {
+      const url = fromId == null
+        ? `https://api.binance.com/api/v3/aggTrades?symbol=${market.symbol.toUpperCase()}&startTime=${startTime}&endTime=${endTime}&limit=1000`
+        : `https://api.binance.com/api/v3/aggTrades?symbol=${market.symbol.toUpperCase()}&fromId=${fromId + 1}&limit=1000`;
+      const res = await fetch(url);
+      if (!res.ok) break;
+      const page = await res.json();
+      if (!page.length) break;
+      trades = trades.concat(page);
+      fromId = page[page.length - 1].a;
+      if (page[page.length - 1].T >= endTime || page.length < 1000) break;
+    }
+  } catch (err) {
+    console.error(`[system] footprint backfill failed (${market.symbol}):`, err.message);
+    return; // leave footprintHistory empty — a clean empty state beats a half-populated one
+  }
+
+  if (!trades.length) return;
+
+  // Bucket into candle-aligned footprint entries — same aggregation as the
+  // live path (handleTradeTick), just replayed over the fetched history.
+  const byMinute = new Map(); // candleOpenTime(ms) -> footprint candle
+  trades.forEach((t) => {
+    const openTime = Math.floor(t.T / 60000) * 60000;
+    if (!byMinute.has(openTime)) byMinute.set(openTime, makeEmptyFootprintCandle(openTime));
+    const fp = byMinute.get(openTime);
+    const bucket = bucketPrice(t.p);
+    if (!fp.levels[bucket]) {
+      fp.levels[bucket] = { spot: { buy: 0, sell: 0, trades: 0 }, perp: { buy: 0, sell: 0, trades: 0 } };
+    }
+    const side = fp.levels[bucket].spot; // spot-only — see note above
+    const qty = parseFloat(t.q);
+    if (t.m) side.sell += qty; else side.buy += qty; // t.m = isBuyerMaker, same convention as the live stream
+    side.trades += 1;
+    fp.volume += qty;
+  });
+
+  // Stitch each bucket onto its real OHLC shape from market.candles so
+  // open/high/low/close aren't left null.
+  const ohlcByTime = new Map(market.candles.map((c) => [c.time, c]));
+  const sortedTimes = [...byMinute.keys()].sort((a, b) => a - b);
+  const built = sortedTimes.map((t) => {
+    const fp = byMinute.get(t);
+    const ohlc = ohlcByTime.get(t);
+    if (ohlc) { fp.open = ohlc.open; fp.high = ohlc.high; fp.low = ohlc.low; fp.close = ohlc.close; }
+    return fp;
+  });
+
+  // The most recent bucket is the still-forming candle — that belongs in
+  // liveFootprint, not footprintHistory, so it isn't duplicated once real
+  // ticks start arriving from connectBinance()/connectBybit() right after.
+  const currentOpenTime = market.candles.length ? market.candles[market.candles.length - 1].time : null;
+  if (built.length && built[built.length - 1].time === currentOpenTime) {
+    market.liveFootprint = built.pop();
+  }
+
+  market.footprintHistory = built.slice(-MAX_CANDLE_HISTORY);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,11 +444,12 @@ async function wakeUp(symbol) {
 
   market.footprintHistory = [];
   market.liveFootprint = makeEmptyFootprintCandle();
+  await backfillFootprintHistory(market); // best-effort — leaves history empty on failure rather than blocking wakeup indefinitely
 
   connectBinance(market);
   connectBybit(market);
 
-  return { alreadyAwake: false, symbol, candleCount: market.candles.length };
+  return { alreadyAwake: false, symbol, candleCount: market.candles.length, footprintCandleCount: market.footprintHistory.length };
 }
 
 function sleep(market) {
