@@ -261,11 +261,16 @@
     document.getElementById('cs-layout-btn').onclick = (e) => {
       e.stopPropagation();
       document.querySelectorAll('.ctc-dd.open').forEach(dd => { if (dd.id !== 'cs-layout-dd') dd.classList.remove('open'); });
-      document.getElementById('cs-layout-dd').classList.toggle('open');
+      const dd = document.getElementById('cs-layout-dd');
+      const wasOpen = dd.classList.contains('open');
+      dd.classList.toggle('open');
+      if (!wasOpen) positionLayoutDD();
     };
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#cs-layout-wrap')) document.getElementById('cs-layout-dd').classList.remove('open');
     });
+    window.addEventListener('scroll', repositionLayoutDDIfOpen, { passive: true, capture: true });
+    window.addEventListener('resize', repositionLayoutDDIfOpen);
 
     wrap.querySelectorAll('[data-layout]').forEach(el => {
       el.onclick = () => setLayout(el.getAttribute('data-layout'));
@@ -273,6 +278,35 @@
     wrap.querySelectorAll('.cs-toggle input').forEach(input => {
       input.onchange = () => { sync[input.dataset.syncKey] = input.checked; if (input.dataset.syncKey === 'symbol' && input.checked) syncPane2ToPane1(); };
     });
+  }
+
+  // .ctc-dd (shared with chart-cockpit.js) is position:fixed so a parent
+  // card's overflow:hidden can never clip it — chart-cockpit.js's own
+  // dropdowns compute their coordinates from their trigger button on open;
+  // this mirrors that for the Layout dropdown, which chart-cockpit.js
+  // doesn't know about.
+  function positionLayoutDD() {
+    const btn = document.getElementById('cs-layout-btn');
+    const dd = document.getElementById('cs-layout-dd');
+    if (!btn || !dd) return;
+    const r = btn.getBoundingClientRect();
+    let right = window.innerWidth - r.right; // keep the dropdown's right edge aligned to the button's, like the old right:0 did relative to .ctc-wrap
+    if (right < 10) right = 10;
+    dd.style.right = right + 'px';
+    dd.style.left = 'auto';
+    const spaceBelow = window.innerHeight - r.bottom;
+    if (spaceBelow < 260 && r.top > 260) {
+      dd.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+      dd.style.top = 'auto';
+    } else {
+      dd.style.top = (r.bottom + 6) + 'px';
+      dd.style.bottom = 'auto';
+    }
+  }
+
+  function repositionLayoutDDIfOpen() {
+    const dd = document.getElementById('cs-layout-dd');
+    if (dd && dd.classList.contains('open')) positionLayoutDD();
   }
 
   function toggleHtml(key, checked) {
