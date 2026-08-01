@@ -142,11 +142,15 @@
     });
   }
 
+  const FOOTPRINT_BAR_SPACING = 90; // px — wide enough for flanking sell/buy cells at normal zoom, no manual zoom-in needed
+  let savedBarSpacing = null; // original spacing, restored when footprint turns off
+
   function activate() {
     active = true;
     const btn = document.getElementById('ctc-footprint-btn');
     if (btn) btn.classList.add('active');
 
+    widenCandleSpacing();
     ensureCanvas();
     ensureTypeSwitch();
     ensureStatusBadge();
@@ -166,6 +170,30 @@
     hideTypeSwitch();
     hideStatusBadge();
     if (unsubscribeTimeRange) { unsubscribeTimeRange(); unsubscribeTimeRange = null; }
+    restoreCandleSpacing();
+  }
+
+  // Widening candle spacing is what lets footprint boxes sit BESIDE each
+  // candle (rather than overlapping it) without forcing the user to
+  // manually pinch-zoom just to get any readable room. Saved/restored so
+  // turning footprint off returns the chart to its normal density.
+  function widenCandleSpacing() {
+    const chart = chartEngine.getInstance();
+    if (!chart) return;
+    try {
+      const current = chart.timeScale().options().barSpacing;
+      if (savedBarSpacing === null) savedBarSpacing = current;
+      if (current < FOOTPRINT_BAR_SPACING) {
+        chart.timeScale().applyOptions({ barSpacing: FOOTPRINT_BAR_SPACING });
+      }
+    } catch (e) { /* if this Lightweight Charts version rejects it, footprint still works, just at whatever spacing the user has */ }
+  }
+
+  function restoreCandleSpacing() {
+    const chart = chartEngine.getInstance();
+    if (!chart || savedBarSpacing === null) return;
+    try { chart.timeScale().applyOptions({ barSpacing: savedBarSpacing }); } catch (e) { /* non-fatal */ }
+    savedBarSpacing = null;
   }
 
   // ── Status badge — visible, on-screen connection state. Exists so a
@@ -369,12 +397,12 @@
       if (window.chartOverlayUtils.isOffscreenX(x, canvas.clientWidth)) return;
 
       const levels = Object.keys(candle.levels || {}).map(Number).sort((a, b) => b - a);
-      let totalBuy = 0, totalSell = 0;
+      let totalBuyUsd = 0, totalSellUsd = 0;
       levels.forEach((p) => {
         const d = readLevel(candle.levels[p]);
-        totalBuy += d.buy; totalSell += d.sell;
+        totalBuyUsd += d.buy * p; totalSellUsd += d.sell * p; // dollar-weighted, not raw quantity
       });
-      const delta = totalBuy - totalSell;
+      const delta = totalBuyUsd - totalSellUsd;
 
       // Hard containment: everything drawn for this candle — boxes, text,
       // delta — is clipped to this candle's own horizontal column via the
@@ -398,14 +426,22 @@
   }
 
   function drawDetailed(x, spacing, candle, levels, series) {
-    const boxW = Math.min(spacing - 4, 76);
-    const half = boxW / 2;
-    // Scale the font down as boxes get smaller instead of hiding text
+    // Approximate half-width of the candlestick body Lightweight Charts
+    // draws at this spacing (not directly exposed by the library) — used
+    // so cells sit BESIDE the candle, never on top of it. The candle
+    // itself stays completely clean/unobstructed.
+    const candleHalfWidth = spacing * 0.28;
+    const cellGap = 3; // breathing room between the candle body and each cell
+    const cellW = Math.max(10, Math.min(spacing / 2 - candleHalfWidth - cellGap, 46));
+    const sellCenterX = x - candleHalfWidth - cellGap - cellW / 2;
+    const buyCenterX = x + candleHalfWidth + cellGap + cellW / 2;
+
+    // Scale the font down as cells get smaller instead of hiding text
     // outright — stays readable at normal zoom levels instead of forcing
     // an extreme zoom-in just to see any numbers at all.
-    const fontSize = Math.max(6, Math.min(9, Math.floor(boxW / 3)));
-    const minRowH = fontSize + 7; // smallest box height a row of this font can hold without colliding into its neighbor
-    const rowGap = 1; // thin visible gap between boxes, like MMT's grouped look
+    const fontSize = Math.max(6, Math.min(9, Math.floor(cellW / 4)));
+    const minRowH = fontSize + 7; // smallest row height this font can hold without colliding into its neighbor
+    const rowGap = 1; // thin visible gap between rows, like MMT's grouped look
 
     // Self-adjusts to zoom: fewer, cleanly-spaced rows at normal zoom, more
     // detail automatically as you zoom in — rather than forcing every level
@@ -433,30 +469,29 @@
       const sellImbalanced = belowBuy > 0 && cur.sell >= belowBuy * IMBALANCE_RATIO;
       const buyImbalanced = aboveSell > 0 && cur.buy >= aboveSell * IMBALANCE_RATIO;
 
-      ctx.fillStyle = sellImbalanced ? `rgba(${COLOR.sell},0.6)` : `rgba(${COLOR.sell},0.22)`;
-      ctx.fillRect(x - half, y - rowH / 2, half - 1, rowH);
-      ctx.fillStyle = buyImbalanced ? `rgba(${COLOR.buy},0.6)` : `rgba(${COLOR.buy},0.22)`;
-      ctx.fillRect(x + 1, y - rowH / 2, half - 1, rowH);
-
-      // Thin border for a defined, grouped-box look instead of flat color
-      // bleeding into the row above/below.
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-      ctx.strokeRect(x - half, y - rowH / 2, boxW - 1, rowH);
+
+      // Sell cell — fully to the LEFT of the candle body.
+      ctx.fillStyle = sellImbalanced ? `rgba(${COLOR.sell},0.6)` : `rgba(${COLOR.sell},0.22)`;
+      ctx.fillRect(sellCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
+      ctx.strokeRect(sellCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
+
+      // Buy cell — fully to the RIGHT of the candle body.
+      ctx.fillStyle = buyImbalanced ? `rgba(${COLOR.buy},0.6)` : `rgba(${COLOR.buy},0.22)`;
+      ctx.fillRect(buyCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
+      ctx.strokeRect(buyCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
 
       ctx.font = fontSize + 'px JetBrains Mono, monospace';
       ctx.fillStyle = COLOR.text;
 
-      // CRITICAL: measure each string's actual rendered width BEFORE
-      // drawing it, and only draw if it genuinely fits within its half of
-      // the box — via the shared drawTextIfFits, so this rule is enforced
-      // identically everywhere it's used, not just here. Never let
-      // ctx.clip() silently chop a number instead — that turns "0.304"
-      // into a visible "304" with no indication anything was cut, which
-      // is actively misleading on a trading tool. Binary rule: show the
-      // correct full number, or show nothing.
-      const availableHalfWidth = half - 4;
-      window.chartOverlayUtils.drawTextIfFits(ctx, fmt(cur.sell), x - 3, y + 3, 'right', availableHalfWidth);
-      window.chartOverlayUtils.drawTextIfFits(ctx, fmt(cur.buy), x + 3, y + 3, 'left', availableHalfWidth);
+      // Each cell now gets its FULL width for a single number (rather than
+      // splitting one shared box in half like before) — real breathing
+      // room, which is a big part of why text kept getting rejected/cut
+      // before. Dollar notional (qty × price), not raw crypto quantity.
+      // Same measure-before-draw safety as everywhere else: show the full
+      // correct number, or show nothing — never a truncated fragment.
+      window.chartOverlayUtils.drawTextIfFits(ctx, fmtUsd(cur.sell * price), sellCenterX, y + 3, 'center', cellW - 4);
+      window.chartOverlayUtils.drawTextIfFits(ctx, fmtUsd(cur.buy * price), buyCenterX, y + 3, 'center', cellW - 4);
     });
   }
 
@@ -475,7 +510,7 @@
     const y = series.priceToCoordinate(candle.low);
     if (y === null) return;
 
-    const text = (delta >= 0 ? '+' : '') + fmt(delta);
+    const text = (delta >= 0 ? '+' : '-') + fmtUsd(delta);
     ctx.font = '10px JetBrains Mono, monospace';
     ctx.fillStyle = delta >= 0 ? '#4CAF7D' : '#E05252';
 
@@ -485,10 +520,21 @@
     window.chartOverlayUtils.drawTextIfFits(ctx, text, x, y + 15, 'center', barSpacing - 4);
   }
 
+  // For internal ratio math (diagonal imbalance) — kept in raw crypto units.
   function fmt(n) {
     if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1) + 'K';
     if (Math.abs(n) >= 1) return n.toFixed(1);
     return n.toFixed(3);
+  }
+
+  // For anything shown on screen — dollar notional (qty × price), not raw
+  // BTC/ETH/etc quantity. "0.304 BTC" means little to most traders at a
+  // glance; "$19.4K" is immediately readable regardless of which asset.
+  function fmtUsd(n) {
+    const abs = Math.abs(n);
+    if (abs >= 1e6) return '$' + (abs / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return '$' + (abs / 1e3).toFixed(1) + 'K';
+    return '$' + abs.toFixed(0);
   }
 
   // ── Init ────────────────────────────────────────────────────────────
