@@ -45,8 +45,8 @@
 
 (function () {
 
-  if (typeof marketStore === 'undefined' || typeof chartEngine === 'undefined') {
-    console.error('[footprint] market-store.js and chart-engine.js must be loaded before footprint.js');
+  if (typeof marketStore === 'undefined' || typeof chartEngine === 'undefined' || typeof window.chartOverlayUtils === 'undefined') {
+    console.error('[footprint] market-store.js, chart-engine.js, and chart-overlay-utils.js must all be loaded before footprint.js');
     return;
   }
 
@@ -98,9 +98,9 @@
   let ws = null;
   let wsReconnectTimer = null;
 
-  let canvas = null;
+  let overlay = null; // { canvas, ctx, resize, clear, destroy } from chartOverlayUtils
+  let canvas = null;  // convenience references to overlay.canvas / overlay.ctx
   let ctx = null;
-  let resizeObserver = null;
   let unsubscribeTimeRange = null;
 
   // ── Bucketing — MUST mirror backend/server.js's bucketPrice() EXACTLY.
@@ -275,39 +275,25 @@
   });
 
   // ── Canvas setup — sized to #klineMainChart, redraws on container resize ─
+  // (Uses chartOverlayUtils — the same canvas-lifecycle code Order Flow and
+  // Liquidity will reuse, rather than each re-deriving its own.)
   function ensureCanvas() {
-    const container = document.getElementById('klineMainChart');
-    if (!container) return;
-
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvas.className = 'fp-overlay';
-      container.appendChild(canvas);
-      ctx = canvas.getContext('2d');
-      resizeObserver = new ResizeObserver(() => { resizeCanvas(); render(); });
-      resizeObserver.observe(container);
+    if (!overlay) {
+      overlay = window.chartOverlayUtils.createOverlayCanvas('klineMainChart', 'fp-overlay');
+      if (!overlay) { console.error('[footprint] could not create overlay canvas'); return; }
+      canvas = overlay.canvas;
+      ctx = overlay.ctx;
+      const container = document.getElementById('klineMainChart');
+      new ResizeObserver(() => { overlay.resize(); render(); }).observe(container);
     }
     canvas.style.display = 'block';
-    resizeCanvas();
-  }
-
-  function resizeCanvas() {
-    const container = document.getElementById('klineMainChart');
-    if (!container || !canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = container.clientWidth * dpr;
-    canvas.height = container.clientHeight * dpr;
-    canvas.style.width = container.clientWidth + 'px';
-    canvas.style.height = container.clientHeight + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    overlay.resize();
   }
 
   function subscribeChartRedraws() {
     const chart = chartEngine.getInstance();
     if (!chart) return;
-    const handler = () => render();
-    chart.timeScale().subscribeVisibleTimeRangeChange(handler);
-    unsubscribeTimeRange = () => chart.timeScale().unsubscribeVisibleTimeRangeChange(handler);
+    unsubscribeTimeRange = window.chartOverlayUtils.subscribeVisibleRangeRedraw(chart, render);
   }
 
   // ── Type switcher (Spot / Futures / Edge) ───────────────────────────────
@@ -377,10 +363,10 @@
 
     const allCandles = liveFootprint ? [...footprintHistory, liveFootprint] : footprintHistory;
 
-    allCandles.forEach((candle, index) => {
+    allCandles.forEach((candle) => {
       if (!candle || candle.time == null) return;
       const x = timeScale.timeToCoordinate(Math.floor(candle.time / 1000));
-      if (x === null || x < -60 || x > canvas.clientWidth + 60) return; // offscreen cull
+      if (window.chartOverlayUtils.isOffscreenX(x, canvas.clientWidth)) return;
 
       const levels = Object.keys(candle.levels || {}).map(Number).sort((a, b) => b - a);
       let totalBuy = 0, totalSell = 0;
@@ -391,23 +377,18 @@
       const delta = totalBuy - totalSell;
 
       // Hard containment: everything drawn for this candle — boxes, text,
-      // delta — is clipped to this candle's own horizontal column. No
-      // matter what any width/spacing calculation below does, it is
-      // physically impossible for one candle's footprint to paint into a
-      // neighboring candle's column once this clip is active.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x - barSpacing / 2, 0, barSpacing, canvas.clientHeight);
-      ctx.clip();
-
-      if (barSpacing < DETAIL_MIN_SPACING) {
-        drawCompact(x, delta);
-      } else {
-        drawDetailed(x, barSpacing, candle, levels, series);
-      }
-      if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, candle, delta, series, barSpacing, index);
-
-      ctx.restore();
+      // delta — is clipped to this candle's own horizontal column via the
+      // shared utility. No matter what any width/spacing calculation below
+      // does, it is physically impossible for one candle's footprint to
+      // paint into a neighboring candle's column once this clip is active.
+      window.chartOverlayUtils.withColumnClip(ctx, x, barSpacing, canvas.clientHeight, () => {
+        if (barSpacing < DETAIL_MIN_SPACING) {
+          drawCompact(x, delta);
+        } else {
+          drawDetailed(x, barSpacing, candle, levels, series);
+        }
+        if (barSpacing >= DELTA_MIN_SPACING) drawDeltaRow(x, candle, delta, series, barSpacing);
+      });
     });
   }
 
@@ -426,20 +407,17 @@
     const minRowH = fontSize + 7; // smallest box height a row of this font can hold without colliding into its neighbor
     const rowGap = 1; // thin visible gap between boxes, like MMT's grouped look
 
-    let lastDrawnY = null; // tracks the last level we actually drew, in pixels
+    // Self-adjusts to zoom: fewer, cleanly-spaced rows at normal zoom, more
+    // detail automatically as you zoom in — rather than forcing every level
+    // to cram in regardless of available pixels (shared with any future
+    // price-level grid, e.g. Order Flow/Liquidity).
+    const rows = window.chartOverlayUtils.layoutNonOverlappingRows(
+      levels.map((p) => ({ price: p })),
+      (price) => series.priceToCoordinate(price),
+      minRowH
+    );
 
-    levels.forEach((price) => {
-      const y = series.priceToCoordinate(price);
-      if (y === null) return;
-
-      // If this level sits too close (in pixels) to the last one we drew,
-      // drawing it would overlap/garble the text — skip it instead. This
-      // is what makes the grid self-adjust to zoom: fewer, cleanly-spaced
-      // rows at normal zoom, more detail automatically as you zoom in —
-      // rather than forcing a fixed set of levels to cram in regardless.
-      if (lastDrawnY !== null && Math.abs(y - lastDrawnY) < minRowH) return;
-      lastDrawnY = y;
-
+    rows.forEach(({ price, y }) => {
       const rowH = minRowH - rowGap;
       const level = candle.levels[price];
       const cur = readLevel(level);
@@ -465,16 +443,20 @@
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.strokeRect(x - half, y - rowH / 2, boxW - 1, rowH);
 
-      // Only skip text entirely below ~10px — genuinely too small for any
-      // legible glyph, regardless of font scaling.
-      if (boxW > 10) {
-        ctx.font = fontSize + 'px JetBrains Mono, monospace';
-        ctx.fillStyle = COLOR.text;
-        ctx.textAlign = 'right';
-        ctx.fillText(fmt(cur.sell), x - 3, y + 3);
-        ctx.textAlign = 'left';
-        ctx.fillText(fmt(cur.buy), x + 3, y + 3);
-      }
+      ctx.font = fontSize + 'px JetBrains Mono, monospace';
+      ctx.fillStyle = COLOR.text;
+
+      // CRITICAL: measure each string's actual rendered width BEFORE
+      // drawing it, and only draw if it genuinely fits within its half of
+      // the box — via the shared drawTextIfFits, so this rule is enforced
+      // identically everywhere it's used, not just here. Never let
+      // ctx.clip() silently chop a number instead — that turns "0.304"
+      // into a visible "304" with no indication anything was cut, which
+      // is actively misleading on a trading tool. Binary rule: show the
+      // correct full number, or show nothing.
+      const availableHalfWidth = half - 4;
+      window.chartOverlayUtils.drawTextIfFits(ctx, fmt(cur.sell), x - 3, y + 3, 'right', availableHalfWidth);
+      window.chartOverlayUtils.drawTextIfFits(ctx, fmt(cur.buy), x + 3, y + 3, 'left', availableHalfWidth);
     });
   }
 
@@ -488,27 +470,19 @@
   // enough that neighboring labels could overlap horizontally, alternate
   // candles are staggered one line lower — both numbers stay attached to
   // their own candle, just offset so they don't sit on top of each other.
-  function drawDeltaRow(x, candle, delta, series, barSpacing, index) {
+  function drawDeltaRow(x, candle, delta, series, barSpacing) {
     if (candle.low == null) return;
     const y = series.priceToCoordinate(candle.low);
     if (y === null) return;
 
     const text = (delta >= 0 ? '+' : '') + fmt(delta);
     ctx.font = '10px JetBrains Mono, monospace';
-    const textWidth = ctx.measureText(text).width;
-
-    // Stagger every other label lower when the label is wider than its own
-    // slot — keeps both numbers visible instead of one overwriting the other.
-    const needsStagger = textWidth > barSpacing - 4;
-    const yOffset = needsStagger && index % 2 === 1 ? 27 : 15;
-
-    // Only give up entirely if there truly isn't room for legible text at
-    // all, even after staggering (extremely tight zoom).
-    if (textWidth > barSpacing * 2.5) return;
-
-    ctx.textAlign = 'center';
     ctx.fillStyle = delta >= 0 ? '#4CAF7D' : '#E05252';
-    ctx.fillText(text, x, y + yOffset);
+
+    // Same rule as the box text: the per-candle clip already confines
+    // drawing to this column, so only draw if it genuinely fits — never
+    // rely on the clip to hide an overflowing/half-chopped number.
+    window.chartOverlayUtils.drawTextIfFits(ctx, text, x, y + 15, 'center', barSpacing - 4);
   }
 
   function fmt(n) {
