@@ -48,7 +48,7 @@
     .ctc-pill.on{background:var(--gold-dim);color:var(--gold);border-color:var(--gold);}
     .ctc-chevron{width:12px;height:12px;opacity:0.6;}
 
-    .ctc-dd{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--bg3);border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:10px;padding:6px;z-index:40;box-shadow:0 12px 30px rgba(0,0,0,0.35);min-width:150px;}
+    .ctc-dd{display:none;position:fixed;background:var(--bg3);border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:10px;padding:6px;z-index:400;box-shadow:0 12px 30px rgba(0,0,0,0.35);min-width:150px;}
     .ctc-dd.open{display:block;}
     .ctc-dd-search{width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg);color:var(--text,#EAECEF);font-size:12px;margin-bottom:6px;box-sizing:border-box;}
     .ctc-dd-item{padding:8px 10px;border-radius:6px;font-size:12.5px;color:var(--text,#EAECEF);cursor:pointer;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:space-between;gap:10px;}
@@ -80,6 +80,9 @@
 
   const CHART_TYPE_LABELS = { candle_solid: 'Candle', candle_stroke: 'Hollow', ohlc: 'OHLC', area: 'Area' };
   const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
+  // which trigger button each dropdown is anchored to — used to compute
+  // fixed-position coordinates (see positionDropdown)
+  const DD_BTN_MAP = { 'ctc-market-dd': 'ctc-market-btn', 'ctc-tf-dd': 'ctc-tf-btn', 'ctc-ct-dd': 'ctc-ct-btn' };
 
   // ── Public init ─────────────────────────────────────────────────────
   function init(opts = {}) {
@@ -101,6 +104,8 @@
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.ctc-wrap')) closeAllDropdowns();
     });
+    window.addEventListener('scroll', repositionOpenDropdowns, { passive: true, capture: true });
+    window.addEventListener('resize', repositionOpenDropdowns);
   }
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -236,10 +241,43 @@
     const dd = document.getElementById(id);
     const wasOpen = dd.classList.contains('open');
     closeAllDropdowns();
-    if (!wasOpen) dd.classList.add('open');
+    if (!wasOpen) {
+      dd.classList.add('open');
+      positionDropdown(id);
+    }
   }
   function closeAllDropdowns() {
     document.querySelectorAll('.ctc-dd.open').forEach(dd => dd.classList.remove('open'));
+  }
+
+  // Anchors a .ctc-dd to its trigger button using viewport coordinates
+  // (position:fixed) rather than relying on position:absolute inside
+  // .ctc-wrap — .chart-workspace has overflow:hidden for its rounded
+  // corners, which would otherwise silently clip these dropdowns.
+  function positionDropdown(ddId) {
+    const btnId = DD_BTN_MAP[ddId];
+    const dd = document.getElementById(ddId);
+    const btn = document.getElementById(btnId);
+    if (!dd || !btn) return;
+    const r = btn.getBoundingClientRect();
+    dd.style.minWidth = Math.max(150, r.width) + 'px';
+    let left = r.left;
+    // keep it inside the right edge of the viewport
+    const maxLeft = window.innerWidth - dd.offsetWidth - 10;
+    if (dd.offsetWidth && left > maxLeft) left = Math.max(10, maxLeft);
+    dd.style.left = left + 'px';
+    const spaceBelow = window.innerHeight - r.bottom;
+    if (spaceBelow < 220 && r.top > 220) {
+      dd.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+      dd.style.top = 'auto';
+    } else {
+      dd.style.top = (r.bottom + 6) + 'px';
+      dd.style.bottom = 'auto';
+    }
+  }
+
+  function repositionOpenDropdowns() {
+    document.querySelectorAll('.ctc-dd.open').forEach(dd => positionDropdown(dd.id));
   }
 
   // ── Actions ─────────────────────────────────────────────────────────
