@@ -837,14 +837,11 @@ body{background:var(--bg);color:var(--white);font-family:'Outfit',sans-serif;min
 
 /* Chart search */
 .chart-wrap{position:relative;}
-.chart-inp{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;cursor:pointer;transition:border-color 0.2s;}
+.chart-inp{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;transition:border-color 0.2s;}
 .chart-inp:focus{border-color:rgba(201,168,76,0.4);}
 .chart-inp::placeholder{color:rgba(107,114,128,0.5);font-family:'Outfit',sans-serif;}
 .chart-dd{position:absolute;top:calc(100%+4px);left:0;right:0;z-index:10050;background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:none;box-shadow:0 16px 48px rgba(0,0,0,0.35);}
 .chart-dd.open{display:block;}
-.chart-search-w{padding:10px;}
-.chart-search{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;color:var(--white);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;}
-.chart-search::placeholder{color:var(--muted);font-family:'Outfit',sans-serif;}
 .chart-cats{display:flex;gap:6px;padding:0 10px 10px;overflow-x:auto;}
 .chart-cat{padding:3px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all 0.2s;}
 .chart-cat:hover,.chart-cat.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim);}

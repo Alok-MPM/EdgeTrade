@@ -735,8 +735,7 @@ const CHARTS=[
 let chartDDOpen=false;
 function openChartDD(){
   document.getElementById('chart-dd').classList.add('open');
-  renderChartList(CHARTS);
-  setTimeout(()=>document.getElementById('chart-search').focus(),80);
+  filterCharts(document.getElementById('e-chart').value||'');
   chartDDOpen=true;
 }
 function filterCharts(val){
@@ -751,7 +750,7 @@ function filterByCat(cat,el){
 function renderChartList(list){
   const el=document.getElementById('chart-list');
   el.innerHTML='';
-  if(!list.length){el.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;">No results</div>';return;}
+  if(!list.length){el.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;">No match — press away to keep this as a custom symbol</div>';return;}
   list.forEach(c=>{
     const d=document.createElement('div');
     d.className='chart-item';
@@ -770,10 +769,25 @@ function selectChart(c){
   document.getElementById('pfx-entry').textContent=isIndian?'₹':'$';
   document.getElementById('lot-asset-opt').textContent=c.sym.split('/')[0];
 }
+// If the user typed a symbol that isn't in the predefined list and never
+// picked one from the dropdown, keep whatever they typed as a valid custom
+// asset (rather than leaving state.selectedChart stale/undefined) — still
+// sets a sensible currency prefix + lot label default.
+function finalizeCustomChartIfNeeded(){
+  const val=(document.getElementById('e-chart').value||'').trim();
+  if(!val) return;
+  if(!state.selectedChart || state.selectedChart.sym.toLowerCase()!==val.toLowerCase()){
+    const sym=val.toUpperCase();
+    state.selectedChart={sym,name:sym,cat:'custom'};
+    document.getElementById('pfx-entry').textContent='$';
+    document.getElementById('lot-asset-opt').textContent=sym.split('/')[0];
+  }
+}
 document.addEventListener('click',e=>{
   if(!chartDDOpen) return;
-  const isInteractive = e.target.closest('#e-chart, #chart-search, .chart-cat, .chart-item');
+  const isInteractive = e.target.closest('#e-chart, .chart-cat, .chart-item');
   if(!isInteractive){
+    finalizeCustomChartIfNeeded();
     document.getElementById('chart-dd').classList.remove('open');
     chartDDOpen=false;
   }
