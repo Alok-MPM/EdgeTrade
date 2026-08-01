@@ -180,17 +180,19 @@ async function fetchInitialCandles(symbol) {
 // a fast, predictable wake-up — full-session footprint still builds up
 // correctly candle-by-candle as the market runs, same as before.
 // ---------------------------------------------------------------------------
-const BACKFILL_MINUTES = 10;
-const BACKFILL_MAX_TRADES = 8000; // safety cap so a busy pair can't stall wakeup
+const BACKFILL_MINUTES = 100;       // ~100 candles of footprint history on wake, as requested
+const BACKFILL_MAX_TRADES = 40000;  // soft cap — the timeout below will usually trigger first for busy pairs
+const BACKFILL_TIMEOUT_MS = 8000;   // hard wall-clock cap — wake-up NEVER hangs waiting on REST pagination, regardless of pair volume. Whatever's fetched by then is used; the rest fills in naturally as the market runs live.
 
 async function backfillFootprintHistory(market) {
   const endTime = Date.now();
   const startTime = endTime - BACKFILL_MINUTES * 60 * 1000;
+  const deadline = Date.now() + BACKFILL_TIMEOUT_MS;
   let trades = [];
   let fromId = null;
 
   try {
-    while (trades.length < BACKFILL_MAX_TRADES) {
+    while (trades.length < BACKFILL_MAX_TRADES && Date.now() < deadline) {
       const url = fromId == null
         ? `https://api.binance.com/api/v3/aggTrades?symbol=${market.symbol.toUpperCase()}&startTime=${startTime}&endTime=${endTime}&limit=1000`
         : `https://api.binance.com/api/v3/aggTrades?symbol=${market.symbol.toUpperCase()}&fromId=${fromId + 1}&limit=1000`;
@@ -354,8 +356,60 @@ function connectBybit(market) {
 // ---------------------------------------------------------------------------
 // TICK -> FOOTPRINT AGGREGATION (per market)
 // ---------------------------------------------------------------------------
+// ── Single source of truth for "which candle is currently live" ───────────
+// Previously, liveFootprint only rotated to a new candle when the kline
+// stream's k.x (close) flag arrived. But trades and klines are two
+// SEPARATE Binance event streams multiplexed on the same connection, with
+// no ordering guarantee between them — so a handful of the new candle's
+// first real trades could arrive (as 'trade' events) BEFORE the kline
+// stream's "previous candle closed" confirmation did, and got bucketed
+// into the OLD candle instead. This is what caused the reported bug: a new
+// candle's early trades landing in the previous candle's footprint, with
+// the new candle appearing empty until the (delayed) kline close event
+// finally rotated it — a rolling one-candle-lagged contamination.
+//
+// Fix: derive "which candle" purely from a timestamp, and let WHICHEVER
+// event (trade or kline) notices the boundary first perform the rotation.
+// Only rotates FORWARD — a stray, out-of-order late trade for an
+// already-closed, already-committed candle is dropped rather than
+// corrupting the current live candle.
+function ensureLiveFootprintCandle(market, candleOpenTime) {
+  if (market.liveFootprint.time === candleOpenTime) return true; // already correct — nothing to do
+
+  if (market.liveFootprint.time != null && candleOpenTime < market.liveFootprint.time) {
+    return false; // late/out-of-order data for a candle that's already closed — caller should drop it
+  }
+
+  if (market.liveFootprint.time != null) {
+    // The previously-live candle has genuinely finished — commit it now,
+    // regardless of whether the kline stream's own close flag has arrived
+    // yet or not.
+    market.footprintHistory.push(market.liveFootprint);
+    if (market.footprintHistory.length > MAX_CANDLE_HISTORY) market.footprintHistory.shift();
+    broadcastToMarket(market, {
+      type: 'candle_closed',
+      candle: {
+        time: market.liveFootprint.time,
+        open: market.liveFootprint.open,
+        high: market.liveFootprint.high,
+        low: market.liveFootprint.low,
+        close: market.liveFootprint.close,
+      },
+    });
+  }
+
+  market.liveFootprint = makeEmptyFootprintCandle(candleOpenTime);
+  return true;
+}
+
 function handleTradeTick(market, { price, qty, isBuyerMaker, time, source }) {
   touchActivity(market); // exchange activity keeps this market's shadow buffer "fresh", not user activity
+
+  // Which candle does THIS trade's own timestamp actually belong to? —
+  // decided here, not assumed from whatever liveFootprint currently
+  // happens to reference.
+  const candleOpenTime = Math.floor(time / 60000) * 60000;
+  if (!ensureLiveFootprintCandle(market, candleOpenTime)) return; // stray late trade for an already-closed candle
 
   const bucket = bucketPrice(price);
   const level = market.liveFootprint.levels[bucket] || {
@@ -402,19 +456,14 @@ function handleKlineUpdate(market, k) {
     if (market.candles.length > MAX_CANDLE_HISTORY) market.candles.shift();
   }
 
-  market.liveFootprint.time = candle.time;
-  market.liveFootprint.open = candle.open;
-  market.liveFootprint.high = candle.high;
-  market.liveFootprint.low = candle.low;
-  market.liveFootprint.close = candle.close;
-
-  if (k.x) {
-    // candle closed — commit footprint to history, start a fresh one
-    market.footprintHistory.push(market.liveFootprint);
-    if (market.footprintHistory.length > MAX_CANDLE_HISTORY) market.footprintHistory.shift();
-    market.liveFootprint = makeEmptyFootprintCandle();
-
-    broadcastToMarket(market, { type: 'candle_closed', candle });
+  // Same rotation function as handleTradeTick — whichever stream notices
+  // the new candle first "wins" and rotates; the other just confirms.
+  const rotated = ensureLiveFootprintCandle(market, k.t);
+  if (rotated) {
+    market.liveFootprint.open = candle.open;
+    market.liveFootprint.high = candle.high;
+    market.liveFootprint.low = candle.low;
+    market.liveFootprint.close = candle.close;
   }
 }
 
