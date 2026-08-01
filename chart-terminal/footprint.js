@@ -142,15 +142,11 @@
     });
   }
 
-  const FOOTPRINT_BAR_SPACING = 90; // px — wide enough for flanking sell/buy cells at normal zoom, no manual zoom-in needed
-  let savedBarSpacing = null; // original spacing, restored when footprint turns off
-
   function activate() {
     active = true;
     const btn = document.getElementById('ctc-footprint-btn');
     if (btn) btn.classList.add('active');
 
-    widenCandleSpacing();
     ensureCanvas();
     ensureTypeSwitch();
     ensureStatusBadge();
@@ -170,30 +166,6 @@
     hideTypeSwitch();
     hideStatusBadge();
     if (unsubscribeTimeRange) { unsubscribeTimeRange(); unsubscribeTimeRange = null; }
-    restoreCandleSpacing();
-  }
-
-  // Widening candle spacing is what lets footprint boxes sit BESIDE each
-  // candle (rather than overlapping it) without forcing the user to
-  // manually pinch-zoom just to get any readable room. Saved/restored so
-  // turning footprint off returns the chart to its normal density.
-  function widenCandleSpacing() {
-    const chart = chartEngine.getInstance();
-    if (!chart) return;
-    try {
-      const current = chart.timeScale().options().barSpacing;
-      if (savedBarSpacing === null) savedBarSpacing = current;
-      if (current < FOOTPRINT_BAR_SPACING) {
-        chart.timeScale().applyOptions({ barSpacing: FOOTPRINT_BAR_SPACING });
-      }
-    } catch (e) { /* if this Lightweight Charts version rejects it, footprint still works, just at whatever spacing the user has */ }
-  }
-
-  function restoreCandleSpacing() {
-    const chart = chartEngine.getInstance();
-    if (!chart || savedBarSpacing === null) return;
-    try { chart.timeScale().applyOptions({ barSpacing: savedBarSpacing }); } catch (e) { /* non-fatal */ }
-    savedBarSpacing = null;
   }
 
   // ── Status badge — visible, on-screen connection state. Exists so a
@@ -426,22 +398,14 @@
   }
 
   function drawDetailed(x, spacing, candle, levels, series) {
-    // Approximate half-width of the candlestick body Lightweight Charts
-    // draws at this spacing (not directly exposed by the library) — used
-    // so cells sit BESIDE the candle, never on top of it. The candle
-    // itself stays completely clean/unobstructed.
-    const candleHalfWidth = spacing * 0.28;
-    const cellGap = 3; // breathing room between the candle body and each cell
-    const cellW = Math.max(10, Math.min(spacing / 2 - candleHalfWidth - cellGap, 46));
-    const sellCenterX = x - candleHalfWidth - cellGap - cellW / 2;
-    const buyCenterX = x + candleHalfWidth + cellGap + cellW / 2;
-
-    // Scale the font down as cells get smaller instead of hiding text
+    const boxW = Math.min(spacing - 4, 76);
+    const half = boxW / 2;
+    // Scale the font down as boxes get smaller instead of hiding text
     // outright — stays readable at normal zoom levels instead of forcing
     // an extreme zoom-in just to see any numbers at all.
-    const fontSize = Math.max(6, Math.min(9, Math.floor(cellW / 4)));
-    const minRowH = fontSize + 7; // smallest row height this font can hold without colliding into its neighbor
-    const rowGap = 1; // thin visible gap between rows, like MMT's grouped look
+    const fontSize = Math.max(6, Math.min(9, Math.floor(boxW / 3)));
+    const minRowH = fontSize + 7; // smallest box height a row of this font can hold without colliding into its neighbor
+    const rowGap = 1; // thin visible gap between boxes, like MMT's grouped look
 
     // Self-adjusts to zoom: fewer, cleanly-spaced rows at normal zoom, more
     // detail automatically as you zoom in — rather than forcing every level
@@ -469,29 +433,23 @@
       const sellImbalanced = belowBuy > 0 && cur.sell >= belowBuy * IMBALANCE_RATIO;
       const buyImbalanced = aboveSell > 0 && cur.buy >= aboveSell * IMBALANCE_RATIO;
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-
-      // Sell cell — fully to the LEFT of the candle body.
       ctx.fillStyle = sellImbalanced ? `rgba(${COLOR.sell},0.6)` : `rgba(${COLOR.sell},0.22)`;
-      ctx.fillRect(sellCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
-      ctx.strokeRect(sellCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
-
-      // Buy cell — fully to the RIGHT of the candle body.
+      ctx.fillRect(x - half, y - rowH / 2, half - 1, rowH);
       ctx.fillStyle = buyImbalanced ? `rgba(${COLOR.buy},0.6)` : `rgba(${COLOR.buy},0.22)`;
-      ctx.fillRect(buyCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
-      ctx.strokeRect(buyCenterX - cellW / 2, y - rowH / 2, cellW, rowH);
+      ctx.fillRect(x + 1, y - rowH / 2, half - 1, rowH);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.strokeRect(x - half, y - rowH / 2, boxW - 1, rowH);
 
       ctx.font = fontSize + 'px JetBrains Mono, monospace';
       ctx.fillStyle = COLOR.text;
 
-      // Each cell now gets its FULL width for a single number (rather than
-      // splitting one shared box in half like before) — real breathing
-      // room, which is a big part of why text kept getting rejected/cut
-      // before. Dollar notional (qty × price), not raw crypto quantity.
-      // Same measure-before-draw safety as everywhere else: show the full
-      // correct number, or show nothing — never a truncated fragment.
-      window.chartOverlayUtils.drawTextIfFits(ctx, fmtUsd(cur.sell * price), sellCenterX, y + 3, 'center', cellW - 4);
-      window.chartOverlayUtils.drawTextIfFits(ctx, fmtUsd(cur.buy * price), buyCenterX, y + 3, 'center', cellW - 4);
+      // Measure-before-draw: show the full correct number, or show
+      // nothing — never a truncated fragment. Dollar notional (qty ×
+      // price), not raw crypto quantity.
+      const availableHalfWidth = half - 4;
+      window.chartOverlayUtils.drawTextIfFits(ctx, fmtUsd(cur.sell * price), x - 3, y + 3, 'right', availableHalfWidth);
+      window.chartOverlayUtils.drawTextIfFits(ctx, fmtUsd(cur.buy * price), x + 3, y + 3, 'left', availableHalfWidth);
     });
   }
 
