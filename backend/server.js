@@ -46,6 +46,14 @@
  *    (from Binance's kline stream) regardless of which footprint type is
  *    selected — there's no separate perp candle shape. Switching type only
  *    changes which volume numbers appear inside the boxes, not the candle.
+ *
+ *  - snapshot also includes `hourlyRollup`: coarse, per-hour price-level
+ *    totals (same spot/perp shape as footprintHistory, just one bucket per
+ *    hour instead of per minute), covering up to MAX_HOURLY_ROLLUP hours.
+ *    This is what Order Flow's 4H/1D views read from — footprintHistory
+ *    alone only covers MAX_CANDLE_HISTORY minutes, nowhere near a full day.
+ *    For 1M/5M/15M/1H, sum the relevant minutes out of footprintHistory
+ *    instead (finer-grained, and well within its range already).
  */
 
 const express = require('express');
@@ -111,6 +119,7 @@ function createMarket(symbol) {
     candles: [],              // last MAX_CANDLE_HISTORY closed candles
     footprintHistory: [],     // completed footprint candles (parallel to candles)
     liveFootprint: makeEmptyFootprintCandle(), // currently-forming candle footprint
+    hourlyRollup: [],         // coarse hourly buy/sell-per-level totals, for Order Flow's 4H/1D views (see foldIntoHourlyRollup)
 
     sockets: { binance: null, bybit: null },
     reconnectTimers: { binance: null, bybit: null },
@@ -372,7 +381,38 @@ function connectBybit(market) {
 // event (trade or kline) notices the boundary first perform the rotation.
 // Only rotates FORWARD — a stray, out-of-order late trade for an
 // already-closed, already-committed candle is dropped rather than
-// corrupting the current live candle.
+// ── Hourly rollup — for Order Flow's 4H/1D timeframes ──────────────────
+// footprintHistory only keeps MAX_CANDLE_HISTORY (200) raw 1-minute
+// candles — nowhere near enough for a 4H (240 min) or 1D (1440 min) view.
+// Rather than keep 1440 minutes of full price-level detail in RAM forever
+// (expensive, and REST backfill can't practically reach that far back
+// anyway — see backfillFootprintHistory's own bounded-lookback note),
+// every candle gets folded into a coarser HOURLY bucket the moment it
+// closes. MAX_HOURLY_ROLLUP hours of these small buckets comfortably
+// covers both 4H and 1D using a fraction of the memory.
+const MAX_HOURLY_ROLLUP = 48; // hours — 2 days, well past 1D's own need
+
+function foldIntoHourlyRollup(market, candle) {
+  const hourStart = Math.floor(candle.time / 3600000) * 3600000;
+  let bucket = market.hourlyRollup[market.hourlyRollup.length - 1];
+  if (!bucket || bucket.time !== hourStart) {
+    bucket = { time: hourStart, levels: {} };
+    market.hourlyRollup.push(bucket);
+    if (market.hourlyRollup.length > MAX_HOURLY_ROLLUP) market.hourlyRollup.shift();
+  }
+
+  for (const price of Object.keys(candle.levels || {})) {
+    const src = candle.levels[price];
+    if (!bucket.levels[price]) {
+      bucket.levels[price] = { spot: { buy: 0, sell: 0, trades: 0 }, perp: { buy: 0, sell: 0, trades: 0 } };
+    }
+    const dst = bucket.levels[price];
+    dst.spot.buy += src.spot.buy; dst.spot.sell += src.spot.sell; dst.spot.trades += src.spot.trades;
+    dst.perp.buy += src.perp.buy; dst.perp.sell += src.perp.sell; dst.perp.trades += src.perp.trades;
+  }
+}
+
+
 function ensureLiveFootprintCandle(market, candleOpenTime) {
   if (market.liveFootprint.time === candleOpenTime) return true; // already correct — nothing to do
 
@@ -386,6 +426,7 @@ function ensureLiveFootprintCandle(market, candleOpenTime) {
     // yet or not.
     market.footprintHistory.push(market.liveFootprint);
     if (market.footprintHistory.length > MAX_CANDLE_HISTORY) market.footprintHistory.shift();
+    foldIntoHourlyRollup(market, market.liveFootprint);
     broadcastToMarket(market, {
       type: 'candle_closed',
       candle: {
@@ -598,6 +639,7 @@ function sendSnapshot(ws, market) {
     candles: market.candles,
     footprintHistory: market.footprintHistory,
     liveFootprint: market.liveFootprint,
+    hourlyRollup: market.hourlyRollup, // Order Flow's 4H/1D views read from this
   }));
 }
 
