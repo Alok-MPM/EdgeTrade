@@ -213,7 +213,13 @@
   // always reflected, even in the 4H/1D views.
   function aggregate(tf) {
     const def = TIMEFRAMES.find(t => t.id === tf) || TIMEFRAMES[1];
-    const now = Date.now();
+    // "Now" is derived from the server's own latest known timestamp
+    // (the currently-live candle's open time, which comes straight from
+    // Binance via the backend), NOT the device's wall clock. A client
+    // clock that's off by even a few minutes would silently widen or
+    // narrow every timeframe window — this makes the filtering immune to
+    // that entirely, since it's anchored to data the server itself gave us.
+    const now = liveFootprint && liveFootprint.time != null ? liveFootprint.time + 60000 : Date.now();
     const levels = {};
 
     if (def.hours) {
