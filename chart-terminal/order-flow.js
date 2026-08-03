@@ -35,7 +35,7 @@
 
   const FOOTPRINT_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint'; // same backend/endpoint as footprint.js
   const RECONNECT_DELAY_MS = 3000;
-  const REFRESH_INTERVAL_MS = 4000; // timeframe windows are time-relative — re-aggregate periodically even with no new tick
+  const REFRESH_INTERVAL_MS = 1200; // timeframe windows are time-relative — re-aggregate periodically even with no new tick. Fast enough to feel live, cheap enough since this is plain DOM/CSS, not canvas.
   const TOP_LEVELS_COUNT = 6;
   const MAX_HISTORY = 200;
 
@@ -63,6 +63,7 @@
 
   let mountEl = null;
   let savedOrderBookHTML = null; // snapshot of Order Book's DOM, restored on deactivate
+  let lastRowPrices = []; // previous render's top-level price order, for smooth in-place updates
 
   // ── Style ────────────────────────────────────────────────────────────
   // Reuses the same CSS custom properties order-book.js does
@@ -84,8 +85,8 @@
     .of-summary-buy{color:var(--green,#4CAF7D);}
     .of-summary-sell{color:var(--red,#E05252);}
     .of-pressure-bar{display:flex;height:6px;border-radius:4px;overflow:hidden;background:var(--bg4);margin-bottom:12px;}
-    .of-pressure-buy{background:var(--green,#4CAF7D);height:100%;}
-    .of-pressure-sell{background:var(--red,#E05252);height:100%;}
+    .of-pressure-buy{background:var(--green,#4CAF7D);height:100%;transition:width 0.5s ease;}
+    .of-pressure-sell{background:var(--red,#E05252);height:100%;transition:width 0.5s ease;}
 
     .of-levels-title{font-size:10.5px;color:var(--muted,#8a8f98);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
     .of-levels{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;}
@@ -96,7 +97,7 @@
     .of-level-buy, .of-level-sell{display:flex;align-items:center;gap:4px;position:relative;height:14px;}
     .of-level-buy{justify-content:flex-end;}
     .of-level-sell{justify-content:flex-start;}
-    .of-level-bar{height:100%;border-radius:3px;min-width:2px;}
+    .of-level-bar{height:100%;border-radius:3px;min-width:2px;transition:width 0.4s ease;}
     .of-level-bar.buy{background:rgba(76,175,125,0.45);}
     .of-level-bar.sell{background:rgba(224,82,82,0.45);}
     .of-level-amt{color:var(--text,#EAECEF);font-size:10.5px;white-space:nowrap;}
@@ -134,11 +135,12 @@
     footprintHistory = [];
     liveFootprint = null;
     hourlyRollup = [];
+    lastRowPrices = [];
   }
 
   marketStore.onSymbolChange(({ symbol }) => {
     if (!active) return;
-    footprintHistory = []; liveFootprint = null; hourlyRollup = [];
+    footprintHistory = []; liveFootprint = null; hourlyRollup = []; lastRowPrices = [];
     currentSymbol = symbol;
     const label = document.getElementById('of-symbol-label');
     if (label) label.textContent = formatSymbol(symbol);
@@ -294,16 +296,40 @@
 
     const body = document.getElementById('of-levels-body');
     if (!body) return;
-    if (!rows.length) { body.innerHTML = '<div class="of-empty">No trades yet in this window.</div>'; return; }
+    if (!rows.length) { body.innerHTML = '<div class="of-empty">No trades yet in this window.</div>'; lastRowPrices = []; return; }
 
     const maxTotal = Math.max(...rows.map((r) => r.total), 1);
-    body.innerHTML = rows.map((r) => `
-      <div class="of-level-row">
-        <div class="of-level-buy"><span class="of-level-amt">${fmtUsd(r.buyUsd)}</span><div class="of-level-bar buy" style="width:${Math.max(2, r.buyUsd / maxTotal * 100).toFixed(0)}%"></div></div>
-        <div class="of-level-price">${r.price}</div>
-        <div class="of-level-sell"><div class="of-level-bar sell" style="width:${Math.max(2, r.sellUsd / maxTotal * 100).toFixed(0)}%"></div><span class="of-level-amt">${fmtUsd(r.sellUsd)}</span></div>
-      </div>
-    `).join('');
+    const newPrices = rows.map((r) => r.price);
+    // Same set of price levels, same order as last render? Update the
+    // EXISTING dom nodes in place so the CSS width transition actually has
+    // something to animate FROM. A full innerHTML rebuild creates brand
+    // new elements every time, which paint straight at their final width
+    // with nothing to glide from — that was the real reason it felt like
+    // it was "snapping" instead of updating smoothly.
+    const sameShape = newPrices.length === lastRowPrices.length && newPrices.every((p, i) => p === lastRowPrices[i]);
+
+    if (sameShape) {
+      rows.forEach((r) => {
+        const row = body.querySelector(`[data-price="${r.price}"]`);
+        if (!row) return;
+        row.querySelector('[data-buy-amt]').textContent = fmtUsd(r.buyUsd);
+        row.querySelector('[data-sell-amt]').textContent = fmtUsd(r.sellUsd);
+        row.querySelector('[data-buy-bar]').style.width = Math.max(2, r.buyUsd / maxTotal * 100).toFixed(0) + '%';
+        row.querySelector('[data-sell-bar]').style.width = Math.max(2, r.sellUsd / maxTotal * 100).toFixed(0) + '%';
+      });
+    } else {
+      // Row set/order actually changed (a level entered/left the top N, or
+      // reordered) — nothing to smoothly animate between different rows,
+      // so just rebuild.
+      body.innerHTML = rows.map((r) => `
+        <div class="of-level-row" data-price="${r.price}">
+          <div class="of-level-buy"><span class="of-level-amt" data-buy-amt>${fmtUsd(r.buyUsd)}</span><div class="of-level-bar buy" data-buy-bar style="width:${Math.max(2, r.buyUsd / maxTotal * 100).toFixed(0)}%"></div></div>
+          <div class="of-level-price">${r.price}</div>
+          <div class="of-level-sell"><div class="of-level-bar sell" data-sell-bar style="width:${Math.max(2, r.sellUsd / maxTotal * 100).toFixed(0)}%"></div><span class="of-level-amt" data-sell-amt>${fmtUsd(r.sellUsd)}</span></div>
+        </div>
+      `).join('');
+    }
+    lastRowPrices = newPrices;
   }
 
   function fmtUsd(n) {
