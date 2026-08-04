@@ -65,6 +65,25 @@
   let savedOrderBookHTML = null; // snapshot of Order Book's DOM, restored on deactivate
   let lastRowPrices = []; // previous render's top-level price order, for smooth in-place updates
 
+  // Server-time anchor — lets us estimate "what time is it right now" using
+  // the SERVER's clock (via whatever timestamp arrived in the last message),
+  // corrected forward by local elapsed time since then. This replaces
+  // relying on the device's own clock entirely for anything that decides
+  // WHICH period/candle a moment belongs to — device clocks can drift and
+  // silently pull in the wrong data. It still ticks smoothly every second
+  // locally, it just stays anchored to server truth.
+  let serverTimeAnchor = null; // { serverTime, receivedAtClientTime }
+  let countdownTimer = null;
+
+  function noteServerTime(t) {
+    if (t == null) return;
+    serverTimeAnchor = { serverTime: t, receivedAtClientTime: Date.now() };
+  }
+  function estimatedServerNow() {
+    if (!serverTimeAnchor) return Date.now(); // no server data yet — best we can do until the first message arrives
+    return serverTimeAnchor.serverTime + (Date.now() - serverTimeAnchor.receivedAtClientTime);
+  }
+
   // ── Style ────────────────────────────────────────────────────────────
   // Reuses the same CSS custom properties order-book.js does
   // (--bg2/--gold/--text/--muted/--green/--red/--border/--bg4) so this
@@ -72,7 +91,9 @@
   const style = document.createElement('style');
   style.textContent = `
     .of-panel{background:var(--bg2);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:12px;padding:10px;display:flex;flex-direction:column;height:100%;box-sizing:border-box;font-family:'Outfit',sans-serif;}
-    .of-header{display:flex;align-items:baseline;gap:6px;margin-bottom:8px;font-family:'Cormorant Garamond',serif;}
+    .of-header{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:8px;font-family:'Cormorant Garamond',serif;}
+    .of-header-left{display:flex;align-items:baseline;gap:6px;}
+    .of-countdown{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text,#EAECEF);background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:6px;letter-spacing:0.5px;}
     .of-title{font-size:17px;font-weight:600;color:var(--text,#EAECEF);}
     .of-symbol{font-size:13px;color:var(--gold);font-family:'JetBrains Mono',monospace;}
 
@@ -120,13 +141,17 @@
     renderShell();
     connect(currentSymbol);
     refreshTimer = setInterval(render, REFRESH_INTERVAL_MS);
+    countdownTimer = setInterval(updateCountdown, 1000);
   }
 
   function deactivate() {
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     clearTimeout(wsReconnectTimer);
     clearInterval(refreshTimer);
+    clearInterval(countdownTimer);
     refreshTimer = null;
+    countdownTimer = null;
+    serverTimeAnchor = null;
 
     if (mountEl && savedOrderBookHTML !== null) {
       mountEl.innerHTML = savedOrderBookHTML; // order-book.js's own listeners pick the restored elements right back up
@@ -164,10 +189,13 @@
         footprintHistory = msg.footprintHistory || [];
         liveFootprint = msg.liveFootprint || null;
         hourlyRollup = msg.hourlyRollup || [];
+        if (liveFootprint && liveFootprint.time != null) noteServerTime(liveFootprint.time);
       } else if (msg.type === 'tick') {
+        noteServerTime(msg.time);
         applyTick(msg);
         return; // render() runs on its own timer — no need to redraw the whole panel on every single tick
       } else if (msg.type === 'candle_closed') {
+        noteServerTime(msg.candle.time);
         if (liveFootprint) {
           footprintHistory.push(liveFootprint);
           if (footprintHistory.length > MAX_HISTORY) footprintHistory.shift();
@@ -211,23 +239,60 @@
   // alone doesn't go back far enough for those. Either way, the still-
   // forming liveFootprint is merged on top so the current minute is
   // always reflected, even in the 4H/1D views.
+  const PERIOD_MS = { '1m': 60000, '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+
+  // Boundary-aligned to the SAME clock marks candles use (e.g. 1H candles
+  // start at :00 past the hour, 4H at 00:00/04:00/08:00 UTC etc.) — not
+  // "N minutes before now". This is what makes Order Flow's window always
+  // mean "this candle/period, from when it opened", exactly mirroring what
+  // the main chart is showing, rather than a trailing window that can span
+  // across two different candles depending on the exact second you look.
+  function periodStart(tf, refTime) {
+    const size = PERIOD_MS[tf] || PERIOD_MS['5m'];
+    return Math.floor(refTime / size) * size;
+  }
+
+  // ── Countdown — time remaining until the CURRENT period (matching
+  // whichever timeframe tab is selected) closes. Ticks every second using
+  // the local clock for smoothness, but the period boundary itself is
+  // always computed from estimatedServerNow() — only the animation is
+  // local, the actual boundary decision never is.
+  function updateCountdown() {
+    const el = document.getElementById('of-countdown');
+    if (!el) return;
+    const size = PERIOD_MS[currentTimeframe] || PERIOD_MS['5m'];
+    const referenceNow = estimatedServerNow();
+    const start = periodStart(currentTimeframe, referenceNow);
+    const end = start + size;
+    const remainingMs = Math.max(0, end - referenceNow);
+    el.textContent = formatCountdown(remainingMs);
+  }
+
+  function formatCountdown(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  }
+
+  // ── Aggregation ──────────────────────────────────────────────────────
+  // 1M/5M/15M/1H sum minutes out of footprintHistory (fine-grained, well
+  // within its range). 4H/1D read hourlyRollup instead — footprintHistory
+  // alone doesn't go back far enough for those. Either way, the still-
+  // forming liveFootprint is merged on top so the current minute is
+  // always reflected.
   function aggregate(tf) {
     const def = TIMEFRAMES.find(t => t.id === tf) || TIMEFRAMES[1];
-    // "Now" is derived from the server's own latest known timestamp
-    // (the currently-live candle's open time, which comes straight from
-    // Binance via the backend), NOT the device's wall clock. A client
-    // clock that's off by even a few minutes would silently widen or
-    // narrow every timeframe window — this makes the filtering immune to
-    // that entirely, since it's anchored to data the server itself gave us.
-    const now = liveFootprint && liveFootprint.time != null ? liveFootprint.time + 60000 : Date.now();
+    const referenceNow = estimatedServerNow(); // server-anchored, not the device clock — see serverTimeAnchor above
+    const start = periodStart(tf, referenceNow);
     const levels = {};
 
     if (def.hours) {
-      const cutoff = now - def.hours * 3600000;
-      hourlyRollup.forEach((bucket) => { if (bucket.time >= cutoff) mergeLevelsInto(levels, bucket.levels); });
+      hourlyRollup.forEach((bucket) => { if (bucket.time >= start) mergeLevelsInto(levels, bucket.levels); });
     } else {
-      const cutoff = now - def.minutes * 60000;
-      footprintHistory.forEach((candle) => { if (candle.time >= cutoff) mergeLevelsInto(levels, candle.levels); });
+      footprintHistory.forEach((candle) => { if (candle.time >= start) mergeLevelsInto(levels, candle.levels); });
     }
     if (liveFootprint) mergeLevelsInto(levels, liveFootprint.levels);
 
@@ -248,8 +313,8 @@
     mountEl.innerHTML = `
       <div class="of-panel">
         <div class="of-header">
-          <span class="of-title">Order Flow</span>
-          <span class="of-symbol" id="of-symbol-label">${formatSymbol(currentSymbol)}</span>
+          <span class="of-header-left"><span class="of-title">Order Flow</span><span class="of-symbol" id="of-symbol-label">${formatSymbol(currentSymbol)}</span></span>
+          <span class="of-countdown" id="of-countdown">--:--</span>
         </div>
         <div class="of-tf-tabs" id="of-tf-tabs">
           ${TIMEFRAMES.map(tf => `<button data-tf="${tf.id}" class="${tf.id === currentTimeframe ? 'active' : ''}">${tf.label}</button>`).join('')}
@@ -271,6 +336,7 @@
       document.querySelectorAll('#of-tf-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tf === currentTimeframe));
       const titleEl = document.getElementById('of-levels-title');
       if (titleEl) titleEl.textContent = 'Top price levels — ' + currentTfLabel();
+      updateCountdown();
       render();
     });
   }
