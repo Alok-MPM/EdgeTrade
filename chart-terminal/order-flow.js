@@ -93,7 +93,10 @@
     .of-panel{background:var(--bg2);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:12px;padding:10px;display:flex;flex-direction:column;height:100%;box-sizing:border-box;font-family:'Outfit',sans-serif;}
     .of-header{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:8px;font-family:'Cormorant Garamond',serif;}
     .of-header-left{display:flex;align-items:baseline;gap:6px;}
-    .of-countdown{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text,#EAECEF);background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:6px;letter-spacing:0.5px;}
+    .of-countdown{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text,#EAECEF);background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:6px;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;}
+    .of-status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted,#8a8f98);flex-shrink:0;}
+    .of-status-dot.live{background:var(--green,#4CAF7D);}
+    .of-status-dot.stale{background:var(--red,#E05252);}
     .of-title{font-size:17px;font-weight:600;color:var(--text,#EAECEF);}
     .of-symbol{font-size:13px;color:var(--gold);font-family:'JetBrains Mono',monospace;}
 
@@ -179,7 +182,10 @@
   // ── WebSocket — same backend/contract as footprint.js ──────────────────
   function connect(symbol) {
     if (ws) { ws.onclose = null; ws.close(); }
+    setStatus('stale'); // dot goes red the instant we're not on a confirmed-open connection — visible proof if a drop happens mid-candle
     ws = new WebSocket(`${FOOTPRINT_WS_BASE}?symbol=${symbol.toLowerCase()}`);
+
+    ws.onopen = () => setStatus('live');
 
     ws.onmessage = (event) => {
       let msg;
@@ -207,9 +213,25 @@
       render();
     };
 
-    ws.onclose = () => { if (active) wsReconnectTimer = setTimeout(() => connect(currentSymbol), RECONNECT_DELAY_MS); };
+    ws.onclose = () => { setStatus('stale'); if (active) wsReconnectTimer = setTimeout(() => connect(currentSymbol), RECONNECT_DELAY_MS); };
     ws.onerror = () => ws.close();
   }
+
+  function setStatus(state) {
+    const dot = document.getElementById('of-status-dot');
+    if (dot) dot.className = 'of-status-dot ' + state;
+  }
+
+  // If the browser tab was backgrounded (very common on mobile — lots of
+  // open tabs, screen lock, app-switching), timers and the WebSocket can
+  // get throttled or silently stall. Rather than wait for that to
+  // naturally resolve (which is what caused the "flat, then sudden burst"
+  // pattern), force a clean reconnect the moment the tab is visible again.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && active) {
+      connect(currentSymbol);
+    }
+  });
 
   function applyTick(msg) {
     if (!liveFootprint) return;
@@ -314,7 +336,7 @@
       <div class="of-panel">
         <div class="of-header">
           <span class="of-header-left"><span class="of-title">Order Flow</span><span class="of-symbol" id="of-symbol-label">${formatSymbol(currentSymbol)}</span></span>
-          <span class="of-countdown" id="of-countdown">--:--</span>
+          <span class="of-countdown"><span class="of-status-dot" id="of-status-dot"></span><span id="of-countdown">--:--</span></span>
         </div>
         <div class="of-tf-tabs" id="of-tf-tabs">
           ${TIMEFRAMES.map(tf => `<button data-tf="${tf.id}" class="${tf.id === currentTimeframe ? 'active' : ''}">${tf.label}</button>`).join('')}
