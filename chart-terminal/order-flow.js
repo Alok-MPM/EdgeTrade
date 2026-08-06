@@ -52,6 +52,7 @@
   let active = false;
   let currentSymbol = null;
   let currentTimeframe = '5m';
+  let currentType = 'edge'; // 'spot' | 'perp' | 'edge' — which exchange(s) this reflects
 
   let footprintHistory = [];
   let liveFootprint = null;
@@ -101,6 +102,10 @@
     .of-symbol{font-size:13px;color:var(--gold);font-family:'JetBrains Mono',monospace;}
 
     .of-tf-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;}
+    .of-type-tabs{display:flex;gap:4px;margin-bottom:10px;}
+    .of-type-tabs button{font-family:'Outfit',sans-serif;font-size:11px;font-weight:500;padding:4px 11px;border-radius:6px;border:1px solid var(--border,rgba(255,255,255,0.08));background:transparent;color:var(--muted,#8a8f98);cursor:pointer;}
+    .of-type-tabs button.active{background:var(--gold);color:#111317;border-color:var(--gold);font-weight:600;}
+    .of-type-tabs button:hover:not(.active){color:var(--text,#EAECEF);}
     .of-tf-tabs button{font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--border,rgba(255,255,255,0.08));background:transparent;color:var(--muted,#8a8f98);cursor:pointer;}
     .of-tf-tabs button.active{background:var(--gold);color:#111317;border-color:var(--gold);font-weight:600;}
     .of-tf-tabs button:hover:not(.active){color:var(--text,#EAECEF);}
@@ -325,8 +330,22 @@
     for (const price of Object.keys(source || {})) {
       const s = source[price];
       if (!target[price]) target[price] = { buy: 0, sell: 0 };
-      target[price].buy += s.spot.buy + s.perp.buy;   // Edge (Aggregate) — spot + perp combined, no type toggle in v1
-      target[price].sell += s.spot.sell + s.perp.sell;
+      // Spot -> Binance only, Futures -> Bybit perp only, Edge -> both combined.
+      // This is exactly what explained the "price level the chart never
+      // visited" reports — Binance and Bybit can trade at slightly
+      // different prices at the same instant, and Edge mixes both in.
+      // Switching to Spot makes this match the chart 1:1 when the chart
+      // itself is Binance-sourced.
+      if (currentType === 'spot') {
+        target[price].buy += s.spot.buy;
+        target[price].sell += s.spot.sell;
+      } else if (currentType === 'perp') {
+        target[price].buy += s.perp.buy;
+        target[price].sell += s.perp.sell;
+      } else {
+        target[price].buy += s.spot.buy + s.perp.buy;
+        target[price].sell += s.spot.sell + s.perp.sell;
+      }
     }
   }
 
@@ -340,6 +359,11 @@
         </div>
         <div class="of-tf-tabs" id="of-tf-tabs">
           ${TIMEFRAMES.map(tf => `<button data-tf="${tf.id}" class="${tf.id === currentTimeframe ? 'active' : ''}">${tf.label}</button>`).join('')}
+        </div>
+        <div class="of-type-tabs" id="of-type-tabs">
+          <button data-type="spot" class="${currentType === 'spot' ? 'active' : ''}">Spot</button>
+          <button data-type="perp" class="${currentType === 'perp' ? 'active' : ''}">Futures</button>
+          <button data-type="edge" class="${currentType === 'edge' ? 'active' : ''}">Edge</button>
         </div>
         <div class="of-summary">
           <span class="of-summary-buy">Buy <span id="of-buy-total">$0</span></span>
@@ -359,6 +383,15 @@
       const titleEl = document.getElementById('of-levels-title');
       if (titleEl) titleEl.textContent = 'Top price levels — ' + currentTfLabel();
       updateCountdown();
+      render();
+    });
+
+    document.getElementById('of-type-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-type]');
+      if (!btn) return;
+      currentType = btn.dataset.type;
+      document.querySelectorAll('#of-type-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.type === currentType));
+      lastRowPrices = []; // level set will differ between Spot/Futures/Edge — force a clean rebuild instead of a mismatched in-place update
       render();
     });
   }
@@ -436,7 +469,30 @@
   function setWidth(id, width) { const el = document.getElementById(id); if (el) el.style.width = width; }
   function formatSymbol(sym) { return (sym || '').replace(/USDT$/, '') + '/USDT'; }
 
-  window.orderflow = { toggle };
+  // Read-only diagnostic — call orderflow.debug() from the browser
+  // console while Order Flow is active. Changes nothing, just exposes the
+  // actual internal state so a reported discrepancy can be checked
+  // against real data instead of guessed at.
+  function debug() {
+    const referenceNow = estimatedServerNow();
+    return {
+      currentTimeframe,
+      referenceNow,
+      referenceNowISO: new Date(referenceNow).toISOString(),
+      deviceNowISO: new Date().toISOString(),
+      periodStart1m: new Date(periodStart('1m', referenceNow)).toISOString(),
+      liveFootprintTime: liveFootprint ? new Date(liveFootprint.time).toISOString() : null,
+      liveFootprintLevelCount: liveFootprint ? Object.keys(liveFootprint.levels || {}).length : 0,
+      footprintHistoryLength: footprintHistory.length,
+      footprintHistoryLastFive: footprintHistory.slice(-5).map(c => ({
+        time: new Date(c.time).toISOString(),
+        levelCount: Object.keys(c.levels || {}).length,
+      })),
+      serverTimeAnchor,
+    };
+  }
+
+  window.orderflow = { toggle, debug };
 
 })();
 
@@ -447,10 +503,12 @@
 //   it currently points at "orderflow.js", double check the filename
 //   matches whatever you save this as).
 //
-// v1 scope notes (intentional, not oversights):
-//   - Edge (Aggregate) only — no Spot/Futures type toggle yet. Easy
-//     fast-follow later: mirror footprint.js's readLevel()-per-type
-//     pattern once this is confirmed stable.
+// v1 scope notes:
+//   - Spot/Futures/Edge type toggle added (Aug 5) — Binance and Bybit can
+//     trade at slightly different prices at the same instant, so Edge
+//     (both combined) can show price levels the chart itself never
+//     visited if the chart is single-exchange sourced. Switch to Spot to
+//     match a Binance-sourced chart exactly.
 //   - No per-candle chart drawing at all, by design — that's what keeps
 //     this in the "low risk" category compared to footprint.
 // ══════════════════════════════════════════════════════════════════════════
