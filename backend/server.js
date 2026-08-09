@@ -86,6 +86,19 @@ const BINANCE_REST_KLINES = (symbol, interval, limit) =>
 const BINANCE_WS_URL = (symbol) =>
   `wss://stream.binance.com:9443/stream?streams=${symbol}@trade/${symbol}@kline_${CANDLE_INTERVAL}`;
 
+// Liquidity — Step 1 (live depth capture only, no history/tracking yet).
+// depth20@1000ms gives the top 20 bid/ask levels, refreshed once a second.
+// Deliberately NOT the full diff-stream (bookTicker/depth@100ms + REST
+// snapshot + incremental patching) — that's a lot more failure-prone (miss
+// one diff and the whole reconstructed book silently goes wrong with no
+// obvious symptom). A top-20 snapshot stream can't drift out of sync like
+// that: every message IS the current truth, self-correcting by design.
+// Trade-off: only visibility into the ~20 nearest levels each side, not
+// the whole book — plenty for "where's the wall near price" (Step 1's
+// actual goal), not enough for deep-book analytics if that's ever wanted.
+const BINANCE_WS_DEPTH_URL = (symbol) =>
+  `wss://stream.binance.com:9443/ws/${symbol}@depth20@1000ms`;
+
 const BYBIT_WS_URL = 'wss://stream.bybit.com/v5/public/linear';
 
 // ---------------------------------------------------------------------------
@@ -124,7 +137,21 @@ function createMarket(symbol) {
     sockets: { binance: null, bybit: null },
     reconnectTimers: { binance: null, bybit: null },
 
-    clients: new Set(), // ws connections currently watching this symbol
+    clients: new Set(), // ws connections currently watching this symbol (footprint + order-flow)
+
+    // Liquidity — fully isolated from everything above: its own socket,
+    // own client room, own awake/idle lifecycle. Turning Footprint or
+    // Order Flow on/off never touches this, and vice versa.
+    liquidity: {
+      bids: [],           // [{ price, qty }, ...] sorted highest price first, top 20
+      asks: [],           // [{ price, qty }, ...] sorted lowest price first, top 20
+      lastUpdateTime: null,
+      awake: false,
+      lastActivity: 0,
+      socket: null,
+      reconnectTimer: null,
+      clients: new Set(),
+    },
   };
 }
 
@@ -363,6 +390,90 @@ function connectBybit(market) {
 }
 
 // ---------------------------------------------------------------------------
+// LIQUIDITY — Step 1: live depth capture (Binance top-20, spot only for now)
+// ---------------------------------------------------------------------------
+function connectLiquidityDepth(market) {
+  clearTimeout(market.liquidity.reconnectTimer);
+
+  const ws = new WebSocket(BINANCE_WS_DEPTH_URL(market.symbol));
+  market.liquidity.socket = ws;
+
+  ws.on('open', () => {
+    console.log(`[liquidity] connected (${market.symbol})`);
+  });
+
+  ws.on('message', (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!Array.isArray(msg.bids) || !Array.isArray(msg.asks)) return;
+
+    market.liquidity.bids = msg.bids.map(([price, qty]) => ({ price: parseFloat(price), qty: parseFloat(qty) }));
+    market.liquidity.asks = msg.asks.map(([price, qty]) => ({ price: parseFloat(price), qty: parseFloat(qty) }));
+    market.liquidity.lastUpdateTime = Date.now();
+    // NOTE: deliberately NOT touching market.liquidity.lastActivity here —
+    // Binance sends a depth snapshot every ~1s unconditionally, so treating
+    // that as "activity" would mean this can never idle-sleep even with
+    // zero clients watching. lastActivity is set only on wake and on
+    // client attach, so it genuinely reflects "since when has anyone
+    // plausibly been watching".
+
+    broadcastToLiquidityClients(market, {
+      type: 'depth',
+      bids: market.liquidity.bids,
+      asks: market.liquidity.asks,
+      time: market.liquidity.lastUpdateTime,
+    });
+  });
+
+  ws.on('close', () => {
+    console.log(`[liquidity] disconnected (${market.symbol}), reconnecting...`);
+    if (market.liquidity.awake) {
+      market.liquidity.reconnectTimer = setTimeout(() => connectLiquidityDepth(market), RECONNECT_DELAY_MS);
+    }
+  });
+
+  ws.on('error', (err) => {
+    console.error(`[liquidity] error (${market.symbol}):`, err.message);
+    ws.close();
+  });
+}
+
+function wakeLiquidity(market) {
+  market.liquidity.lastActivity = Date.now();
+  if (market.liquidity.awake) return;
+  console.log(`[liquidity] waking up for ${market.symbol}...`);
+  market.liquidity.awake = true;
+  connectLiquidityDepth(market);
+}
+
+function sleepLiquidity(market) {
+  if (!market.liquidity.awake) return;
+  console.log(`[liquidity] ${market.symbol} going to sleep (idle timeout reached)`);
+  if (market.liquidity.socket) market.liquidity.socket.close();
+  clearTimeout(market.liquidity.reconnectTimer);
+  market.liquidity.awake = false;
+  market.liquidity.bids = [];
+  market.liquidity.asks = [];
+  market.liquidity.lastUpdateTime = null;
+
+  if (!market.awake && market.clients.size === 0 && market.liquidity.clients.size === 0) {
+    markets.delete(market.symbol);
+  }
+}
+
+function broadcastToLiquidityClients(market, payload) {
+  if (!market.liquidity.clients.size) return;
+  const msg = JSON.stringify(payload);
+  market.liquidity.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) client.send(msg);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // TICK -> FOOTPRINT AGGREGATION (per market)
 // ---------------------------------------------------------------------------
 // ── Single source of truth for "which candle is currently live" ───────────
@@ -556,11 +667,14 @@ function sleep(market) {
   market.footprintHistory = [];
   market.liveFootprint = makeEmptyFootprintCandle();
 
-  // Free the market entry entirely once it's asleep AND nobody's watching —
-  // keeps the `markets` Map from growing forever across many symbols over
-  // time. A market only reaches here with clients.size > 0 during shutdown,
-  // where deleting the entry doesn't matter (process is exiting anyway).
-  if (market.clients.size === 0) markets.delete(market.symbol);
+  // Free the market entry entirely once it's asleep AND nobody's watching
+  // ANYTHING on it (footprint/order-flow's clients, or liquidity's own
+  // separate clients/awake state) — keeps the `markets` Map from growing
+  // forever across many symbols over time, without accidentally destroying
+  // an independently-active Liquidity connection sharing this same object.
+  if (market.clients.size === 0 && !market.liquidity.awake && market.liquidity.clients.size === 0) {
+    markets.delete(market.symbol);
+  }
 }
 
 function countAwakeMarkets() {
@@ -574,6 +688,9 @@ setInterval(() => {
   for (const market of markets.values()) {
     if (market.awake && market.clients.size === 0 && now - market.lastActivity > IDLE_SLEEP_MS) {
       sleep(market);
+    }
+    if (market.liquidity.awake && market.liquidity.clients.size === 0 && now - market.liquidity.lastActivity > IDLE_SLEEP_MS) {
+      sleepLiquidity(market);
     }
   }
 }, IDLE_CHECK_INTERVAL_MS);
@@ -593,6 +710,13 @@ app.post('/api/wakeup', async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+app.post('/api/wakeup-liquidity', (req, res) => {
+  const symbol = (req.body?.symbol || DEFAULT_SYMBOL).toLowerCase();
+  const market = getOrCreateMarket(symbol);
+  wakeLiquidity(market);
+  res.json({ ok: true, symbol });
 });
 
 app.get('/api/status', (req, res) => {
@@ -622,6 +746,24 @@ app.get('/api/status', (req, res) => {
     awakeMarkets: countAwakeMarkets(),
     totalConnectedClients: summary.reduce((sum, m) => sum + m.connectedClients, 0),
     markets: summary,
+  });
+});
+
+app.get('/api/liquidity-status', (req, res) => {
+  const symbol = (req.query.symbol || DEFAULT_SYMBOL).toLowerCase();
+  const market = markets.get(symbol);
+  if (!market) return res.json({ symbol, awake: false, bidCount: 0, askCount: 0 });
+
+  res.json({
+    symbol,
+    awake: market.liquidity.awake,
+    lastUpdateTime: market.liquidity.lastUpdateTime,
+    ageMs: market.liquidity.lastUpdateTime ? Date.now() - market.liquidity.lastUpdateTime : null,
+    connectedClients: market.liquidity.clients.size,
+    bidCount: market.liquidity.bids.length,
+    askCount: market.liquidity.asks.length,
+    topBids: market.liquidity.bids.slice(0, 5),
+    topAsks: market.liquidity.asks.slice(0, 5),
   });
 });
 
@@ -706,6 +848,71 @@ wss.on('connection', (ws, req) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// WEBSOCKET SERVER — Liquidity (Step 1), fully separate from /ws/footprint.
+// Same attach/detach/subscribe pattern, own client room, own wake/sleep.
+// ---------------------------------------------------------------------------
+const wssLiquidity = new WebSocket.Server({ server, path: '/ws/liquidity' });
+
+function sendLiquiditySnapshot(ws, market) {
+  ws.send(JSON.stringify({
+    type: 'snapshot',
+    symbol: market.symbol,
+    bids: market.liquidity.bids,
+    asks: market.liquidity.asks,
+    time: market.liquidity.lastUpdateTime,
+  }));
+}
+
+function attachToLiquidity(ws, symbol) {
+  const market = getOrCreateMarket(symbol);
+  market.liquidity.lastActivity = Date.now(); // client presence IS the activity signal here — see the note in connectLiquidityDepth
+  market.liquidity.clients.add(ws);
+  ws.liqSymbol = symbol;
+
+  if (!market.liquidity.awake) wakeLiquidity(market);
+
+  sendLiquiditySnapshot(ws, market);
+}
+
+function detachFromLiquidity(ws) {
+  if (!ws.liqSymbol) return;
+  const market = markets.get(ws.liqSymbol);
+  if (!market) return;
+  market.liquidity.clients.delete(ws);
+  market.liquidity.lastActivity = Date.now(); // leaving still counts as recent — don't sleep instantly, let the idle timer decide
+}
+
+wssLiquidity.on('connection', (ws, req) => {
+  const reqUrl = new URL(req.url, 'http://localhost');
+  const symbol = (reqUrl.searchParams.get('symbol') || DEFAULT_SYMBOL).toLowerCase();
+
+  console.log(`[liquidity client] connected for ${symbol}`);
+  attachToLiquidity(ws, symbol);
+
+  ws.on('message', (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (msg && msg.type === 'subscribe' && typeof msg.symbol === 'string') {
+      const newSymbol = msg.symbol.toLowerCase();
+      if (newSymbol !== ws.liqSymbol) {
+        console.log(`[liquidity client] switching ${ws.liqSymbol} -> ${newSymbol}`);
+        detachFromLiquidity(ws);
+        attachToLiquidity(ws, newSymbol);
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    console.log(`[liquidity client] disconnected (was watching ${ws.liqSymbol})`);
+    detachFromLiquidity(ws);
+  });
+});
+
 function broadcastToMarket(market, payload) {
   if (!market.clients.size) return;
   const msg = JSON.stringify(payload);
@@ -719,7 +926,7 @@ function broadcastToMarket(market, payload) {
 // ---------------------------------------------------------------------------
 function shutdown() {
   console.log('[system] shutting down...');
-  for (const market of markets.values()) sleep(market);
+  for (const market of markets.values()) { sleep(market); sleepLiquidity(market); }
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 2000);
 }
@@ -729,4 +936,5 @@ process.on('SIGTERM', shutdown);
 server.listen(PORT, () => {
   console.log(`[system] EdgeTrade backend listening on port ${PORT}`);
   console.log(`[system] POST /api/wakeup { symbol } to warm up, connect to ws://<host>/ws/footprint?symbol=<symbol> for live data`);
+  console.log(`[system] Liquidity (Step 1): POST /api/wakeup-liquidity { symbol }, GET /api/liquidity-status?symbol=..., or connect to ws://<host>/ws/liquidity?symbol=<symbol>`);
 });
