@@ -719,6 +719,16 @@ app.post('/api/wakeup-liquidity', (req, res) => {
   res.json({ ok: true, symbol });
 });
 
+// GET twin of the above — same effect, but triggerable by just visiting a
+// URL in a browser (no DevTools/Postman needed). Convenient for testing
+// from a phone where opening a console isn't straightforward.
+app.get('/api/wakeup-liquidity', (req, res) => {
+  const symbol = (req.query.symbol || DEFAULT_SYMBOL).toLowerCase();
+  const market = getOrCreateMarket(symbol);
+  wakeLiquidity(market);
+  res.json({ ok: true, symbol });
+});
+
 app.get('/api/status', (req, res) => {
   const symbol = req.query.symbol ? String(req.query.symbol).toLowerCase() : null;
 
