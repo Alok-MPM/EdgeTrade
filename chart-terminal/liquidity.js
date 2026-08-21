@@ -1,30 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════
 // chart-terminal/liquidity.js
-//
-// Liquidity overlay — deliberately NOT a heatmap (Bookmap/MMT-style color-
-// gradient grids are intentionally hard to read at a glance: you have to
-// learn to interpret shade intensity, and the exact size is often not
-// shown at all). Instead: the biggest resting bid/ask orders near the
-// current price are drawn as clean horizontal bars anchored at their real
-// price against the chart's own price axis — bar LENGTH encodes size
-// (easier to compare at a glance than color shade), and every bar always
-// carries its exact dollar value as text. Only 2 colors, ever: green for
-// resting buy orders, red for resting sell orders.
-//
-// SCOPE (Step 1, honest limitation): the backend currently captures only
-// the top ~20 bid/ask levels each side (Binance depth20@1000ms) — for a
-// pair like BTC that's often within a dollar or two of price, not a wall
-// sitting far away. This shows the biggest of THOSE nearby resting
-// orders, not deep book structure. Deeper capture is a future step.
-//
-// This is a canvas overlay on the chart (like footprint.js), but only
-// draws in a narrow strip near the right edge (the price-axis area) —
-// it never touches the candles themselves.
-//
-// Integration contract (matches chart-cockpit.js's existing wiring, same
-// as order-flow.js): window.liquidity.toggle() -> returns true/false.
-//
-// Depends on: market-store.js, chart-engine.js, chart-overlay-utils.js.
 // ══════════════════════════════════════════════════════════════════════════
 
 (function () {
@@ -34,10 +9,10 @@
     return;
   }
 
-  const LIQUIDITY_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/liquidity'; // same backend host as footprint/order-flow, different path
+  const LIQUIDITY_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/liquidity';
   const RECONNECT_DELAY_MS = 3000;
-  const TOP_ORDERS_COUNT = 6; // per side — keeps it readable, not a wall of numbers
-  const MAX_BAR_WIDTH = 130; // px, longest a bar can draw regardless of size
+  const TOP_ORDERS_COUNT = 6; 
+  const MAX_BAR_WIDTH = 130; 
   const BAR_HEIGHT = 14;
 
   const COLOR = { buy: '76,175,125', sell: '224,82,82', text: '#EAECEF' };
@@ -45,21 +20,52 @@
   // ── State ────────────────────────────────────────────────────────────
   let active = false;
   let currentSymbol = null;
-  let bids = []; // [{price, qty}]
+  let bids = []; 
   let asks = [];
 
   let ws = null;
   let wsReconnectTimer = null;
 
-  let overlay = null; // { canvas, ctx, resize, clear, destroy } from chartOverlayUtils
+  let overlay = null; 
   let unsubscribeTimeRange = null;
 
   // ── Style ────────────────────────────────────────────────────────────
   const style = document.createElement('style');
-  style.textContent = `.liq-overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:4;}`;
+  style.textContent = `
+    .liq-overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:4;}
+    .liq-status{position:absolute;top:34px;right:8px;z-index:6;display:none;
+      font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;
+      border-radius:6px;background:rgba(20,20,20,0.75);color:#EAECEF;
+      max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .liq-status.visible{display:block;}
+    .liq-status.ok{color:#4CAF7D;}
+    .liq-status.err{color:#E05252;}
+  `;
   document.head.appendChild(style);
 
-  // ── Public toggle — matches chart-cockpit.js's existing call ──────────
+  // ── Status badge ───────────────────────────────────────────────────────
+  let statusEl = null;
+  function ensureStatusBadge() {
+    const container = document.getElementById('klineMainChart');
+    if (!container) return;
+    if (!statusEl) {
+      statusEl = document.createElement('div');
+      statusEl.className = 'liq-status';
+      container.appendChild(statusEl);
+    }
+    statusEl.classList.add('visible');
+  }
+  function hideStatusBadge() {
+    if (statusEl) statusEl.classList.remove('visible');
+  }
+  function setStatus(text, kind) {
+    if (!statusEl) return;
+    statusEl.textContent = 'LIQ: ' + text;
+    statusEl.classList.remove('ok', 'err');
+    if (kind) statusEl.classList.add(kind);
+  }
+
+  // ── Public toggle ──────────────────────────────────────────────────────
   function toggle() {
     active = !active;
     if (active) activate(); else deactivate();
@@ -68,6 +74,7 @@
 
   function activate() {
     ensureCanvas();
+    ensureStatusBadge();
     subscribeChartRedraws();
     connect(marketStore.getState().symbol);
     render();
@@ -77,6 +84,7 @@
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     clearTimeout(wsReconnectTimer);
     if (overlay) { overlay.clear(); overlay.canvas.style.display = 'none'; }
+    hideStatusBadge();
     if (unsubscribeTimeRange) { unsubscribeTimeRange(); unsubscribeTimeRange = null; }
     bids = []; asks = [];
   }
@@ -92,12 +100,22 @@
     }
   });
 
-  // ── WebSocket — own connection to /ws/liquidity, fully separate from
-  // footprint/order-flow's own connections ───────────────────────────
+  // ── WebSocket ────────────────────────────────────────────────────────
   function connect(symbol) {
     currentSymbol = symbol;
     if (ws) { ws.onclose = null; ws.close(); }
-    ws = new WebSocket(`${LIQUIDITY_WS_BASE}?symbol=${symbol.toLowerCase()}`);
+    
+    setStatus('connecting...', null);
+    
+    try {
+        ws = new WebSocket(`${LIQUIDITY_WS_BASE}?symbol=${symbol.toLowerCase()}`);
+    } catch(e) {
+        setStatus('bad URL', 'err');
+        wsReconnectTimer = setTimeout(() => { if (active) connect(currentSymbol); }, RECONNECT_DELAY_MS);
+        return;
+    }
+
+    ws.onopen = () => setStatus('live', 'ok');
 
     ws.onmessage = (event) => {
       let msg;
@@ -108,11 +126,14 @@
       render();
     };
 
-    ws.onclose = () => { if (active) wsReconnectTimer = setTimeout(() => connect(currentSymbol), RECONNECT_DELAY_MS); };
+    ws.onclose = (ev) => {
+        setStatus('closed (' + ev.code + ')', 'err');
+        if (active) wsReconnectTimer = setTimeout(() => connect(currentSymbol), RECONNECT_DELAY_MS); 
+    };
     ws.onerror = () => ws.close();
   }
 
-  // ── Canvas + redraw sync — same shared utilities footprint.js uses ────
+  // ── Canvas + redraw sync ───────────────────────────────────────────────
   function ensureCanvas() {
     if (!overlay) {
       overlay = window.chartOverlayUtils.createOverlayCanvas('klineMainChart', 'liq-overlay');
@@ -133,8 +154,9 @@
   // ── Render ──────────────────────────────────────────────────────────
   function render() {
     if (!active || !overlay) return;
+    const chart = chartEngine.getInstance();
     const series = chartEngine.getSeries();
-    if (!series) return;
+    if (!chart || !series) return;
     const { ctx, canvas } = overlay;
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
@@ -143,7 +165,14 @@
     const allValues = [...topBids, ...topAsks].map((o) => o.price * o.qty);
     const maxValue = Math.max(...allValues, 1);
 
-    const rightEdge = canvas.clientWidth;
+    // FIX: Canvas clientWidth (full container) vs Chart plot area width.
+    // Subtract the price scale width so bars don't render underneath the axis labels.
+    let priceScaleWidth = 60; // fallback
+    try {
+        priceScaleWidth = chart.priceScale('right').width();
+    } catch(e) {}
+    
+    const rightEdge = canvas.clientWidth - priceScaleWidth;
 
     drawSide(topBids, 'buy', series, rightEdge, maxValue);
     drawSide(topAsks, 'sell', series, rightEdge, maxValue);
@@ -151,6 +180,10 @@
 
   function drawSide(orders, side, series, rightEdge, maxValue) {
     const { ctx } = overlay;
+    
+    // Add context configuration that was missing but required by chartOverlayUtils
+    ctx.textBaseline = 'middle';
+    
     orders.forEach((order) => {
       const y = series.priceToCoordinate(order.price);
       if (y === null) return;
@@ -164,11 +197,12 @@
       ctx.strokeStyle = `rgba(${colorKey},0.7)`;
       ctx.strokeRect(rightEdge - barW, y - BAR_HEIGHT / 2, barW, BAR_HEIGHT);
 
-      // Label always shows the exact $ value — never just relying on bar
-      // length/color alone to communicate size.
       const label = fmtUsd(value);
       ctx.font = '10px JetBrains Mono, monospace';
-      window.chartOverlayUtils.drawTextIfFits(ctx, label, rightEdge - barW - 5, y + 3, 'right', 70);
+      ctx.fillStyle = COLOR.text;
+      
+      // Use the custom utility you already have to draw text
+      window.chartOverlayUtils.drawTextIfFits(ctx, label, rightEdge - barW - 5, y, 'right', 70);
     });
   }
 
@@ -183,21 +217,3 @@
 
 })();
 
-// ══════════════════════════════════════════════════════════════════════════
-// BEFORE THIS GOES LIVE:
-//   Add <script src="chart-terminal/liquidity.js"></script> to index.html,
-//   right after order-flow.js.
-//
-// Scope notes:
-//   - Only the biggest ~6 resting orders per side are shown (by $ value,
-//     not raw quantity) — keeps it a quick read instead of 40 overlapping
-//     bars. Everything smaller stays hidden by design.
-//   - Bars are drawn from the chart's right edge inward, at each order's
-//     real price (via series.priceToCoordinate) — they move with the
-//     chart automatically on pan/zoom, same mechanism as footprint.js.
-//   - "Zone grouping" (combining many nearby raw price levels into wider
-//     bins) was discussed but isn't needed yet — Step 1's ~20-level depth
-//     is naturally already a narrow price band, so the top orders by size
-//     ARE effectively the meaningful zones. Revisit if/when deeper book
-//     capture is added later.
-// ══════════════════════════════════════════════════════════════════════════
