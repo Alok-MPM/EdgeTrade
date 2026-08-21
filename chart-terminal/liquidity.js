@@ -9,7 +9,8 @@
     return;
   }
 
-  const LIQUIDITY_WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/liquidity';
+  // UPDATED URL: Ab sidha backend ko hit karega 1006 error nahi aayega
+  const LIQUIDITY_WS_BASE = 'wss://edgetrade-backend.onrender.com/ws/liquidity';
   const RECONNECT_DELAY_MS = 3000;
   const TOP_ORDERS_COUNT = 6; 
   const MAX_BAR_WIDTH = 130; 
@@ -132,8 +133,7 @@
     };
     ws.onerror = () => ws.close();
   }
-
-  // ── Canvas + redraw sync ───────────────────────────────────────────────
+    // ── Canvas + redraw sync ───────────────────────────────────────────────
   function ensureCanvas() {
     if (!overlay) {
       overlay = window.chartOverlayUtils.createOverlayCanvas('klineMainChart', 'liq-overlay');
@@ -165,9 +165,7 @@
     const allValues = [...topBids, ...topAsks].map((o) => o.price * o.qty);
     const maxValue = Math.max(...allValues, 1);
 
-    // FIX: Canvas clientWidth (full container) vs Chart plot area width.
-    // Subtract the price scale width so bars don't render underneath the axis labels.
-    let priceScaleWidth = 60; // fallback
+    let priceScaleWidth = 60; 
     try {
         priceScaleWidth = chart.priceScale('right').width();
     } catch(e) {}
@@ -180,13 +178,20 @@
 
   function drawSide(orders, side, series, rightEdge, maxValue) {
     const { ctx } = overlay;
-    
-    // Add context configuration that was missing but required by chartOverlayUtils
     ctx.textBaseline = 'middle';
     
+    const occupiedY = []; // overlap rokne ke liye tracking
+    const MIN_GAP = 16;   // 14px bar height + 2px extra spacing
+
     orders.forEach((order) => {
       const y = series.priceToCoordinate(order.price);
       if (y === null) return;
+
+      // Agar yeh naya order purane drawn order ke bohot paas hai, toh usko skip karo
+      const isOverlapping = occupiedY.some(drawnY => Math.abs(y - drawnY) < MIN_GAP);
+      if (isOverlapping) return; 
+
+      occupiedY.push(y); // Safe space ko mark kar diya
 
       const value = order.price * order.qty;
       const barW = Math.max(6, (value / maxValue) * MAX_BAR_WIDTH);
@@ -201,7 +206,6 @@
       ctx.font = '10px JetBrains Mono, monospace';
       ctx.fillStyle = COLOR.text;
       
-      // Use the custom utility you already have to draw text
       window.chartOverlayUtils.drawTextIfFits(ctx, label, rightEdge - barW - 5, y, 'right', 70);
     });
   }
@@ -216,4 +220,3 @@
   window.liquidity = { toggle };
 
 })();
-
