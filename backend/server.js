@@ -1,7 +1,7 @@
 /**
  * EdgeTrade — Isolated Backend (server.js)
  * -----------------------------------------
- * Cold-Start / Zero-Latency Footprint Engine — MULTI-SYMBOL
+ * Cold-Start / Zero-Latency Footprint Engine — MULTI-SYMBOL & DYNAMIC OFFSET
  */
 
 const express = require('express');
@@ -32,6 +32,7 @@ const BINANCE_WS_DEPTH_URL = (symbol) =>
   `wss://stream.binance.com:9443/ws/${symbol}@depth20@1000ms`;
 
 const BYBIT_WS_URL = 'wss://stream.bybit.com/v5/public/linear';
+const DELTA_WS_URL = 'wss://socket.delta.exchange';
 
 // ---------------------------------------------------------------------------
 // STATE
@@ -48,9 +49,10 @@ function makeEmptyFootprintCandle(time) {
 function createMarket(symbol) {
   return {
     symbol, awake: false, lastActivity: 0,
+    masterPrices: { delta: null, binance: null, bybit: null }, // SPREAD TRACKER
     candles: [], footprintHistory: [], liveFootprint: makeEmptyFootprintCandle(), hourlyRollup: [],
-    sockets: { binance: null, bybit: null },
-    reconnectTimers: { binance: null, bybit: null },
+    sockets: { binance: null, bybit: null, delta: null },
+    reconnectTimers: { binance: null, bybit: null, delta: null },
     clients: new Set(),
     liquidity: {
       bids: [], asks: [], lastUpdateTime: null, awake: false, lastActivity: 0,
@@ -113,9 +115,7 @@ async function backfillFootprintHistory(market) {
       fromId = page[page.length - 1].a;
       if (page[page.length - 1].T >= endTime || page.length < 1000) break;
     }
-  } catch (err) {
-    return; 
-  }
+  } catch (err) { return; }
 
   if (!trades.length) return;
 
@@ -150,8 +150,35 @@ async function backfillFootprintHistory(market) {
 }
 
 // ---------------------------------------------------------------------------
-// EXCHANGE WS
+// EXCHANGE WS (BINANCE, BYBIT, DELTA)
 // ---------------------------------------------------------------------------
+function connectDelta(market) {
+  clearTimeout(market.reconnectTimers.delta);
+  const ws = new WebSocket(DELTA_WS_URL);
+  market.sockets.delta = ws;
+  const deltaSymbol = market.symbol.toUpperCase(); 
+
+  ws.on('open', () => {
+    console.log(`[delta-anchor] connected (${market.symbol})`);
+    ws.send(JSON.stringify({
+      type: 'subscribe', payload: { channels: [{ name: 'v2/ticker', symbols: [deltaSymbol] }] }
+    }));
+  });
+
+  ws.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
+    if (msg.type === 'v2/ticker' && msg.mark_price) {
+      market.masterPrices.delta = parseFloat(msg.mark_price);
+    }
+  });
+
+  ws.on('close', () => {
+    if (market.awake) market.reconnectTimers.delta = setTimeout(() => connectDelta(market), RECONNECT_DELAY_MS);
+  });
+  ws.on('error', () => ws.close());
+}
+
 function connectBinance(market) {
   clearTimeout(market.reconnectTimers.binance);
   const ws = new WebSocket(BINANCE_WS_URL(market.symbol));
@@ -165,8 +192,9 @@ function connectBinance(market) {
     if (!payload) return;
 
     if (payload.e === 'trade') {
-      handleTradeTick(market, { price: payload.p, qty: payload.q, isBuyerMaker: payload.m, time: payload.T, source: 'spot' });
+      handleTradeTick(market, { price: payload.p, qty: payload.q, isBuyerMaker: payload.m, time: payload.T, exchange: 'binance', source: 'spot' });
     } else if (payload.e === 'kline') {
+      market.masterPrices.binance = parseFloat(payload.k.c);
       handleKlineUpdate(market, payload.k);
     }
   });
@@ -194,7 +222,10 @@ function connectBybit(market) {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg.topic && msg.topic.startsWith('publicTrade') && Array.isArray(msg.data)) {
-      msg.data.forEach((t) => handleTradeTick(market, { price: t.p, qty: t.v, isBuyerMaker: t.S === 'Sell', time: t.T, source: 'perp' }));
+      msg.data.forEach((t) => {
+        market.masterPrices.bybit = parseFloat(t.p);
+        handleTradeTick(market, { price: t.p, qty: t.v, isBuyerMaker: t.S === 'Sell', time: t.T, exchange: 'bybit', source: 'perp' });
+      });
     }
   });
 
@@ -204,7 +235,6 @@ function connectBybit(market) {
   });
   ws.on('error', () => ws.close());
 }
-
 function connectLiquidityDepth(market) {
   clearTimeout(market.liquidity.reconnectTimer);
   const ws = new WebSocket(BINANCE_WS_DEPTH_URL(market.symbol));
@@ -216,8 +246,13 @@ function connectLiquidityDepth(market) {
     try { msg = JSON.parse(raw); } catch { return; }
     if (!Array.isArray(msg.bids) || !Array.isArray(msg.asks)) return;
 
-    market.liquidity.bids = msg.bids.map(([price, qty]) => ({ price: parseFloat(price), qty: parseFloat(qty) }));
-    market.liquidity.asks = msg.asks.map(([price, qty]) => ({ price: parseFloat(price), qty: parseFloat(qty) }));
+    let offset = 0;
+    if (market.masterPrices.delta && market.masterPrices.binance) {
+        offset = market.masterPrices.binance - market.masterPrices.delta;
+    }
+
+    market.liquidity.bids = msg.bids.map(([price, qty]) => ({ price: parseFloat(price) - offset, qty: parseFloat(qty) }));
+    market.liquidity.asks = msg.asks.map(([price, qty]) => ({ price: parseFloat(price) - offset, qty: parseFloat(qty) }));
     market.liquidity.lastUpdateTime = Date.now();
 
     broadcastToLiquidityClients(market, { type: 'depth', bids: market.liquidity.bids, asks: market.liquidity.asks, time: market.liquidity.lastUpdateTime });
@@ -292,12 +327,19 @@ function ensureLiveFootprintCandle(market, candleOpenTime) {
   return true;
 }
 
-function handleTradeTick(market, { price, qty, isBuyerMaker, time, source }) {
+// THE DYNAMIC SPREAD CALCULATOR APPLIED TO TRADES
+function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, source }) {
   touchActivity(market); 
   const candleOpenTime = Math.floor(time / 60000) * 60000;
   if (!ensureLiveFootprintCandle(market, candleOpenTime)) return; 
 
-  const bucket = bucketPrice(price);
+  let adjustedPrice = parseFloat(price);
+  if (market.masterPrices.delta && market.masterPrices[exchange]) {
+      const offset = market.masterPrices[exchange] - market.masterPrices.delta;
+      adjustedPrice = adjustedPrice - offset;
+  }
+
+  const bucket = bucketPrice(adjustedPrice);
   const level = market.liveFootprint.levels[bucket] || { spot: { buy: 0, sell: 0, trades: 0 }, perp: { buy: 0, sell: 0, trades: 0 } };
   const side = level[source]; 
 
@@ -306,7 +348,7 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, source }) {
   market.liveFootprint.levels[bucket] = level;
   market.liveFootprint.volume += parseFloat(qty);
 
-  broadcastToMarket(market, { type: 'tick', price: parseFloat(price), qty: parseFloat(qty), side: isBuyerMaker ? 'sell' : 'buy', source, time });
+  broadcastToMarket(market, { type: 'tick', price: adjustedPrice, qty: parseFloat(qty), side: isBuyerMaker ? 'sell' : 'buy', source, time });
 }
 
 function handleKlineUpdate(market, k) {
@@ -323,31 +365,22 @@ function handleKlineUpdate(market, k) {
     market.liveFootprint.open = candle.open; market.liveFootprint.high = candle.high; market.liveFootprint.low = candle.low; market.liveFootprint.close = candle.close;
   }
 }
-// ---------------------------------------------------------------------------
-// WAKE / SLEEP LIFECYCLE (per market)
-// ---------------------------------------------------------------------------
+
 async function wakeUp(symbol) {
   const market = getOrCreateMarket(symbol);
   touchActivity(market);
 
   if (market.awake) return { alreadyAwake: true, symbol };
-
-  if (countAwakeMarkets() >= MAX_AWAKE_MARKETS) {
-    return { alreadyAwake: false, symbol, error: 'server_at_capacity', candleCount: 0 };
-  }
+  if (countAwakeMarkets() >= MAX_AWAKE_MARKETS) return { alreadyAwake: false, symbol, error: 'server_at_capacity', candleCount: 0 };
 
   market.awake = true;
-
-  try {
-    market.candles = await fetchInitialCandles(symbol);
-  } catch (err) {
-    market.candles = [];
-  }
+  try { market.candles = await fetchInitialCandles(symbol); } catch (err) { market.candles = []; }
 
   market.footprintHistory = [];
   market.liveFootprint = makeEmptyFootprintCandle();
   await backfillFootprintHistory(market); 
 
+  connectDelta(market); // WAKE MASTER ANCHOR
   connectBinance(market);
   connectBybit(market);
 
@@ -358,17 +391,17 @@ function sleep(market) {
   if (!market.awake) return;
   if (market.sockets.binance) market.sockets.binance.close();
   if (market.sockets.bybit) market.sockets.bybit.close();
+  if (market.sockets.delta) market.sockets.delta.close();
   clearTimeout(market.reconnectTimers.binance);
   clearTimeout(market.reconnectTimers.bybit);
+  clearTimeout(market.reconnectTimers.delta);
 
   market.awake = false;
   market.candles = [];
   market.footprintHistory = [];
   market.liveFootprint = makeEmptyFootprintCandle();
 
-  if (market.clients.size === 0 && !market.liquidity.awake && market.liquidity.clients.size === 0) {
-    markets.delete(market.symbol);
-  }
+  if (market.clients.size === 0 && !market.liquidity.awake && market.liquidity.clients.size === 0) markets.delete(market.symbol);
 }
 
 function countAwakeMarkets() {
@@ -380,30 +413,19 @@ function countAwakeMarkets() {
 setInterval(() => {
   const now = Date.now();
   for (const market of markets.values()) {
-    if (market.awake && market.clients.size === 0 && now - market.lastActivity > IDLE_SLEEP_MS) {
-      sleep(market);
-    }
-    if (market.liquidity.awake && market.liquidity.clients.size === 0 && now - market.liquidity.lastActivity > IDLE_SLEEP_MS) {
-      sleepLiquidity(market);
-    }
+    if (market.awake && market.clients.size === 0 && now - market.lastActivity > IDLE_SLEEP_MS) sleep(market);
+    if (market.liquidity.awake && market.liquidity.clients.size === 0 && now - market.liquidity.lastActivity > IDLE_SLEEP_MS) sleepLiquidity(market);
   }
 }, IDLE_CHECK_INTERVAL_MS);
 
-// ---------------------------------------------------------------------------
-// EXPRESS APP
-// ---------------------------------------------------------------------------
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 app.post('/api/wakeup', async (req, res) => {
   const symbol = (req.body?.symbol || DEFAULT_SYMBOL).toLowerCase();
-  try {
-    const result = await wakeUp(symbol);
-    res.json({ ok: true, ...result });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
+  try { const result = await wakeUp(symbol); res.json({ ok: true, ...result }); } 
+  catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
 app.post('/api/wakeup-liquidity', (req, res) => {
@@ -422,16 +444,13 @@ app.get('/api/wakeup-liquidity', (req, res) => {
 
 app.get('/api/status', (req, res) => {
   const symbol = req.query.symbol ? String(req.query.symbol).toLowerCase() : null;
-
   if (symbol) {
     const market = markets.get(symbol);
     return res.json(market ? {
       symbol, awake: market.awake, candleCount: market.candles.length, footprintCandleCount: market.footprintHistory.length,
-      lastActivity: market.lastActivity, idleForMs: market.lastActivity ? Date.now() - market.lastActivity : null,
-      connectedClients: market.clients.size,
+      lastActivity: market.lastActivity, idleForMs: market.lastActivity ? Date.now() - market.lastActivity : null, connectedClients: market.clients.size,
     } : { symbol, awake: false, candleCount: 0, footprintCandleCount: 0, connectedClients: 0 });
   }
-
   const summary = [...markets.values()].map((m) => ({ symbol: m.symbol, awake: m.awake, connectedClients: m.clients.size }));
   res.json({ totalMarkets: markets.size, awakeMarkets: countAwakeMarkets(), totalConnectedClients: summary.reduce((sum, m) => sum + m.connectedClients, 0), markets: summary });
 });
@@ -440,7 +459,6 @@ app.get('/api/liquidity-status', (req, res) => {
   const symbol = (req.query.symbol || DEFAULT_SYMBOL).toLowerCase();
   const market = markets.get(symbol);
   if (!market) return res.json({ symbol, awake: false, bidCount: 0, askCount: 0 });
-
   res.json({
     symbol, awake: market.liquidity.awake, lastUpdateTime: market.liquidity.lastUpdateTime,
     ageMs: market.liquidity.lastUpdateTime ? Date.now() - market.liquidity.lastUpdateTime : null, connectedClients: market.liquidity.clients.size,
@@ -449,10 +467,6 @@ app.get('/api/liquidity-status', (req, res) => {
 });
 
 const server = http.createServer(app);
-// ---------------------------------------------------------------------------
-// WEBSOCKET SERVER — frontend-facing, zero-latency delivery, per-symbol rooms
-// ---------------------------------------------------------------------------
-// FIX 1: noServer set to true
 const wss = new WebSocket.Server({ noServer: true }); 
 
 function sendSnapshot(ws, market) {
@@ -482,39 +496,24 @@ function detachFromMarket(ws) {
 wss.on('connection', (ws, req) => {
   const reqUrl = new URL(req.url, 'http://localhost');
   const symbol = (reqUrl.searchParams.get('symbol') || DEFAULT_SYMBOL).toLowerCase();
-
   attachToMarket(ws, symbol);
-
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg && msg.type === 'subscribe' && typeof msg.symbol === 'string') {
       const newSymbol = msg.symbol.toLowerCase();
-      if (newSymbol !== ws.symbol) {
-        detachFromMarket(ws);
-        attachToMarket(ws, newSymbol);
-      }
+      if (newSymbol !== ws.symbol) { detachFromMarket(ws); attachToMarket(ws, newSymbol); }
       return;
     }
-    if (ws.symbol) {
-      const market = markets.get(ws.symbol);
-      if (market) touchActivity(market);
-    }
+    if (ws.symbol) { const market = markets.get(ws.symbol); if (market) touchActivity(market); }
   });
-
   ws.on('close', () => detachFromMarket(ws));
 });
 
-// ---------------------------------------------------------------------------
-// WEBSOCKET SERVER — Liquidity
-// ---------------------------------------------------------------------------
-// FIX 2: noServer set to true
 const wssLiquidity = new WebSocket.Server({ noServer: true });
-
 function sendLiquiditySnapshot(ws, market) {
   ws.send(JSON.stringify({ type: 'snapshot', symbol: market.symbol, bids: market.liquidity.bids, asks: market.liquidity.asks, time: market.liquidity.lastUpdateTime }));
 }
-
 function attachToLiquidity(ws, symbol) {
   const market = getOrCreateMarket(symbol);
   market.liquidity.lastActivity = Date.now(); 
@@ -523,7 +522,6 @@ function attachToLiquidity(ws, symbol) {
   if (!market.liquidity.awake) wakeLiquidity(market);
   sendLiquiditySnapshot(ws, market);
 }
-
 function detachFromLiquidity(ws) {
   if (!ws.liqSymbol) return;
   const market = markets.get(ws.liqSymbol);
@@ -531,58 +529,34 @@ function detachFromLiquidity(ws) {
   market.liquidity.clients.delete(ws);
   market.liquidity.lastActivity = Date.now();
 }
-
 wssLiquidity.on('connection', (ws, req) => {
   const reqUrl = new URL(req.url, 'http://localhost');
   const symbol = (reqUrl.searchParams.get('symbol') || DEFAULT_SYMBOL).toLowerCase();
-
   attachToLiquidity(ws, symbol);
-
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg && msg.type === 'subscribe' && typeof msg.symbol === 'string') {
       const newSymbol = msg.symbol.toLowerCase();
-      if (newSymbol !== ws.liqSymbol) {
-        detachFromLiquidity(ws);
-        attachToLiquidity(ws, newSymbol);
-      }
+      if (newSymbol !== ws.liqSymbol) { detachFromLiquidity(ws); attachToLiquidity(ws, newSymbol); }
     }
   });
-
   ws.on('close', () => detachFromLiquidity(ws));
 });
 
 function broadcastToMarket(market, payload) {
   if (!market.clients.size) return;
   const msg = JSON.stringify(payload);
-  market.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) client.send(msg);
-  });
+  market.clients.forEach((client) => { if (client.readyState === WebSocket.OPEN) client.send(msg); });
 }
 
-// ---------------------------------------------------------------------------
-// MANUAL TRAFFIC CONTROLLER FOR MULTIPLE WEBSOCKETS (FIX 3)
-// ---------------------------------------------------------------------------
 server.on('upgrade', (request, socket, head) => {
   const pathname = new URL(request.url, 'http://localhost').pathname;
-
-  if (pathname === '/ws/footprint') {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
-    });
-  } else if (pathname === '/ws/liquidity') {
-    wssLiquidity.handleUpgrade(request, socket, head, (ws) => {
-      wssLiquidity.emit('connection', ws, request);
-    });
-  } else {
-    socket.destroy();
-  }
+  if (pathname === '/ws/footprint') { wss.handleUpgrade(request, socket, head, (ws) => { wss.emit('connection', ws, request); }); } 
+  else if (pathname === '/ws/liquidity') { wssLiquidity.handleUpgrade(request, socket, head, (ws) => { wssLiquidity.emit('connection', ws, request); }); } 
+  else { socket.destroy(); }
 });
 
-// ---------------------------------------------------------------------------
-// GRACEFUL SHUTDOWN
-// ---------------------------------------------------------------------------
 function shutdown() {
   console.log('[system] shutting down...');
   for (const market of markets.values()) { sleep(market); sleepLiquidity(market); }
@@ -591,7 +565,4 @@ function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-
-server.listen(PORT, () => {
-  console.log(`[system] EdgeTrade backend listening on port ${PORT}`);
-});
+server.listen(PORT, () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
