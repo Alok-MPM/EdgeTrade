@@ -50,6 +50,7 @@ function createMarket(symbol) {
   return {
     symbol, awake: false, lastActivity: 0,
     masterPrices: { delta: null, binance: null, bybit: null }, // SPREAD TRACKER
+    whaleTracker: { retailBuy: 0, retailSell: 0, smBuy: 0, smSell: 0, openPrice: null, currentPhase: 0 },
     candles: [], footprintHistory: [], liveFootprint: makeEmptyFootprintCandle(), hourlyRollup: [],
     sockets: { binance: null, bybit: null, delta: null },
     reconnectTimers: { binance: null, bybit: null, delta: null },
@@ -324,6 +325,7 @@ function ensureLiveFootprintCandle(market, candleOpenTime) {
   }
 
   market.liveFootprint = makeEmptyFootprintCandle(candleOpenTime);
+  market.whaleTracker = { retailBuy: 0, retailSell: 0, smBuy: 0, smSell: 0, openPrice: null, currentPhase: 0 };
   return true;
 }
 
@@ -338,6 +340,35 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, sou
       const offset = market.masterPrices[exchange] - market.masterPrices.delta;
       adjustedPrice = adjustedPrice - offset;
   }
+
+  // --- WHALE ABSORPTION TRACKER ---
+  const tradeValue = adjustedPrice * parseFloat(qty);
+  const isRetail = tradeValue <= 10000;
+  
+  if (!market.whaleTracker.openPrice) market.whaleTracker.openPrice = adjustedPrice;
+  
+  if (isBuyerMaker) {
+      if (isRetail) market.whaleTracker.retailSell += tradeValue; else market.whaleTracker.smSell += tradeValue;
+  } else {
+      if (isRetail) market.whaleTracker.retailBuy += tradeValue; else market.whaleTracker.smBuy += tradeValue;
+  }
+
+  const priceDrop = market.whaleTracker.openPrice - adjustedPrice;
+  let alertMsg = null;
+
+  // BTC strict trap filter: Price drop must be <= $100 despite heavy selling
+  if (market.whaleTracker.retailSell > 300000 && priceDrop <= 100 && market.whaleTracker.currentPhase === 0) {
+      alertMsg = 'Phase 1: Retail Panic Sell'; market.whaleTracker.currentPhase = 1;
+  } else if (market.whaleTracker.currentPhase === 1 && market.whaleTracker.smBuy > 200000 && priceDrop <= 100) {
+      alertMsg = 'Phase 2: Whale Absorption Starts'; market.whaleTracker.currentPhase = 2;
+  } else if (market.whaleTracker.currentPhase === 2 && market.whaleTracker.smBuy > 1000000) {
+      alertMsg = 'Phase 3: Massive SM Execution'; market.whaleTracker.currentPhase = 3;
+  }
+
+  if (alertMsg) {
+      broadcastToMarket(market, { type: 'whale_alert', time, price: adjustedPrice, message: alertMsg, rSell: market.whaleTracker.retailSell, smBuy: market.whaleTracker.smBuy });
+  }
+  // --- END WHALE ABSORPTION TRACKER ---
 
   const bucket = bucketPrice(adjustedPrice);
   const level = market.liveFootprint.levels[bucket] || { spot: { buy: 0, sell: 0, trades: 0 }, perp: { buy: 0, sell: 0, trades: 0 } };
