@@ -158,6 +158,7 @@
         <button class="ctc-pill" id="ctc-footprint-btn" title="Footprint chart">Footprint</button>
         <button class="ctc-pill" id="ctc-orderflow-btn" title="Order Flow">Order Flow</button>
         <button class="ctc-pill" id="ctc-liquidity-btn" title="Liquidity">Liquidity</button>
+        <button class="ctc-pill" id="ctc-whales-btn" title="Whale Absorption">Whales</button>
 
         <div class="ctc-divider"></div>
 
@@ -216,6 +217,7 @@
     document.getElementById('ctc-footprint-btn').onclick = () => toggleFeatureModule('footprint', 'ctc-footprint-btn');
     document.getElementById('ctc-orderflow-btn').onclick = () => toggleFeatureModule('orderflow', 'ctc-orderflow-btn');
     document.getElementById('ctc-liquidity-btn').onclick = () => toggleFeatureModule('liquidity', 'ctc-liquidity-btn');
+    document.getElementById('ctc-whales-btn').onclick = () => toggleFeatureModule('whaleTracker', 'ctc-whales-btn');
 
     document.getElementById('ctc-ai-btn').onclick = () => {
       if (window.aiAssistant && typeof window.aiAssistant.open === 'function') {

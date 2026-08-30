@@ -92,9 +92,9 @@ async function fetchInitialCandles(symbol) {
   }));
 }
 
-const BACKFILL_MINUTES = 100;       
-const BACKFILL_MAX_TRADES = 40000;  
-const BACKFILL_TIMEOUT_MS = 8000;   
+const BACKFILL_MINUTES = 1440;       
+const BACKFILL_MAX_TRADES = 200000;  
+const BACKFILL_TIMEOUT_MS = 25000;   
 
 async function backfillFootprintHistory(market) {
   const endTime = Date.now();
