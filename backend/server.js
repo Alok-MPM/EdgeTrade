@@ -597,3 +597,48 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 server.listen(PORT, () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
+
+// --- DEEP LIQUIDITY (RESTING ORDERS) $50 BUCKET ENGINE ---
+let deepLiquidityCache = { bids: [], asks: [] };
+
+async function fetchDeepLiquidity(symbol) {
+    try {
+        // Fetch 5000 deepest levels from Binance Futures
+        const res = await fetch(`https://fapi.binance.com/fapi/v1/depth?symbol=${symbol.toUpperCase()}&limit=1000`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const BUCKET_SIZE = 50; // $50 ka merge bucket
+        
+        const bucketOrders = (orders) => {
+            const buckets = new Map();
+            orders.forEach(([p, q]) => {
+                const price = parseFloat(p);
+                const qty = parseFloat(q);
+                const bucketPrice = Math.round(price / BUCKET_SIZE) * BUCKET_SIZE;
+                const val = price * qty;
+                buckets.set(bucketPrice, (buckets.get(bucketPrice) || 0) + val);
+            });
+            
+            // Filter noise: Sirf $500k se upar ke massive orders dikhayega
+            return Array.from(buckets.entries())
+                .map(([price, total]) => ({ price, total }))
+                .filter(b => b.total > 500000)
+                .sort((a, b) => b.total - a.total); 
+        };
+
+        deepLiquidityCache = { bids: bucketOrders(data.bids), asks: bucketOrders(data.asks) };
+
+        // Broadcast to Liquidity UI
+        const msg = JSON.stringify({ type: 'liquidity_map', ...deepLiquidityCache });
+        if (typeof wssLiquidity !== 'undefined' && wssLiquidity.clients) {
+            wssLiquidity.clients.forEach(client => {
+                if (client.readyState === 1 /* OPEN */) client.send(msg);
+            });
+        }
+    } catch (err) { console.error('[Liquidity Engine] Error:', err.message); }
+}
+
+// Har 15 second mein deep liquidity update karega
+setInterval(() => fetchDeepLiquidity('BTCUSDT'), 15000);
+// ---------------------------------------------------------
