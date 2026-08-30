@@ -58,7 +58,10 @@
        } else {
            if(ws) { ws.close(); ws = null; }
            activeMarkers = [];
-           updateChartMarkers();
+           const series = window.chartEngine?.getSeries();
+           if(series) {
+               series.setMarkers([]); 
+           }
        }
        return isEnabled;
    }

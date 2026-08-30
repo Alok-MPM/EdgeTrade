@@ -153,7 +153,7 @@
     }));
   }
 
-  async function fetchCandles(symbol = state.symbol, interval = state.interval, limit = 300) {
+  async function fetchCandles(symbol = state.symbol, interval = state.interval, limit = 1000) {
     const activeBrokers = activeBrokerIds();
     const results = await Promise.allSettled(activeBrokers.map(b => fetchOneBrokerCandles(b, symbol, interval, limit)));
     const byTimestamp = new Map();
