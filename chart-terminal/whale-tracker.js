@@ -5,7 +5,7 @@
    
    async function loadHistory(symbol) {
        try {
-           const res = await fetch(`https://edgetrade-backend.onrender.com/api/whale-history?symbol=${symbol}`);
+           const res = await fetch(`https://m-edgetrade-api-server.onrender.com/api/whale-history?symbol=${symbol}`);
            if(!res.ok) return;
            const history = await res.json();
            history.forEach(item => {
@@ -28,7 +28,7 @@
        activeMarkers = [];
        loadHistory(symbol); // Fetch old events from Supabase
 
-       ws = new WebSocket(`wss://edgetrade-backend.onrender.com/ws/footprint?symbol=${symbol}`);
+       ws = new WebSocket(`wss://m-edgetrade-api-server.onrender.com/ws/footprint?symbol=${symbol}`);
        ws.onmessage = (e) => {
            const msg = JSON.parse(e.data);
            if(msg.type === 'whale_alert') {
