@@ -79,4 +79,17 @@
             }
         }
     };
+        // --- AUTO-INJECT PULSE BUTTON ---
+    setTimeout(() => {
+        const btns = Array.from(document.querySelectorAll('button'));
+        const whaleBtn = btns.find(b => b.innerText.includes('Whales'));
+        if (whaleBtn) {
+            const pulseBtn = document.createElement('button');
+            pulseBtn.className = whaleBtn.className;
+            pulseBtn.innerHTML = '⚡ Pulse';
+            pulseBtn.onclick = window.pulse.toggle;
+            pulseBtn.style.cssText = 'color: #f5cb42; border-color: #f5cb42; font-weight: bold; margin-left: 5px; background: transparent;';
+            whaleBtn.parentNode.insertBefore(pulseBtn, whaleBtn.nextSibling);
+        }
+    }, 2000);
 })();
