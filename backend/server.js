@@ -452,6 +452,32 @@ setInterval(() => {
 const app = express();
 app.use(cors());
 app.use(express.json());
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+async function saveWhaleEventToDB(symbol, time, price, phase, rSell, smBuy) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/whale_events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ symbol: symbol.toUpperCase(), timestamp_ms: time, price, phase, retail_amount: rSell, whale_amount: smBuy })
+    });
+  } catch (e) { console.error('DB Save Error:', e); }
+}
+
+app.get('/api/whale-history', async (req, res) => {
+  const symbol = (req.query.symbol || 'BTCUSDT').toUpperCase();
+  if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_events?symbol=eq.${symbol}&order=timestamp_ms.desc&limit=500`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await response.json();
+    res.json(data || []);
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
 
 app.post('/api/wakeup', async (req, res) => {
   const symbol = (req.body?.symbol || DEFAULT_SYMBOL).toLowerCase();
