@@ -365,9 +365,11 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, sou
       alertMsg = 'Phase 3: Massive SM Execution'; market.whaleTracker.currentPhase = 3;
   }
 
-  if (alertMsg) {
-      broadcastToMarket(market, { type: 'whale_alert', time, price: adjustedPrice, message: alertMsg, rSell: market.whaleTracker.retailSell, smBuy: market.whaleTracker.smBuy });
-  }
+      if (alertMsg) {
+        broadcastToMarket(market, { type: 'whale_alert', time, price: adjustedPrice, message: alertMsg, rSell: market.whaleTracker.retailSell, smBuy: market.whaleTracker.smBuy });
+        saveWhaleEventToDB(market.symbol, time, adjustedPrice, alertMsg, market.whaleTracker.retailSell, market.whaleTracker.smBuy);
+      }
+  
   // --- END WHALE ABSORPTION TRACKER ---
 
   const bucket = bucketPrice(adjustedPrice);
