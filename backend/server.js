@@ -10,6 +10,9 @@ const http = require('http');
 const WebSocket = require('ws');
 const { URL } = require('url');
 
+// --- MARKET PULSE MEMORY ---
+let marketPulse = { cvd: 0, oi: 0, poc: 0, profile: {}, lastPrice: 0, narrative: "Syncing data...", verdict: "Neutral" };
+
 // ---------------------------------------------------------------------------
 // CONFIG
 // ---------------------------------------------------------------------------
@@ -332,6 +335,13 @@ function ensureLiveFootprintCandle(market, candleOpenTime) {
 // THE DYNAMIC SPREAD CALCULATOR APPLIED TO TRADES
 function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, source }) {
   touchActivity(market); 
+      const p = parseFloat(price);
+    const q = parseFloat(qty);
+    marketPulse.lastPrice = p;
+    marketPulse.cvd += isBuyerMaker ? -q : q;
+    const bucket = Math.round(p / 10) * 10;
+    marketPulse.profile[bucket] = (marketPulse.profile[bucket] || 0) + q;
+  
   const candleOpenTime = Math.floor(time / 60000) * 60000;
   if (!ensureLiveFootprintCandle(market, candleOpenTime)) return; 
 
@@ -670,3 +680,35 @@ async function fetchDeepLiquidity(symbol) {
 // Har 15 second mein deep liquidity update karega
 setInterval(() => fetchDeepLiquidity('BTCUSDT'), 15000);
 // ---------------------------------------------------------
+
+// --- MARKET PULSE AI ENGINE ---
+setInterval(async () => {
+    try {
+        const res = await fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT');
+        const data = await res.json();
+        if (data.openInterest) marketPulse.oi = parseFloat(data.openInterest);
+
+        // Calculate POC (Max Volume Level)
+        let maxVol = 0; let poc = 0;
+        for (let price in marketPulse.profile) {
+            if (marketPulse.profile[price] > maxVol) { maxVol = marketPulse.profile[price]; poc = parseFloat(price); }
+        }
+        if (poc > 0) marketPulse.poc = poc;
+
+        // Logic & Verdict
+        if (marketPulse.cvd > 0 && marketPulse.lastPrice > marketPulse.poc) {
+            marketPulse.narrative = "Bulls in Control. Whales holding above POC. Trap set for shorts.";
+            marketPulse.verdict = "Bullish";
+        } else if (marketPulse.cvd < 0 && marketPulse.lastPrice < marketPulse.poc) {
+            marketPulse.narrative = "Sellers dominant. Heavy limit selling below POC. Pump is fake.";
+            marketPulse.verdict = "Bearish";
+        } else {
+            marketPulse.narrative = "Chop Zone. CVD and Price contradicting. Wait for breakout.";
+            marketPulse.verdict = "Neutral";
+        }
+
+        const btcMarket = markets.get('BTCUSDT');
+        if (btcMarket) broadcastToMarket(btcMarket, { type: 'pulse', data: marketPulse });
+    } catch (err) {}
+}, 5000);
+
