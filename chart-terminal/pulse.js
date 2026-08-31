@@ -79,17 +79,22 @@
             }
         }
     };
-        // --- AUTO-INJECT PULSE BUTTON ---
-    setTimeout(() => {
+       // --- ZIDDI AUTO-INJECT PULSE BUTTON ---
+    const pulseInterval = setInterval(() => {
         const btns = Array.from(document.querySelectorAll('button'));
         const whaleBtn = btns.find(b => b.innerText.includes('Whales'));
-        if (whaleBtn) {
+        
+        if (whaleBtn && !document.getElementById('pulse-btn-inj')) {
             const pulseBtn = document.createElement('button');
+            pulseBtn.id = 'pulse-btn-inj';
             pulseBtn.className = whaleBtn.className;
             pulseBtn.innerHTML = '⚡ Pulse';
-            pulseBtn.onclick = window.pulse.toggle;
+            pulseBtn.onclick = () => { if(window.pulse) window.pulse.toggle(); };
             pulseBtn.style.cssText = 'color: #f5cb42; border-color: #f5cb42; font-weight: bold; margin-left: 5px; background: transparent;';
+            
             whaleBtn.parentNode.insertBefore(pulseBtn, whaleBtn.nextSibling);
+            clearInterval(pulseInterval); // Button lagte hi loop band
         }
-    }, 2000);
+    }, 1000); 
+
 })();
