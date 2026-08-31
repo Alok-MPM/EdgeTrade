@@ -335,10 +335,10 @@ function ensureLiveFootprintCandle(market, candleOpenTime) {
 // THE DYNAMIC SPREAD CALCULATOR APPLIED TO TRADES
 function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, source }) {
   touchActivity(market); 
-      const p = parseFloat(price);
-    const q = parseFloat(qty);
+          const p = parseFloat(trade.p);
+    const q = parseFloat(trade.q);
     marketPulse.lastPrice = p;
-    marketPulse.cvd += isBuyerMaker ? -q : q;
+    marketPulse.cvd += trade.m ? -q : q; // Maker Buyer = Sell
     const bucket = Math.round(p / 10) * 10;
     marketPulse.profile[bucket] = (marketPulse.profile[bucket] || 0) + q;
   
