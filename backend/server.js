@@ -367,20 +367,6 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, sou
         });
     }
 
-
-  // BTC strict trap filter: Price drop must be <= $100 despite heavy selling
-  if (market.whaleTracker.retailSell > 300000 && priceDrop <= 100 && market.whaleTracker.currentPhase === 0) {
-      alertMsg = 'Phase 1: Retail Panic Sell'; market.whaleTracker.currentPhase = 1;
-  } else if (market.whaleTracker.currentPhase === 1 && market.whaleTracker.smBuy > 200000 && priceDrop <= 100) {
-      alertMsg = 'Phase 2: Whale Absorption Starts'; market.whaleTracker.currentPhase = 2;
-  } else if (market.whaleTracker.currentPhase === 2 && market.whaleTracker.smBuy > 1000000) {
-      alertMsg = 'Phase 3: Massive SM Execution'; market.whaleTracker.currentPhase = 3;
-  }
-
-      if (alertMsg) {
-        broadcastToMarket(market, { type: 'whale_alert', time, price: adjustedPrice, message: alertMsg, rSell: market.whaleTracker.retailSell, smBuy: market.whaleTracker.smBuy });
-        saveWhaleEventToDB(market.symbol, time, adjustedPrice, alertMsg, market.whaleTracker.retailSell, market.whaleTracker.smBuy);
-      }
   
   // --- END WHALE ABSORPTION TRACKER ---
 
