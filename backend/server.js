@@ -352,22 +352,6 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, sou
       adjustedPrice = adjustedPrice - offset;
   }
 
-    // --- DIRECT WHALE TRACKER (Aggressive & Absorption) ---
-    const tradeValue = p * q;
-    
-    // Agar koi 1 single trade $100,000 (100k) se bada hai, toh turant save karo
-    if (tradeValue >= 100000) {
-        const phase = isBuyerMaker ? 'Institutional Dump (Sell)' : 'Institutional Pump (Buy)';
-        saveWhaleEvent(market.symbol, time, p, phase, 0, tradeValue); // 0 = no retail involved
-        
-        // Frontend ko live update bhejo
-        broadcastToMarket(market, {
-            type: 'whale_event',
-            data: { symbol: market.symbol, price: p, amount: tradeValue, type: isBuyerMaker ? 'sell' : 'buy', time: time }
-        });
-    }
-
-  
   // --- END WHALE ABSORPTION TRACKER ---
 
   const bucket = bucketPrice(adjustedPrice);
@@ -699,4 +683,43 @@ setInterval(async () => {
         if (btcMarket) broadcastToMarket(btcMarket, { type: 'pulse', data: marketPulse });
     } catch (err) {}
 }, 5000);
+
+// ==========================================
+// PHASE 1: ON-CHAIN WHALE ALERT TRACKER
+// ==========================================
+// Kyu zaroori hai: Yeh Binance ke order book ki jagah direct Blockchain scan karega taaki 
+// exchange par bada fund (ammo) aane se pehle hi humein inflow/outflow pata chal jaye.
+
+const WHALE_ALERT_THRESHOLD = 50000000; // Filter: Sirf $50 Million se bade transfer pakdega
+
+async function fetchOnChainWhales() {
+    try {
+        console.log("🔍 Checking Blockchain for Whale Transfers...");
+        
+        // FUTURE SETUP: Yahan hum WhaleAlert ki API key lagayenge. 
+        // Logic: Agar API ko anjaan wallet se Binance mein $50M+ aata dikha, toh RED ALERT.
+        
+        /* 
+        // Example Frontend Trigger (Jab API live hogi):
+        broadcastToMarket({ symbol: 'BTCUSDT' }, {
+            type: 'onchain_whale',
+            data: { 
+                action: 'inflow', 
+                amount_usd: 75000000, 
+                time: Date.now(),
+                message: "🚨 $75M transferred to Exchange (Dump Warning)"
+            }
+        });
+        */
+    } catch (error) {
+        console.error("Whale Alert Fetch Error:", error.message);
+    }
+}
+
+// Har 2 minute (120,000 ms) mein ek baar blockchain check karega. 
+// Isse Render server par load nahi padega aur API limit cross nahi hogi.
+setInterval(fetchOnChainWhales, 120000);
+
+
+
 
