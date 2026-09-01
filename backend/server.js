@@ -707,7 +707,7 @@ setInterval(async () => {
             marketPulse.verdict = "Neutral";
         }
 
-        const btcMarket = markets.get('BTCUSDT');
+        const btcMarket = markets.get('btcusdt');
         if (btcMarket) broadcastToMarket(btcMarket, { type: 'pulse', data: marketPulse });
     } catch (err) {}
 }, 5000);
