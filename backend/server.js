@@ -352,20 +352,21 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, sou
       adjustedPrice = adjustedPrice - offset;
   }
 
-  // --- WHALE ABSORPTION TRACKER ---
-  const tradeValue = adjustedPrice * parseFloat(qty);
-  const isRetail = tradeValue <= 10000;
-  
-  if (!market.whaleTracker.openPrice) market.whaleTracker.openPrice = adjustedPrice;
-  
-  if (isBuyerMaker) {
-      if (isRetail) market.whaleTracker.retailSell += tradeValue; else market.whaleTracker.smSell += tradeValue;
-  } else {
-      if (isRetail) market.whaleTracker.retailBuy += tradeValue; else market.whaleTracker.smBuy += tradeValue;
-  }
+    // --- DIRECT WHALE TRACKER (Aggressive & Absorption) ---
+    const tradeValue = p * q;
+    
+    // Agar koi 1 single trade $100,000 (100k) se bada hai, toh turant save karo
+    if (tradeValue >= 100000) {
+        const phase = isBuyerMaker ? 'Institutional Dump (Sell)' : 'Institutional Pump (Buy)';
+        saveWhaleEvent(market.symbol, time, p, phase, 0, tradeValue); // 0 = no retail involved
+        
+        // Frontend ko live update bhejo
+        broadcastToMarket(market, {
+            type: 'whale_event',
+            data: { symbol: market.symbol, price: p, amount: tradeValue, type: isBuyerMaker ? 'sell' : 'buy', time: time }
+        });
+    }
 
-  const priceDrop = market.whaleTracker.openPrice - adjustedPrice;
-  let alertMsg = null;
 
   // BTC strict trap filter: Price drop must be <= $100 despite heavy selling
   if (market.whaleTracker.retailSell > 300000 && priceDrop <= 100 && market.whaleTracker.currentPhase === 0) {
