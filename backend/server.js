@@ -608,19 +608,20 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 server.listen(PORT, () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
 
-// --- DEEP LIQUIDITY (RESTING ORDERS) $50 BUCKET ENGINE ---
+// --- DEEP LIQUIDITY & WHALE WALL TRACKER ---
 let deepLiquidityCache = { bids: [], asks: [] };
+const WHALE_WALL_THRESHOLD = 5000000; // $5 Million (Isse badi deewar par history save hogi)
 
 async function fetchDeepLiquidity(symbol) {
     try {
-        // Fetch 5000 deepest levels from Binance Futures
+        // Fetch 1000 deepest levels from Binance Futures
         const res = await fetch(`https://fapi.binance.com/fapi/v1/depth?symbol=${symbol.toUpperCase()}&limit=1000`);
         if (!res.ok) return;
         const data = await res.json();
         
-        const BUCKET_SIZE = 50; // $50 ka merge bucket
+        const BUCKET_SIZE = 50; // $50 ka price range merge
         
-        const bucketOrders = (orders) => {
+        const processWalls = async (orders, side) => {
             const buckets = new Map();
             orders.forEach(([p, q]) => {
                 const price = parseFloat(p);
@@ -630,14 +631,42 @@ async function fetchDeepLiquidity(symbol) {
                 buckets.set(bucketPrice, (buckets.get(bucketPrice) || 0) + val);
             });
             
-            // Filter noise: Sirf $500k se upar ke massive orders dikhayega
-            return Array.from(buckets.entries())
-                .map(([price, total]) => ({ price, total }))
+            // Filter noise: Frontend UI ke liye $500k se upar ke orders
+            let walls = Array.from(buckets.entries())
+                .map(([price, total]) => ({ price: parseFloat(price), total }))
                 .filter(b => b.total > 500000)
                 .sort((a, b) => b.total - a.total); 
+
+            // --- DATABASE LOGIC: Sirf $5 Million+ ki MASSIVE deewarein save karo ---
+            let massiveWalls = walls.filter(b => b.total >= WHALE_WALL_THRESHOLD);
+            if (massiveWalls.length > 0 && SUPABASE_URL && SUPABASE_KEY) {
+                const timestamp = Date.now();
+                const insertData = massiveWalls.map(w => ({
+                    symbol: symbol.toUpperCase(),
+                    timestamp_ms: timestamp,
+                    side: side, // 'BUY' (Support) or 'SELL' (Resistance)
+                    price: w.price,
+                    total_value_usd: w.total
+                }));
+                
+                // Fire and forget (Background mein Supabase ko bhej do)
+                fetch(`${SUPABASE_URL}/rest/v1/whale_walls`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'apikey': SUPABASE_KEY, 
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify(insertData)
+                }).catch(e => console.error("Wall Save Error:", e.message));
+            }
+            
+            return walls;
         };
 
-        deepLiquidityCache = { bids: bucketOrders(data.bids), asks: bucketOrders(data.asks) };
+        deepLiquidityCache.bids = await processWalls(data.bids, 'BUY');
+        deepLiquidityCache.asks = await processWalls(data.asks, 'SELL');
 
         // Broadcast to Liquidity UI
         const msg = JSON.stringify({ type: 'liquidity_map', ...deepLiquidityCache });
@@ -649,9 +678,9 @@ async function fetchDeepLiquidity(symbol) {
     } catch (err) { console.error('[Liquidity Engine] Error:', err.message); }
 }
 
-// Har 15 second mein deep liquidity update karega
+// Har 15 second mein order book scan karega
 setInterval(() => fetchDeepLiquidity('BTCUSDT'), 15000);
-// ---------------------------------------------------------
+
 
 // --- MARKET PULSE AI ENGINE ---
 setInterval(async () => {
@@ -683,43 +712,3 @@ setInterval(async () => {
         if (btcMarket) broadcastToMarket(btcMarket, { type: 'pulse', data: marketPulse });
     } catch (err) {}
 }, 5000);
-
-// ==========================================
-// PHASE 1: ON-CHAIN WHALE ALERT TRACKER
-// ==========================================
-// Kyu zaroori hai: Yeh Binance ke order book ki jagah direct Blockchain scan karega taaki 
-// exchange par bada fund (ammo) aane se pehle hi humein inflow/outflow pata chal jaye.
-
-const WHALE_ALERT_THRESHOLD = 50000000; // Filter: Sirf $50 Million se bade transfer pakdega
-
-async function fetchOnChainWhales() {
-    try {
-        console.log("🔍 Checking Blockchain for Whale Transfers...");
-        
-        // FUTURE SETUP: Yahan hum WhaleAlert ki API key lagayenge. 
-        // Logic: Agar API ko anjaan wallet se Binance mein $50M+ aata dikha, toh RED ALERT.
-        
-        /* 
-        // Example Frontend Trigger (Jab API live hogi):
-        broadcastToMarket({ symbol: 'BTCUSDT' }, {
-            type: 'onchain_whale',
-            data: { 
-                action: 'inflow', 
-                amount_usd: 75000000, 
-                time: Date.now(),
-                message: "🚨 $75M transferred to Exchange (Dump Warning)"
-            }
-        });
-        */
-    } catch (error) {
-        console.error("Whale Alert Fetch Error:", error.message);
-    }
-}
-
-// Har 2 minute (120,000 ms) mein ek baar blockchain check karega. 
-// Isse Render server par load nahi padega aur API limit cross nahi hogi.
-setInterval(fetchOnChainWhales, 120000);
-
-
-
-
