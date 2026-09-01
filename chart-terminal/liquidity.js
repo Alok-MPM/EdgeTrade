@@ -6,7 +6,7 @@
   if (typeof chartEngine === 'undefined' || typeof window.chartOverlayUtils === 'undefined') return;
 
   const CONFIG = {
-    wsUrl: 'wss://edgetrade-backend.onrender.com/ws/liquidity',
+    wsUrl: 'wss://m-edgetrade-api-server.onrender.com/ws/liquidity',
     reconnectMs: 3000,
     colors: {
       buy:  '76, 175, 125', // Green for resting Bids
