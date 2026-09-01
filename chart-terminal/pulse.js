@@ -36,8 +36,14 @@
         
         <button onclick="window.pulse.toggle()" style="margin-top: auto; background: #2a2a30; color: white; border: none; padding: 10px; cursor: pointer; border-radius: 4px;">Close Pulse Box</button>
     `;
-    // Attach box to the right panel container
-    setTimeout(() => { document.querySelector('.right-panel, .trade-panel, aside').appendChild(box); }, 1000);
+        // Attach box directly to body with high z-index
+    document.body.appendChild(box);
+    box.style.position = 'fixed';
+    box.style.top = '70px'; 
+    box.style.right = '20px';
+    box.style.zIndex = '999999';
+    box.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+
 
     // 2. WebSocket Listener for Pulse Data
     const ws = new WebSocket('wss://m-edgetrade-api-server.onrender.com/ws/footprint?symbol=BTCUSDT');
