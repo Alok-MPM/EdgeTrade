@@ -676,33 +676,52 @@ async function fetchDeepLiquidity(symbol) {
 setInterval(() => fetchDeepLiquidity('BTCUSDT'), 15000);
 
 
-// --- MARKET PULSE AI ENGINE ---
+// --- MARKET PULSE AI ENGINE (V2: ROLLING 5M ENGINE) ---
+let currentPulseStartTime = Math.floor(Date.now() / 300000) * 300000;
+
 setInterval(async () => {
-    try {
-        const res = await fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT');
-        const data = await res.json();
-        if (data.openInterest) marketPulse.oi = parseFloat(data.openInterest);
+  try {
+    const symbol = 'BTCUSDT';
+    // Fetch real-time Open Interest
+    const oiRes = await fetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`);
+    const oiData = await oiRes.json();
+    const currentOI = parseFloat(oiData.openInterest);
+    if (currentOI) marketPulse.oi = currentOI;
 
-        // Calculate POC (Max Volume Level)
-        let maxVol = 0; let poc = 0;
-        for (let price in marketPulse.profile) {
-            if (marketPulse.profile[price] > maxVol) { maxVol = marketPulse.profile[price]; poc = parseFloat(price); }
-        }
-        if (poc > 0) marketPulse.poc = poc;
+    const now = Date.now();
+    const current5mInterval = Math.floor(now / 300000) * 300000;
 
-        // Logic & Verdict
-        if (marketPulse.cvd > 0 && marketPulse.lastPrice > marketPulse.poc) {
-            marketPulse.narrative = "Bulls in Control. Whales holding above POC. Trap set for shorts.";
-            marketPulse.verdict = "Bullish";
-        } else if (marketPulse.cvd < 0 && marketPulse.lastPrice < marketPulse.poc) {
-            marketPulse.narrative = "Sellers dominant. Heavy limit selling below POC. Pump is fake.";
-            marketPulse.verdict = "Bearish";
-        } else {
-            marketPulse.narrative = "Chop Zone. CVD and Price contradicting. Wait for breakout.";
-            marketPulse.verdict = "Neutral";
-        }
+    // End of 5-minute bucket: Save snapshot to Supabase and Reset local memory
+    if (current5mInterval > currentPulseStartTime) {
+            
+      // Calculate total volume for this specific 5m bucket
+      let bucketVol = 0;
+      for (let p in marketPulse.profile) bucketVol += marketPulse.profile[p];
 
-        const btcMarket = markets.get('btcusdt');
-        if (btcMarket) broadcastToMarket(btcMarket, { type: 'pulse', data: marketPulse });
-    } catch (err) {}
-}, 5000);
+      if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_KEY) {
+        fetch(`${SUPABASE_URL}/rest/v1/market_pulse_5m`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+          body: JSON.stringify({
+            symbol: symbol,
+            timestamp_ms: currentPulseStartTime,
+            price_close: marketPulse.lastPrice,
+            volume: bucketVol,
+            cvd: marketPulse.cvd,
+            open_interest: currentOI
+          })
+        }).catch(e => console.error("Pulse 5m Save Error:", e.message));
+      }
+
+      // Reset local variables for the next 5-minute window
+      currentPulseStartTime = current5mInterval;
+      marketPulse.cvd = 0; 
+      marketPulse.profile = {}; 
+    }
+
+    // Transmit basic live pulse to frontend (Advanced AI logic will be fetched via REST API)
+    const btcMarket = markets.get('btcusdt');
+    if (btcMarket) broadcastToMarket(btcMarket, { type: 'pulse', data: marketPulse });
+
+  } catch (err) {}
+}, 10000); // Check every 10 seconds to respect rate limits
