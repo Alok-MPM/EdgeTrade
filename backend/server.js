@@ -760,14 +760,14 @@ setInterval(async () => {
         fetch(`${SUPABASE_URL}/rest/v1/market_pulse_5m`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({
+          body: JSON.stringify([{
             symbol: symbol,
             timestamp_ms: currentPulseStartTime,
-            price_close: marketPulse.lastPrice,
-            volume: bucketVol,
-            cvd: marketPulse.cvd,
-            open_interest: currentOI
-          })
+            price_close: marketPulse.lastPrice || 0,
+            volume: bucketVol || 0,
+            cvd: marketPulse.cvd || 0,
+            open_interest: currentOI || marketPulse.oi || 0
+          }])
         }).catch(e => console.error("Pulse 5m Save Error:", e.message));
       }
 
