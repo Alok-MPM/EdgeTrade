@@ -51,13 +51,14 @@
     box.style.top = '70px'; 
     box.style.right = '20px';
     box.style.zIndex = '999999';
-    box.stsyle.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    box.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
 
-    const updatePulseFromApi = async () => {
-        const timeframe = document.getElementById('tf-selector').value;
-        try {
-            const response = await fetch(`https://m-edgetrade-api-server.onrender.com/api/pulse-ai?tf=${encodeURIComponent(timeframe)}`);
-            const data = await response.json();
+        const updatePulseFromApi = async () => {
+            const timeframe = document.getElementById('tf-selector').value;
+            try {
+                const response = await fetch(`https://m-edgetrade-api-server.onrender.com/api/pulse-ai?tf=${encodeURIComponent(timeframe)}`);
+                const data = await response.json();
+
             if (data.waiting || data.error) {
                 document.getElementById('p-verdict').innerText = data.message || data.error;
                 return;
