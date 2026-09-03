@@ -740,10 +740,10 @@ let currentPulseStartTime = Math.floor(Date.now() / 300000) * 300000;
 setInterval(async () => {
   try {
     const symbol = 'BTCUSDT';
-    // Fetch real-time Open Interest
-    const oiRes = await fetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`);
+    // Fetch real-time Open Interest (Using Bybit to bypass Binance US IP Block on Render)
+    const oiRes = await fetch(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${symbol}`);
     const oiData = await oiRes.json();
-    const currentOI = parseFloat(oiData.openInterest);
+    const currentOI = oiData?.result?.list?.[0]?.openInterest ? parseFloat(oiData.result.list[0].openInterest) : 0;
     if (currentOI) marketPulse.oi = currentOI;
 
     const now = Date.now();
