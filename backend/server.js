@@ -610,75 +610,69 @@ server.listen(PORT, () => { console.log(`[system] EdgeTrade backend listening on
 
 // --- DEEP LIQUIDITY & WHALE WALL TRACKER ---
 let deepLiquidityCache = { bids: [], asks: [] };
-const WHALE_WALL_THRESHOLD = 5000000; // $5 Million (Isse badi deewar par history save hogi)
+const WHALE_WALL_THRESHOLD = 5000000; // $5 Million (Massive wall filter)
 
 async function fetchDeepLiquidity(symbol) {
-    try {
-        // Fetch 1000 deepest levels from Binance Futures
-        const res = await fetch(`https://fapi.binance.com/fapi/v1/depth?symbol=${symbol.toUpperCase()}&limit=1000`);
-        if (!res.ok) return;
-        const data = await res.json();
+  try {
+    const res = await fetch(`https://fapi.binance.com/fapi/v1/depth?symbol=${symbol.toUpperCase()}&limit=1000`);
+    if (!res.ok) return;
+    const data = await res.json();
         
-        const BUCKET_SIZE = 50; // $50 ka price range merge
+    const BUCKET_SIZE = 50;
         
-        const processWalls = async (orders, side) => {
-            const buckets = new Map();
-            orders.forEach(([p, q]) => {
-                const price = parseFloat(p);
-                const qty = parseFloat(q);
-                const bucketPrice = Math.round(price / BUCKET_SIZE) * BUCKET_SIZE;
-                const val = price * qty;
-                buckets.set(bucketPrice, (buckets.get(bucketPrice) || 0) + val);
-            });
+    const processWalls = async (orders, side) => {
+      const buckets = new Map();
+      orders.forEach(([p, q]) => {
+        const price = parseFloat(p);
+        const qty = parseFloat(q);
+        const bucketPrice = Math.round(price / BUCKET_SIZE) * BUCKET_SIZE;
+        const val = price * qty;
+        buckets.set(bucketPrice, (buckets.get(bucketPrice) || 0) + val);
+      });
             
-            // Filter noise: Frontend UI ke liye $500k se upar ke orders
-            let walls = Array.from(buckets.entries())
-                .map(([price, total]) => ({ price: parseFloat(price), total }))
-                .filter(b => b.total > 500000)
-                .sort((a, b) => b.total - a.total); 
+      let walls = Array.from(buckets.entries())
+        .map(([price, total]) => ({ price: parseFloat(price), total }))
+        .filter(b => b.total > 500000)
+                .sort((a, b) => b.total - a.total);
 
-            // --- DATABASE LOGIC: Sirf $5 Million+ ki MASSIVE deewarein save karo ---
-            let massiveWalls = walls.filter(b => b.total >= WHALE_WALL_THRESHOLD);
-            if (massiveWalls.length > 0 && SUPABASE_URL && SUPABASE_KEY) {
-                const timestamp = Date.now();
-                const insertData = massiveWalls.map(w => ({
-                    symbol: symbol.toUpperCase(),
-                    timestamp_ms: timestamp,
-                    side: side, // 'BUY' (Support) or 'SELL' (Resistance)
-                    price: w.price,
-                    total_value_usd: w.total
-                }));
+      // DATABASE LOGIC: Save massive $5M+ walls to Supabase
+      let massiveWalls = walls.filter(b => b.total >= WHALE_WALL_THRESHOLD);
+      if (massiveWalls.length > 0 && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && SUPABASE_KEY) {
+        const timestamp = Date.now();
+        const insertData = massiveWalls.map(w => ({
+          symbol: symbol.toUpperCase(),
+          timestamp_ms: timestamp,
+          side: side,
+          price: w.price,
+          total_value_usd: w.total
+        }));
                 
-                // Fire and forget (Background mein Supabase ko bhej do)
-                fetch(`${SUPABASE_URL}/rest/v1/whale_walls`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'apikey': SUPABASE_KEY, 
-                        'Authorization': `Bearer ${SUPABASE_KEY}`,
-                        'Prefer': 'return=minimal'
-                    },
-                    body: JSON.stringify(insertData)
-                }).catch(e => console.error("Wall Save Error:", e.message));
-            }
-            
-            return walls;
-        };
+        fetch(`${SUPABASE_URL}/rest/v1/whale_walls`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(insertData)
+        }).catch(e => console.error("Wall Save Error:", e.message));
+      }
+      return walls;
+    };
 
-        deepLiquidityCache.bids = await processWalls(data.bids, 'BUY');
-        deepLiquidityCache.asks = await processWalls(data.asks, 'SELL');
+    deepLiquidityCache.bids = await processWalls(data.bids, 'BUY');
+    deepLiquidityCache.asks = await processWalls(data.asks, 'SELL');
 
-        // Broadcast to Liquidity UI
-        const msg = JSON.stringify({ type: 'liquidity_map', ...deepLiquidityCache });
-        if (typeof wssLiquidity !== 'undefined' && wssLiquidity.clients) {
-            wssLiquidity.clients.forEach(client => {
-                if (client.readyState === 1 /* OPEN */) client.send(msg);
-            });
-        }
-    } catch (err) { console.error('[Liquidity Engine] Error:', err.message); }
+    const msg = JSON.stringify({ type: 'liquidity_map', ...deepLiquidityCache });
+    if (typeof wssLiquidity !== 'undefined' && wssLiquidity.clients) {
+      wssLiquidity.clients.forEach(client => {
+        if (client.readyState === 1 /* OPEN */) client.send(msg);
+      });
+    }
+  } catch (err) { console.error('[Liquidity Engine] Error:', err.message); }
 }
 
-// Har 15 second mein order book scan karega
 setInterval(() => fetchDeepLiquidity('BTCUSDT'), 15000);
 
 
