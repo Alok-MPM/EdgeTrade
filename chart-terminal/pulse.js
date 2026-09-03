@@ -88,17 +88,11 @@
         const msg = JSON.parse(e.data);
         if (msg.type === 'pulse' && isVisible) {
             // Update UI
-            document.getElementById('p-poc').innerText = `$${msg.data.poc.toLocaleString()}`;
             document.getElementById('p-oi').innerText = msg.data.oi.toLocaleString() + ' BTC';
             
             const cvdEl = document.getElementById('p-cvd');
             cvdEl.innerText = msg.data.cvd > 0 ? `+${msg.data.cvd.toFixed(2)}` : msg.data.cvd.toFixed(2);
             cvdEl.style.color = msg.data.cvd > 0 ? '#4CAF7D' : '#E05252';
-
-            const verdEl = document.getElementById('p-verdict');
-            verdEl.innerText = msg.data.verdict;
-            verdEl.style.color = msg.data.verdict === 'Bullish' ? '#4CAF7D' : (msg.data.verdict === 'Bearish' ? '#E05252' : '#f5cb42');
-            document.getElementById('p-narrative').innerText = msg.data.narrative;
 
             // Draw/Update POC Line on Chart
             const series = window.chartEngine?.getSeries();
