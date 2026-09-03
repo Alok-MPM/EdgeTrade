@@ -507,6 +507,63 @@ app.get('/api/liquidity-status', (req, res) => {
   });
 });
 
+  app.get('/api/pulse-ai', async (req, res) => {
+    const symbol = (req.query.symbol || 'BTCUSDT').toUpperCase();
+    const tf = req.query.tf || '1h'; // default 1 hour
+    
+    // Timeframe to milliseconds
+    const tfMs = { '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000 }[tf] || 3600000;
+    const now = Date.now();
+    
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.json({ error: 'Database not connected' });
+
+    try {
+      const snaps = await fetch(`${SUPABASE_URL}/rest/v1/market_pulse_5m?symbol=eq.${symbol}&timestamp_ms=gte.${now - tfMs}&order=timestamp_ms.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      }).then(r => r.json());
+
+      if (!snaps || snaps.length < 2) return res.json({ waiting: true, message: "Accumulating rolling data..." });
+
+      const past = snaps[0];
+      const current = snaps[snaps.length - 1];
+
+      const priceDelta = current.price_close - past.price_close;
+      const oiDelta = current.open_interest - past.open_interest;
+      const cvdDelta = current.cvd - past.cvd;
+
+      // POC (Magnet) Calculation for this timeframe
+      let maxVol = 0;
+      let poc = current.price_close;
+      snaps.forEach(s => { if (s.volume > maxVol) { maxVol = s.volume; poc = s.price_close; } });
+
+      // Institutional Trap Logic Engine
+      let verdict = "Neutral Chop Zone";
+      let type = "neutral";
+
+      if (priceDelta > 0) {
+        if (oiDelta > 0 && cvdDelta > 0) { verdict = "🟢 REAL UP: Fresh Longs. Safe to ride."; type = "real"; }
+        else if (oiDelta < 0) { verdict = "⚠️ FAKE UP (TRAP): Short Squeeze. Reversal likely."; type = "trap"; }
+        else if (oiDelta > 0 && cvdDelta <= 0) { verdict = "🛑 FAKE UP: Absorption. Heavy Limit Selling at Top."; type = "trap"; }
+      } else if (priceDelta < 0) {
+        if (oiDelta > 0 && cvdDelta < 0) { verdict = "🔴 REAL DOWN: Fresh Shorts. Safe to drop."; type = "real"; }
+        else if (oiDelta < 0) { verdict = "⚠️ FAKE DOWN (TRAP): Long Liquidation. Prepare for bounce."; type = "trap"; }
+        else if (oiDelta > 0 && cvdDelta >= 0) { verdict = "🛑 FAKE DOWN: Absorption. Heavy Limit Buying at Bottom."; type = "trap"; }
+      }
+
+      res.json({ 
+        tf, 
+        poc, 
+        oiDelta: oiDelta.toFixed(2), 
+        cvdDelta: cvdDelta.toFixed(2), 
+        verdict, 
+        type,
+        distanceToPoc: (current.price_close - poc).toFixed(2) 
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true }); 
 

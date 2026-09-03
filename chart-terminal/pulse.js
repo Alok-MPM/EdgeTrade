@@ -19,7 +19,16 @@
         </div>
 
         <div style="margin-top: 15px;">
-            <div style="color: #8b8b96; font-size: 11px;">Open Interest (OI)</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; color: #8b8b96; font-size: 11px;">
+                <span>Open Interest (OI)</span>
+                <select id="tf-selector" style="background: #1a1a20; color: #EAECEF; border: 1px solid #2a2a30; padding: 3px; font-size: 11px;">
+                    <option value="5m">5m</option>
+                    <option value="15m">15m</option>
+                    <option value="1h" selected>1h</option>
+                    <option value="4h">4h</option>
+                    <option value="1d">1d</option>
+                </select>
+            </div>
             <div id="p-oi" style="color: #EAECEF; font-size: 14px;">Loading...</div>
         </div>
 
@@ -43,6 +52,33 @@
     box.style.right = '20px';
     box.style.zIndex = '999999';
     box.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+
+    const updatePulseFromApi = async () => {
+        const timeframe = document.getElementById('tf-selector').value;
+        try {
+            const response = await fetch(`/api/pulse-ai?tf=${encodeURIComponent(timeframe)}`);
+            const data = await response.json();
+            if (data.waiting || data.error) {
+                document.getElementById('p-verdict').innerText = data.message || data.error;
+                return;
+            }
+
+            document.getElementById('p-poc').innerText = `$${Number(data.poc).toLocaleString()}`;
+            document.getElementById('p-oi').innerText = `${data.oiDelta} BTC`;
+            const cvdEl = document.getElementById('p-cvd');
+            cvdEl.innerText = `${Number(data.cvdDelta) > 0 ? '+' : ''}${data.cvdDelta}`;
+            cvdEl.style.color = Number(data.cvdDelta) >= 0 ? '#4CAF7D' : '#E05252';
+
+            const verdEl = document.getElementById('p-verdict');
+            verdEl.innerText = data.verdict;
+            verdEl.style.color = data.type === 'real' ? '#4CAF7D' : (data.type === 'trap' ? '#E05252' : '#f5cb42');
+            document.getElementById('p-narrative').innerText = `Distance to POC: ${data.distanceToPoc}`;
+        } catch (error) {
+            document.getElementById('p-verdict').innerText = 'Pulse API unavailable';
+        }
+    };
+
+    document.getElementById('tf-selector').addEventListener('change', updatePulseFromApi);
 
 
     // 2. WebSocket Listener for Pulse Data
@@ -79,6 +115,7 @@
         toggle: () => {
             isVisible = !isVisible;
             box.style.display = isVisible ? 'flex' : 'none';
+            if (isVisible) updatePulseFromApi();
             if (!isVisible && pocLine) { // Hide line when box closed
                 window.chartEngine?.getSeries()?.removePriceLine(pocLine);
                 pocLine = null;
