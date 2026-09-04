@@ -466,7 +466,7 @@ app.get('/api/whale-history', async (req, res) => {
 app.get('/api/whale-walls', async (req, res) => {
   if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.10000000&order=total_value_usd.desc&limit=20`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.10000000&order=total_value_usd.desc&limit=10`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
     const data = await response.json();

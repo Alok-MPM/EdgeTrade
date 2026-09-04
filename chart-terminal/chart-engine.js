@@ -146,15 +146,13 @@
       walls.forEach(w => {
         const alpha = Math.max(0.2, w.total_value_usd / maxVal);
         const color = w.side === 'BUY' ? `rgba(76, 175, 80, ${alpha})` : `rgba(255, 82, 82, ${alpha})`;
-        const valM = (w.total_value_usd / 1000000).toFixed(1) + 'M';
-
         series.createPriceLine({
           price: parseFloat(w.price),
           color: color,
           lineWidth: 2,
           lineStyle: 3,
-          axisLabelVisible: true,
-          title: `${w.side} $${valM}`
+          axisLabelVisible: false,
+           title: `${w.side} ${(w.total_value_usd/1000000).toFixed(1)}M`
         });
       });
     } catch (e) { console.error(e); }
@@ -337,7 +335,7 @@
         color: '#FFD700',
         lineWidth: index === 0 ? 3 : 1,
         lineStyle: 0,
-        axisLabelVisible: true,
+        axisLabelVisible: false,
         title: index === 0 ? `POC (${volText})` : `HVN ${index} (${volText})`
       });
       pocLines.push(line);
