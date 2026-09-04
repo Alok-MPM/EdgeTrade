@@ -463,6 +463,17 @@ app.get('/api/whale-history', async (req, res) => {
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
+app.get('/api/whale-walls', async (req, res) => {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.1000000&order=total_value_usd.desc&limit=50`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await response.json();
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 
 app.post('/api/wakeup', async (req, res) => {
   const symbol = (req.body?.symbol || DEFAULT_SYMBOL).toLowerCase();
