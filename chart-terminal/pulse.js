@@ -60,7 +60,7 @@
                 const data = await response.json();
 
             if (data.top5Poc && data.top5Poc.length > 0) {
-                document.getElementById('p-poc').innerText = '$' + data.top5Poc[0].toLocaleString();
+                document.getElementById('p-poc').innerText = '$' + data.top5Poc[0].price.toLocaleString();
                 window.dispatchEvent(new CustomEvent('drawPocLines', { detail: data.top5Poc }));
             }
 
@@ -78,7 +78,7 @@
             const verdEl = document.getElementById('p-verdict');
             verdEl.innerText = data.verdict;
             verdEl.style.color = data.type === 'real' ? '#4CAF7D' : (data.type === 'trap' ? '#E05252' : '#f5cb42');
-            const distance = data.lastPrice ? (data.lastPrice - data.top5Poc[0]).toFixed(2) : 0;
+            const distance = (data.lastPrice && data.top5Poc.length > 0) ? (data.lastPrice - data.top5Poc[0].price).toFixed(2) : 0;
             document.getElementById('p-narrative').innerText = `Distance to POC: ${distance}`;
         } catch (error) {
             document.getElementById('p-verdict').innerText = 'Pulse API unavailable';

@@ -153,7 +153,7 @@
           color: color,
           lineWidth: 2,
           lineStyle: 3,
-          axisLabelVisible: false,
+          axisLabelVisible: true,
           title: `${w.side} $${valM}`
         });
       });
@@ -330,14 +330,15 @@
     const top5Poc = e.detail;
     pocLines.forEach(line => seriesInstance.removePriceLine(line));
     pocLines = [];
-    top5Poc.forEach((pocPrice, index) => {
+    top5Poc.forEach((pocObj, index) => {
+      const volText = pocObj.vol > 1000 ? (pocObj.vol / 1000).toFixed(1) + 'k' : pocObj.vol.toFixed(1);
       const line = seriesInstance.createPriceLine({
-        price: pocPrice,
+        price: pocObj.price,
         color: '#FFD700',
         lineWidth: index === 0 ? 3 : 1,
         lineStyle: 0,
         axisLabelVisible: true,
-        title: index === 0 ? 'POC' : `HVN ${index}`
+        title: index === 0 ? `POC (${volText})` : `HVN ${index} (${volText})`
       });
       pocLines.push(line);
     });

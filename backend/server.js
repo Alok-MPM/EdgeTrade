@@ -567,8 +567,8 @@ app.get('/api/liquidity-status', (req, res) => {
       const top5Poc = [];
       for (const item of profileArr) {
         if (top5Poc.length >= 3) break;
-        if (!top5Poc.some(poc => Math.abs(poc - item.price) < 50)) {
-          top5Poc.push(item.price);
+        if (!top5Poc.some(poc => Math.abs(poc.price - item.price) < 50)) {
+          top5Poc.push({ price: item.price, vol: item.vol });
         }
       }
 
