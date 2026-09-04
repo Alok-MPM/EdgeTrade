@@ -78,7 +78,7 @@
             const verdEl = document.getElementById('p-verdict');
             verdEl.innerText = data.verdict;
             verdEl.style.color = data.type === 'real' ? '#4CAF7D' : (data.type === 'trap' ? '#E05252' : '#f5cb42');
-            const distance = data.lastPrice ? (data.lastPrice - data.top5Poc[0]) : 0;
+            const distance = data.lastPrice ? (data.lastPrice - data.top5Poc[0]).toFixed(2) : 0;
             document.getElementById('p-narrative').innerText = `Distance to POC: ${distance}`;
         } catch (error) {
             document.getElementById('p-verdict').innerText = 'Pulse API unavailable';
