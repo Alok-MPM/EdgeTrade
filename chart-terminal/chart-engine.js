@@ -153,7 +153,7 @@
           color: color,
           lineWidth: 2,
           lineStyle: 3,
-          axisLabelVisible: true,
+          axisLabelVisible: false,
           title: `${w.side} $${valM}`
         });
       });

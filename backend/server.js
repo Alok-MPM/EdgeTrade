@@ -466,7 +466,7 @@ app.get('/api/whale-history', async (req, res) => {
 app.get('/api/whale-walls', async (req, res) => {
   if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.1000000&order=total_value_usd.desc&limit=50`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.10000000&order=total_value_usd.desc&limit=20`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
     const data = await response.json();
@@ -564,12 +564,19 @@ app.get('/api/liquidity-status', (req, res) => {
 
       const profileArr = Object.entries(marketPulse.profile || {}).map(([p, v]) => ({ price: parseFloat(p), vol: v }));
       profileArr.sort((a, b) => b.vol - a.vol);
-      const top5Poc = profileArr.slice(0, 5).map(item => item.price);
+      const top5Poc = [];
+      for (const item of profileArr) {
+        if (top5Poc.length >= 3) break;
+        if (!top5Poc.some(poc => Math.abs(poc - item.price) < 50)) {
+          top5Poc.push(item.price);
+        }
+      }
 
       res.json({ 
         tf, 
         poc, 
         top5Poc,
+        lastPrice: marketPulse.lastPrice,
         oiDelta: oiDelta.toFixed(2), 
         cvdDelta: cvdDelta.toFixed(2), 
         verdict, 
