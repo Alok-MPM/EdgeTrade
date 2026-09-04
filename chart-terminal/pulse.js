@@ -59,6 +59,11 @@
                 const response = await fetch(`https://m-edgetrade-api-server.onrender.com/api/pulse-ai?tf=${encodeURIComponent(timeframe)}`);
                 const data = await response.json();
 
+            if (data.top5Poc && data.top5Poc.length > 0) {
+                document.getElementById('p-poc').innerText = '$' + data.top5Poc[0].toLocaleString();
+                window.dispatchEvent(new CustomEvent('drawPocLines', { detail: data.top5Poc }));
+            }
+
             if (data.waiting || data.error) {
                 document.getElementById('p-verdict').innerText = data.message || data.error;
                 return;

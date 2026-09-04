@@ -325,6 +325,24 @@
     currentCandleTimestamp = null;
   }
 
+  let pocLines = [];
+  window.addEventListener('drawPocLines', (e) => {
+    const top5Poc = e.detail;
+    pocLines.forEach(line => seriesInstance.removePriceLine(line));
+    pocLines = [];
+    top5Poc.forEach((pocPrice, index) => {
+      const line = seriesInstance.createPriceLine({
+        price: pocPrice,
+        color: '#FFD700',
+        lineWidth: index === 0 ? 3 : 1,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: index === 0 ? 'POC' : `HVN ${index}`
+      });
+      pocLines.push(line);
+    });
+  });
+
   // ── Expose ───────────────────────────────────────────────────────────
   window.chartEngine = {
     init,

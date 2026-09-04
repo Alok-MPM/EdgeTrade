@@ -562,9 +562,14 @@ app.get('/api/liquidity-status', (req, res) => {
         else if (oiDelta > 0 && cvdDelta >= 0) { verdict = "🛑 FAKE DOWN: Absorption. Heavy Limit Buying at Bottom."; type = "trap"; }
       }
 
+      const profileArr = Object.entries(marketPulse.profile || {}).map(([p, v]) => ({ price: parseFloat(p), vol: v }));
+      profileArr.sort((a, b) => b.vol - a.vol);
+      const top5Poc = profileArr.slice(0, 5).map(item => item.price);
+
       res.json({ 
         tf, 
         poc, 
+        top5Poc,
         oiDelta: oiDelta.toFixed(2), 
         cvdDelta: cvdDelta.toFixed(2), 
         verdict, 
