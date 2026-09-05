@@ -151,8 +151,8 @@
           color: color,
           lineWidth: 2,
           lineStyle: 3,
-          axisLabelVisible: false,
-           title: `${w.side} ${(w.total_value_usd/1000000).toFixed(1)}M`
+          axisLabelVisible: true,
+          title: `${w.side} ${(w.total_value_usd/1000000).toFixed(1)}M`
         });
       });
     } catch (e) { console.error(e); }

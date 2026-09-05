@@ -466,11 +466,19 @@ app.get('/api/whale-history', async (req, res) => {
 app.get('/api/whale-walls', async (req, res) => {
   if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.10000000&order=total_value_usd.desc&limit=10`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.10000000&order=total_value_usd.desc`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
-    const data = await response.json();
-    res.json(data || []);
+    const { data, error } = { data: await response.json(), error: response.ok ? null : response.statusText };
+    const walls = data || [];
+    const filteredWalls = [];
+    for (const w of walls) {
+      if (filteredWalls.length >= 5) break;
+      if (!filteredWalls.some(fw => Math.abs(parseFloat(fw.price) - parseFloat(w.price)) < 100)) {
+        filteredWalls.push(w);
+      }
+    }
+    res.json(filteredWalls);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -572,6 +580,21 @@ app.get('/api/liquidity-status', (req, res) => {
         }
       }
 
+      marketPulse.verdict = verdict;
+      if (marketPulse.cvd < -100 || marketPulse.oi < -200) {
+        marketPulse.verdict = "Severe Dump: The market is falling heavily with strong selling pressure. It is very risky to buy right now.";
+      } else if (marketPulse.cvd > 100 || marketPulse.oi > 200) {
+        marketPulse.verdict = "Massive Pump: The market is rising fast with heavy buying volume. It is very risky to sell right now.";
+      } else if (marketPulse.verdict.includes("FAKE DOWN") || marketPulse.verdict.includes("TRAP")) {
+        marketPulse.verdict = "Fake Downward Move: Sellers are being trapped. The price is likely to bounce back up soon.";
+      } else if (marketPulse.verdict.includes("FAKE UP")) {
+        marketPulse.verdict = "Fake Upward Move: Buyers are being trapped. The price is likely to drop back down soon.";
+      } else if (marketPulse.verdict.includes("REAL UP")) {
+        marketPulse.verdict = "Real Upward Trend: Strong and healthy buying volume. The upward movement is safe to trust.";
+      } else if (marketPulse.verdict.includes("REAL DOWN")) {
+        marketPulse.verdict = "Real Downward Trend: Strong and consistent selling. The downward movement is safe to trust.";
+      }
+
       res.json({ 
         tf, 
         poc, 
@@ -579,7 +602,7 @@ app.get('/api/liquidity-status', (req, res) => {
         lastPrice: marketPulse.lastPrice,
         oiDelta: oiDelta.toFixed(2), 
         cvdDelta: cvdDelta.toFixed(2), 
-        verdict, 
+        verdict: marketPulse.verdict,
         type,
         distanceToPoc: (current.price_close - poc).toFixed(2) 
       });
