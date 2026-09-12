@@ -402,7 +402,8 @@ app.get('/api/whale-walls', async (req, res) => {
   if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
   try {
     const oneMinAgo = Date.now() - (60 * 1000);
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?total_value_usd=gte.10000000&timestamp_ms=gte.${oneMinAgo}&order=total_value_usd.desc`, {
+    const wallSymbol = (req.query.symbol || 'BTCUSDT').toUpperCase();
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/whale_walls?symbol=eq.${wallSymbol}&total_value_usd=gte.10000000&timestamp_ms=gte.${oneMinAgo}&order=total_value_usd.desc`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
     });
     const data = response.ok ? await response.json() : [];

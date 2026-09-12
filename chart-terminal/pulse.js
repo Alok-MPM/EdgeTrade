@@ -11,7 +11,6 @@ const REST_BASE = 'https://m-edgetrade-api-server.onrender.com';
 const WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint';
 const REFRESH_MS = 20000; // box khula rahe to POC/verdict khud taaza hote rahen
 let isVisible = false;
-let pocLine = null;
 let refreshTimer = null;
 let ws = null;
 let wsReconnectTimer = null;
@@ -60,12 +59,6 @@ function verdictColor(data) {
   if (data.bias) return '#f5cb42';
   return data.type === 'real' ? '#4CAF7D' : (data.type === 'trap' ? '#E05252' : '#f5cb42');
 }
-function updatePocLine(price) {
-  const series = (window.chartEngine && window.chartEngine.getSeries) ? window.chartEngine.getSeries() : null;
-  if (!series || !(price > 0)) return;
-  if (!pocLine) pocLine = series.createPriceLine({ price: price, color: '#f5cb42', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: 'POC' });
-  else pocLine.applyOptions({ price: price });
-}
 const updatePulseFromApi = async () => {
   const tf = document.getElementById('tf-selector').value;
   const verdictEl = document.getElementById('p-verdict');
@@ -84,7 +77,7 @@ const updatePulseFromApi = async () => {
     if (Array.isArray(data.top5Poc) && data.top5Poc.length) {
       window.dispatchEvent(new CustomEvent('drawPocLines', { detail: data.top5Poc }));
     }
-    updatePocLine(data.poc);
+    // POC/HVN chart lines chart-engine.js own karta hai (drawPocLines event se)
     // OI — absolute value OI label ke neeche; window delta alag line pe
     if (typeof data.oi === 'number' && data.oi > 0) document.getElementById('p-oi').innerText = data.oi.toLocaleString() + ' BTC';
     document.getElementById('p-oidelta').innerText = `Δ(${tf}): ${signed(data.oiDelta)} BTC`;
@@ -140,8 +133,7 @@ window.pulse = {
       refreshTimer = setInterval(updatePulseFromApi, REFRESH_MS);
     } else {
       clearInterval(refreshTimer); refreshTimer = null;
-      const series = (window.chartEngine && window.chartEngine.getSeries) ? window.chartEngine.getSeries() : null;
-      if (pocLine && series) { series.removePriceLine(pocLine); pocLine = null; }
+      window.dispatchEvent(new CustomEvent('drawPocLines', { detail: [] }));
     }
   },
 };
