@@ -135,21 +135,8 @@ window.pulse = {
       clearInterval(refreshTimer); refreshTimer = null;
       window.dispatchEvent(new CustomEvent('drawPocLines', { detail: [] }));
     }
+    return isVisible;
   },
 };
-// --- ZIDDI AUTO-INJECT PULSE BUTTON ---
-const pulseInterval = setInterval(() => {
-  const btns = Array.from(document.querySelectorAll('button'));
-  const whaleBtn = btns.find(b => b.innerText.includes('Whales'));
-  if (whaleBtn && !document.getElementById('pulse-btn-inj')) {
-    const pulseBtn = document.createElement('button');
-    pulseBtn.id = 'pulse-btn-inj';
-    pulseBtn.className = whaleBtn.className;
-    pulseBtn.innerHTML = '⚡ Pulse';
-    pulseBtn.onclick = () => { if (window.pulse) window.pulse.toggle(); };
-    pulseBtn.style.cssText = 'color: #f5cb42; border-color: #f5cb42; font-weight: bold; margin-left: 5px; background: transparent;';
-    whaleBtn.parentNode.insertBefore(pulseBtn, whaleBtn.nextSibling);
-    clearInterval(pulseInterval);
-  }
-}, 1000);
+// Pulse button ab chart-cockpit.js own karta hai (ctc-pulse-btn) — DOM scan loop removed.
 })();
