@@ -23,11 +23,12 @@ const MAX_AWAKE_MARKETS = 40;
 const PULSE_BUCKET_MS = 300000;
 const MAX_PULSE_BUCKETS = 288;
 const WHALE_WALL_THRESHOLD = 5000000;   // $5M => save to DB
-const LIQ_WALL_MIN = 500000;            // $500k => show on liquidity map
+const LIQ_WALL_MIN = 1000000;           // $1M => show on liquidity map (noise kam)
 const WALL_HEARTBEAT_MS = 60000;
 const WALL_CHANGE_PCT = 0.10;
+const BINANCE_REST_BASE = 'https://data-api.binance.vision/api/v3'; // geo-neutral public market-data host
 const BINANCE_REST_KLINES = (symbol, interval, limit) =>
-  `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+  `${BINANCE_REST_BASE}/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
 const BINANCE_WS_URL = (symbol) =>
   `wss://stream.binance.com:9443/stream?streams=${symbol}@trade/${symbol}@kline_${CANDLE_INTERVAL}`;
 const BINANCE_WS_DEPTH_URL = (symbol) =>
@@ -99,8 +100,8 @@ async function backfillFootprintHistory(market) {
   try {
     while (trades.length < BACKFILL_MAX_TRADES && Date.now() < deadline) {
       const url = fromId == null
-        ? `https://api.binance.com/api/v3/aggTrades?symbol=${market.symbol.toUpperCase()}&startTime=${startTime}&endTime=${endTime}&limit=1000`
-        : `https://api.binance.com/api/v3/aggTrades?symbol=${market.symbol.toUpperCase()}&fromId=${fromId + 1}&limit=1000`;
+        ? `${BINANCE_REST_BASE}/aggTrades?symbol=${market.symbol.toUpperCase()}&startTime=${startTime}&endTime=${endTime}&limit=1000`
+        : `${BINANCE_REST_BASE}/aggTrades?symbol=${market.symbol.toUpperCase()}&fromId=${fromId + 1}&limit=1000`;
       const res = await fetch(url);
       if (!res.ok) break;
       const page = await res.json();
@@ -324,6 +325,7 @@ async function wakeUp(symbol) {
   market.footprintHistory = [];
   market.liveFootprint = makeEmptyFootprintCandle();
   market.pulse = makePulseState();
+  await seedPulseBucketsFromDB(market);
   await backfillFootprintHistory(market);
   connectDelta(market);
   connectBinance(market);
@@ -386,6 +388,18 @@ function savePulseSnapshot(market, bucketStart, close, volume, cvd, oi) {
       price_close: round2(close), volume: round2(volume), cvd: round2(cvd), open_interest: round2(oi || 0),
     }]),
   }).catch(e => console.error('Pulse 5m Save Error:', e.message));
+}
+async function seedPulseBucketsFromDB(market) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    const since = Date.now() - MAX_PULSE_BUCKETS * PULSE_BUCKET_MS;
+    const snaps = await fetch(`${SUPABASE_URL}/rest/v1/market_pulse_5m?symbol=eq.${market.symbol.toUpperCase()}&timestamp_ms=gte.${since}&order=timestamp_ms.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+    }).then(r => r.json());
+    if (Array.isArray(snaps)) {
+      market.pulse.buckets = snaps.map(s => ({ time: s.timestamp_ms, close: s.price_close, volume: s.volume, cvd: s.cvd, oi: s.open_interest })).filter(b => b.close > 0);
+    }
+  } catch (e) { /* memory-only fallback */ }
 }
 app.get('/api/whale-history', async (req, res) => {
   const symbol = (req.query.symbol || 'BTCUSDT').toUpperCase();
@@ -686,7 +700,10 @@ function clusterDepthWalls(orders, side, minWallUsd) {
       acc = 0; sum = 0; levels = 0;
     }
   }
-  return walls;
+  // Display cap: sirf top 8 walls per side - 1000-level book se
+  // 100+ lines ban ke chart spaghetti ho jaata tha.
+  walls.sort((a, b) => b.total - a.total);
+  return walls.slice(0, 8);
 }
 async function fetchDeepLiquidity(symbol) {
   let anyLiquidityClient = false;
@@ -782,4 +799,6 @@ function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-server.listen(PORT, () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
+app.get('/', (req, res) => res.json({ ok: true, service: 'edgetrade-backend' }));
+app.get('/healthz', (req, res) => res.json({ ok: true }));
+server.listen(PORT, '0.0.0.0', () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
