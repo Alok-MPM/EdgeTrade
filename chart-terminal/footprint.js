@@ -134,19 +134,16 @@
   // and the button would never respond to clicks. Delegation checks at
   // click-time instead of bind-time, so it works no matter when the
   // cockpit's HTML actually gets injected.
-  function bindButton() {
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('#ctc-footprint-btn');
-      if (!btn) return;
-      active ? deactivate() : activate();
-    });
+  // Button ownership: chart-cockpit.js calls window.footprint.toggle() itself.
+  // No local delegation here — a second handler would double-toggle per click.
+  function toggle() {
+    if (active) { deactivate(); return false; }
+    activate();
+    return true;
   }
 
   function activate() {
     active = true;
-    const btn = document.getElementById('ctc-footprint-btn');
-    if (btn) btn.classList.add('active');
-
     ensureCanvas();
     ensureTypeSwitch();
     ensureStatusBadge();
@@ -157,9 +154,6 @@
 
   function deactivate() {
     active = false;
-    const btn = document.getElementById('ctc-footprint-btn');
-    if (btn) btn.classList.remove('active');
-
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     clearTimeout(wsReconnectTimer);
     if (canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = 'none'; }
@@ -218,7 +212,7 @@
       try { msg = JSON.parse(event.data); } catch { return; }
 
       if (msg.type === 'snapshot') {
-        footprintHistory = msg.footprintHistory || [];
+        footprintHistory = (msg.footprintHistory || []).slice(-MAX_HISTORY);
         liveFootprint = msg.liveFootprint || makeEmptyFootprint(null);
         setStatus('live — ' + footprintHistory.length + ' candles', 'ok');
       } else if (msg.type === 'tick') {
@@ -228,11 +222,11 @@
           footprintHistory.push(liveFootprint);
           if (footprintHistory.length > MAX_HISTORY) footprintHistory.shift();
         }
-        liveFootprint = makeEmptyFootprint(msg.candle.time);
-        liveFootprint.open = msg.candle.open;
-        liveFootprint.high = msg.candle.high;
-        liveFootprint.low = msg.candle.low;
-        liveFootprint.close = msg.candle.close;
+        // New live candle = NEXT minute, OHLC unknown yet. (Previously the closed
+        // candle's time+OHLC were copied here, which painted the forming candle on
+        // top of the just-closed column for up to 60s and polluted history with a
+        // duplicate timestamp on the next rotation.)
+        liveFootprint = makeEmptyFootprint(msg.candle.time + 60000);
       } else {
         return; // unknown message — don't waste a render pass
       }
@@ -261,6 +255,15 @@
     side.trades += 1;
     liveFootprint.volume += msg.qty;
   }
+
+  // Mobile tab-switch can throttle/stall the socket without closing it —
+  // force a clean reconnect when the tab becomes visible again (only if the
+  // socket isn't already open/connecting).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !active) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    connect(currentSymbol);
+  });
 
   marketStore.onSymbolChange(({ symbol }) => {
     if (!active) return;
@@ -495,10 +498,11 @@
     return '$' + abs.toFixed(0);
   }
 
-  // ── Init ────────────────────────────────────────────────────────────
-  bindButton();
-
-  window.footprintOverlay = { activate, deactivate, isActive: () => active };
+  // ── Init / expose ───────────────────────────────────────────────────
+  // Cockpit contract: window.footprint.toggle() -> boolean (same shape as
+  // orderflow / whaleTracker / liquidity). footprintOverlay kept as alias.
+  window.footprint = { toggle, isActive: () => active };
+  window.footprintOverlay = { activate, deactivate, toggle, isActive: () => active };
 
 })();
 
