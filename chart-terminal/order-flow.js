@@ -198,15 +198,16 @@
 
       if (msg.type === 'snapshot') {
         footprintHistory = msg.footprintHistory || [];
+        if (footprintHistory.length > MAX_HISTORY) footprintHistory = footprintHistory.slice(-MAX_HISTORY);
         liveFootprint = msg.liveFootprint || null;
         hourlyRollup = msg.hourlyRollup || [];
-        if (liveFootprint && liveFootprint.time != null) noteServerTime(liveFootprint.time);
+        // Candle open time can be up to 60s in the past — never anchor "now" to it.
       } else if (msg.type === 'tick') {
         noteServerTime(msg.time);
         applyTick(msg);
         return; // render() runs on its own timer — no need to redraw the whole panel on every single tick
       } else if (msg.type === 'candle_closed') {
-        noteServerTime(msg.candle.time);
+        noteServerTime(msg.candle.time + 60000); // candle just closed => server now ≈ open + 60s
         if (liveFootprint) {
           footprintHistory.push(liveFootprint);
           if (footprintHistory.length > MAX_HISTORY) footprintHistory.shift();
@@ -234,6 +235,7 @@
   // pattern), force a clean reconnect the moment the tab is visible again.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && active) {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
       connect(currentSymbol);
     }
   });
@@ -317,7 +319,9 @@
     const levels = {};
 
     if (def.hours) {
-      hourlyRollup.forEach((bucket) => { if (bucket.time >= start) mergeLevelsInto(levels, bucket.levels); });
+      const hourStart = Math.floor(referenceNow / 3600000) * 3600000;
+      hourlyRollup.forEach((bucket) => { if (bucket.time >= start && bucket.time < hourStart) mergeLevelsInto(levels, bucket.levels); });
+      footprintHistory.forEach((candle) => { if (candle.time >= hourStart && candle.time >= start) mergeLevelsInto(levels, candle.levels); });
     } else {
       footprintHistory.forEach((candle) => { if (candle.time >= start) mergeLevelsInto(levels, candle.levels); });
     }
