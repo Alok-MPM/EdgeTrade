@@ -31,7 +31,7 @@ function ensureBox() {
 function ensureOutBox() {
   if (!state.outEl) {
     state.outEl = document.createElement('div'); state.outEl.className = 'fi-box2';
-    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">60m</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
+    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
     document.body.appendChild(state.outEl);
   }
   state.outEl.style.display = state.outOn ? 'block' : 'none';
@@ -67,6 +67,8 @@ function updateOutBox() {
   const act = document.getElementById('fo-action');
   if (act) { const a = computeAction(); act.textContent = a; act.style.color = a.indexOf('BUY') >= 0 && a.indexOf('avoid BUY') < 0 ? '#4CAF7D' : a.indexOf('SELL') >= 0 && a.indexOf('avoid SELL') < 0 ? '#E05252' : '#f5cb42'; }
   const conf = document.getElementById('fo-conf'); if (conf) conf.textContent = o ? Math.abs(o.score) + '/100' : '—';
+  const hz = document.getElementById('fo-horizon'); if (hz) hz.textContent = o ? '1H candle' : '—';
+  state.horizonEnd = o && o.horizonEnd ? o.horizonEnd : null;
   const rs = document.getElementById('fo-reasons'); if (rs) rs.innerHTML = o && o.reasons && o.reasons.length ? o.reasons.map(r => '• ' + r).join('<br>') : 'abhi koi strong signal nahi';
   const rec = document.getElementById('fo-record');
   if (rec && state.record && state.record.stats) rec.textContent = `${state.record.stats.correct}/${state.record.stats.total} (${state.record.stats.accuracyPct}%)`;
@@ -240,5 +242,14 @@ connect(currentSymbol());
 loadHistory(currentSymbol());
 fetchRecord();
 setInterval(fetchRecord, 300000);
+setInterval(() => {
+  const el = document.getElementById('fo-left');
+  if (!el) return;
+  if (!state.outOn || !state.horizonEnd) { el.textContent = '—'; return; }
+  const ms = state.horizonEnd - Date.now();
+  if (ms <= 0) { el.textContent = 'candle closed → new call'; return; }
+  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+  el.textContent = m + 'm ' + String(s).padStart(2, '0') + 's';
+}, 1000);
 window.flowIntel = { toggleLayer, togglePanel, toggleOutlook, isActive: () => anyLayerOn() };
 })();
