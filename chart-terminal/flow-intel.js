@@ -24,7 +24,7 @@ function ensureBanner() {
 function ensureBox() {
   if (!state.boxEl) {
     state.boxEl = document.createElement('div'); state.boxEl.className = 'fi-box';
-    state.boxEl.innerHTML = `<h4>🧠 Flow Intel</h4><div class="fi-row fi-muted"><span>Thresholds</span><span id="fi-pct">—</span></div><div class="fi-row"><span>Retail CVD</span><span id="fi-retail">—</span></div><div class="fi-row"><span>Pro CVD</span><span id="fi-pro">—</span></div><div class="fi-row"><span>Whale CVD</span><span id="fi-whale">—</span></div><div class="fi-row fi-muted"><span>Retail herd</span><span id="fi-herd">none</span></div><div class="fi-row fi-muted"><span>Study trades</span><span id="fi-study">0</span></div><div class="fi-row" style="margin-top:6px;color:#ff8a8a;" id="fi-trap-row"><span id="fi-trap"></span></div>`;
+    state.boxEl.innerHTML = `<h4>🧠 Flow Intel</h4><div class="fi-row fi-muted"><span>Thresholds</span><span id="fi-pct">—</span></div><div class="fi-row"><span>Retail CVD</span><span id="fi-retail">—</span></div><div class="fi-row"><span>Pro CVD</span><span id="fi-pro">—</span></div><div class="fi-row"><span>Whale CVD</span><span id="fi-whale">—</span></div><div class="fi-row fi-muted"><span>Retail herd</span><span id="fi-herd">none</span></div><div class="fi-row" style="color:#D4B886;"><span>Outlook 60m</span><span id="fi-outlook">—</span></div><div class="fi-row fi-muted"><span>Record</span><span id="fi-record">—</span></div><div class="fi-row fi-muted"><span>Last call</span><span id="fi-lastcall">—</span></div><div class="fi-row fi-muted"><span>Study trades</span><span id="fi-study">0</span></div><div class="fi-row" style="margin-top:6px;color:#ff8a8a;" id="fi-trap-row"><span id="fi-trap"></span></div>`;
     document.body.appendChild(state.boxEl);
   }
   state.boxEl.style.display = state.panelOn ? 'block' : 'none';
@@ -34,7 +34,9 @@ function updatePanel() {
   if (!state.panelOn || !state.live) return;
   const L = state.live;
   const set = (id, t, c) => { const el = document.getElementById(id); if (el) { el.textContent = t; if (c) el.style.color = c; } };
-  set('fi-pct', `R<${usd(L.pct.p75)} W>${usd(L.pct.p95)}`);
+  set('fi-pct', `R<${usd(L.bounds ? L.bounds.retailMax : L.pct.p75)} W>${usd(L.bounds ? L.bounds.whaleMin : L.pct.p95)}`);
+  const o = L.outlook;
+  set('fi-outlook', o ? `${o.call.toUpperCase()} · conf ${Math.abs(o.score)}` : '—');
   const rc = L.cls.retail.buy - L.cls.retail.sell, pc = L.cls.pro.buy - L.cls.pro.sell, wc = L.cls.whale.buy - L.cls.whale.sell;
   set('fi-retail', (rc >= 0 ? '+' : '') + usd(rc), rc >= 0 ? '#4CAF7D' : '#E05252');
   set('fi-pro', (pc >= 0 ? '+' : '') + usd(pc), pc >= 0 ? '#4CAF7D' : '#E05252');
@@ -135,6 +137,16 @@ function toggleLayer(name) {
   return state.layers[name];
 }
 function togglePanel() { state.panelOn = !state.panelOn; ensureBox(); updatePanel(); return state.panelOn; }
+async function fetchRecord() {
+  try {
+    const res = await fetch(`${REST_BASE}/api/outlook?symbol=${currentSymbol()}`);
+    const d = await res.json();
+    if (d.stats) { const el = document.getElementById('fi-record'); if (el) el.textContent = `${d.stats.correct}/${d.stats.total} (${d.stats.accuracyPct}%)`; }
+    if (d.history && d.history[0]) { const el = document.getElementById('fi-lastcall'); if (el) el.textContent = `${d.history[0].call.toUpperCase()} ${d.history[0].correct ? '✓' : '✗'} ${d.history[0].actual_pct > 0 ? '+' : ''}${d.history[0].actual_pct}%`; }
+  } catch (e) {}
+}
+setInterval(fetchRecord, 300000);
+fetchRecord();
 connect(currentSymbol());
 loadHistory(currentSymbol());
 window.flowIntel = { toggleLayer, togglePanel, isActive: () => anyLayerOn() };
