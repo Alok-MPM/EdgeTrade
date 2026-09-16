@@ -73,6 +73,11 @@ window.addEventListener('scroll', repositionOpenDropdowns, { passive: true, capt
 window.addEventListener('resize', repositionOpenDropdowns);
 const fiScript = document.createElement('script');
 fiScript.src = 'chart-terminal/flow-intel.js';
+fiScript.onload = () => {
+  document.querySelectorAll('[data-pending-layer]').forEach(b => { const l = b.getAttribute('data-pending-layer'); b.removeAttribute('data-pending-layer'); b.classList.toggle('on', window.flowIntel.toggleLayer(l)); });
+  const pb = document.getElementById('ctc-fi-panel-btn'); if (pb && pb.hasAttribute('data-pending-panel')) { pb.removeAttribute('data-pending-panel'); pb.classList.toggle('on', window.flowIntel.togglePanel()); }
+  const ob = document.getElementById('ctc-fi-outlook-btn'); if (ob && ob.hasAttribute('data-pending-outlook')) { ob.removeAttribute('data-pending-outlook'); ob.classList.toggle('on', window.flowIntel.toggleOutlook()); }
+};
 document.head.appendChild(fiScript);
 clearInterval(healthTimer);
 healthTimer = setInterval(updateHealthDot, 10000);
@@ -141,6 +146,7 @@ mountEl.innerHTML = `
   <button class="ctc-pill" id="ctc-fi-abs-btn" title="Absorption zones">🧊 Absorb</button>
   <button class="ctc-pill" id="ctc-fi-herd-btn" title="Retail herd zones">👥 Retail</button>
   <button class="ctc-pill" id="ctc-fi-panel-btn" title="Flow Intel panel + trap alerts">🧠 Flow Intel</button>
+  <button class="ctc-pill" id="ctc-fi-outlook-btn" title="Market Outlook + accuracy record">📈 Outlook</button>
   <div class="ctc-divider"></div>
   <button class="ctc-pill ctc-ai-btn" id="ctc-ai-btn" title="AI Assistant">✨ AI</button>
 </div>`;
@@ -180,12 +186,13 @@ document.getElementById('ctc-orderflow-btn').onclick = () => toggleFeatureModule
 document.getElementById('ctc-liquidity-btn').onclick = () => toggleFeatureModule('liquidity', 'ctc-liquidity-btn');
 document.getElementById('ctc-whales-btn').onclick = () => toggleFeatureModule('whaleTracker', 'ctc-whales-btn');
 document.getElementById('ctc-pulse-btn').onclick = () => toggleFeatureModule('pulse', 'ctc-pulse-btn');
-const fiLayer = (layer, btnId) => { const fi = window.flowIntel; const btn = document.getElementById(btnId); if (fi && fi.toggleLayer) btn.classList.toggle('on', fi.toggleLayer(layer)); };
+const fiLayer = (layer, btnId) => { const fi = window.flowIntel; const btn = document.getElementById(btnId); if (fi && fi.toggleLayer) { btn.classList.toggle('on', fi.toggleLayer(layer)); } else { btn.setAttribute('data-pending-layer', layer); btn.classList.add('on'); } };
 document.getElementById('ctc-fi-whale-btn').onclick = () => fiLayer('whale', 'ctc-fi-whale-btn');
 document.getElementById('ctc-fi-sweep-btn').onclick = () => fiLayer('sweep', 'ctc-fi-sweep-btn');
 document.getElementById('ctc-fi-abs-btn').onclick = () => fiLayer('absorb', 'ctc-fi-abs-btn');
 document.getElementById('ctc-fi-herd-btn').onclick = () => fiLayer('herd', 'ctc-fi-herd-btn');
-document.getElementById('ctc-fi-panel-btn').onclick = () => { const fi = window.flowIntel; const btn = document.getElementById('ctc-fi-panel-btn'); if (fi && fi.togglePanel) btn.classList.toggle('on', fi.togglePanel()); };
+document.getElementById('ctc-fi-panel-btn').onclick = () => { const fi = window.flowIntel; const btn = document.getElementById('ctc-fi-panel-btn'); if (fi && fi.togglePanel) { btn.classList.toggle('on', fi.togglePanel()); } else { btn.setAttribute('data-pending-panel', '1'); btn.classList.add('on'); } };
+document.getElementById('ctc-fi-outlook-btn').onclick = () => { const fi = window.flowIntel; const btn = document.getElementById('ctc-fi-outlook-btn'); if (fi && fi.toggleOutlook) { btn.classList.toggle('on', fi.toggleOutlook()); } else { btn.setAttribute('data-pending-outlook', '1'); btn.classList.add('on'); } };
 document.getElementById('ctc-ai-btn').onclick = () => {
   if (window.aiAssistant && typeof window.aiAssistant.open === 'function') window.aiAssistant.open();
   else console.warn('[chart-cockpit] ai-assistant.js not loaded yet');
