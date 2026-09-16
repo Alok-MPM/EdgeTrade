@@ -537,10 +537,11 @@ function flowContext(market) {
 }
 function saveOutlook(market, o) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
-  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: flowContext(market), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
+  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: flowContext(market), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
 }
 function maybeEmitOutlook(market) {
   const o = computeOutlook(market); if (!o) return;
+  if (!(market.pulse.lastPrice > 0)) return; // no price = no prediction
   const hourStart = Math.floor(Date.now() / 3600000) * 3600000;
   const hourEnd = hourStart + 3600000;
   o.hourStart = hourStart;
@@ -549,6 +550,8 @@ function maybeEmitOutlook(market) {
   const last = market.outlook;
   if (last && last.hourStart === hourStart && last.call === o.call) return; // ek 1H candle = ek call
   if (last && last.hourStart === hourStart && Date.now() - last.ts < 10 * 60000) return;
+  o.ts = hourStart; // PK (symbol, ts) => same candle par UPSERT, nayi row nahi
+  o.horizonMin = 60;
   market.outlook = o;
   broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: o.ts, type: 'OUTLOOK', side: o.call, usd: 0, price: market.pulse.lastPrice || 0, meta: { score: o.score, horizonMin: o.horizonMin, reasons: o.reasons } } });
   saveOutlook(market, o);
@@ -567,6 +570,10 @@ async function resolveOutlooks() {
     }
     for (const row of due) {
       const px = prices[row.symbol]; if (!px) continue;
+      if (!row.price_at_call || row.price_at_call <= 0) {
+        fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => {});
+        continue;
+      }
       if (now - row.ts < (row.horizon_min || 60) * 60000) continue;
       const pct = ((px - row.price_at_call) / row.price_at_call) * 100;
       const actual = pct > 0.15 ? 'up' : pct < -0.15 ? 'down' : 'flat';
