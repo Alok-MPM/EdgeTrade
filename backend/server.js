@@ -60,6 +60,7 @@ function createMarket(symbol) {
     reconnectTimers: { binance: null, bybit: null, delta: null },
     clients: new Set(),
     pulse: makePulseState(),
+    flow: makeFlowState(),
     liquidity: { bids: [], asks: [], lastUpdateTime: null, awake: false, lastActivity: 0, socket: null, reconnectTimer: null, clients: new Set() },
   };
 }
@@ -280,6 +281,7 @@ function handleTradeTick(market, { price, qty, isBuyerMaker, time, exchange, sou
   market.pulse.lastPrice = p;
   market.pulse.bucketCvd += isBuyerMaker ? -q : q;
   market.pulse.bucketVolume += q;
+  observeTrade(market, p, q, isBuyerMaker);
   const candleOpenTime = Math.floor(time / 60000) * 60000;
   if (!ensureLiveFootprintCandle(market, candleOpenTime)) return;
   let adjustedPrice = p;
@@ -304,6 +306,7 @@ function handleKlineUpdate(market, k) {
     market.candles.push(candle);
     if (market.candles.length > MAX_CANDLE_HISTORY) market.candles.shift();
   }
+  pushSwing(market, candle.high, candle.low);
   ensureLiveFootprintCandle(market, k.t);
   if (market.liveFootprint.time === candle.time) {
     market.liveFootprint.open = candle.open;
@@ -359,6 +362,145 @@ setInterval(() => {
   }
 }, IDLE_CHECK_INTERVAL_MS);
 
+// ---------------------------------------------------------------------------
+// FLOW INTELLIGENCE ENGINE (retail / pro / whale classification + traps)
+// ---------------------------------------------------------------------------
+function makeFlowState() {
+  return {
+    hist: new Map(), histSum: new Map(), studyTrades: 0, dayKey: null,
+    pct: { p50: 800, p75: 10000, p90: 40000, p95: 100000, p99: 400000 },
+    cls: { retail: { buy: 0, sell: 0 }, pro: { buy: 0, sell: 0 }, whale: { buy: 0, sell: 0 } },
+    clips: [], absorb: new Map(), swing: [], swingHigh: null, swingLow: null,
+    armedUp: null, armedDn: null,
+    herd: { side: null, share: 0, until: 0 }, trap: null, recentSmart: null,
+    lastEventTs: {},
+  };
+}
+function histIdx(usd) { return Math.max(0, Math.floor(Math.log2(Math.max(1, usd)))); }
+function pushSwing(market, high, low) {
+  const f = market.flow; if (!f) return;
+  f.swing.push({ high, low }); if (f.swing.length > 30) f.swing.shift();
+  f.swingHigh = Math.max(...f.swing.map(s => s.high));
+  f.swingLow = Math.min(...f.swing.map(s => s.low));
+}
+function flowCooldown(f, key, ms) { const n = Date.now(); if (f.lastEventTs[key] && n - f.lastEventTs[key] < ms) return false; f.lastEventTs[key] = n; return true; }
+function saveFlowEvent(ev) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  fetch(`${SUPABASE_URL}/rest/v1/flow_events`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify([ev]) }).catch(e => console.error('flow event save:', e.message));
+}
+function emitFlowEvent(market, type, side, usd, price, meta) {
+  const ev = { symbol: market.symbol.toUpperCase(), ts: Date.now(), type, side, usd: round2(usd), price: round2(price), meta: meta || {} };
+  if (market.clients.size) broadcastToMarket(market, { type: 'flow_event', data: ev });
+  saveFlowEvent(ev);
+  if (type === 'SPLIT_EXEC' || type === 'ABSORPTION' || type === 'WHALE_PRINT') market.flow.recentSmart = { side, ts: ev.ts, type };
+  if (type === 'TRAP') market.flow.trap = { side, ts: ev.ts, action: (meta && meta.action) || '', text: (meta && meta.text) || '' };
+}
+function percentilesFromHist(f) {
+  const total = [...f.hist.values()].reduce((a, b) => a + b, 0);
+  if (total < 500) return null;
+  const keys = [...f.hist.keys()].sort((a, b) => a - b);
+  const targets = { p50: 0.5, p75: 0.75, p90: 0.9, p95: 0.95, p99: 0.99 };
+  const order = ['p50', 'p75', 'p90', 'p95', 'p99'];
+  const out = {}; let acc = 0, ti = 0;
+  for (const k of keys) { acc += f.hist.get(k); while (ti < order.length && acc >= total * targets[order[ti]]) { out[order[ti]] = Math.pow(2, k + 1); ti++; } }
+  while (ti < order.length) { out[order[ti]] = Math.pow(2, keys[keys.length - 1] + 1); ti++; }
+  return out;
+}
+function recalibrateFlow(market) {
+  const f = market.flow; const p = percentilesFromHist(f);
+  if (p) f.pct = p;
+  const day = new Date().toISOString().slice(0, 10);
+  if (f.dayKey !== day) {
+    f.dayKey = day;
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      const total = [...f.hist.values()].reduce((a, b) => a + b, 0);
+      const vol = [...f.histSum.values()].reduce((a, b) => a + b, 0);
+      fetch(`${SUPABASE_URL}/rest/v1/flow_size_stats`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), day, p50: round2(f.pct.p50), p75: round2(f.pct.p75), p90: round2(f.pct.p90), p95: round2(f.pct.p95), p99: round2(f.pct.p99), max_usd: round2(Math.pow(2, [...f.hist.keys()].reduce((m, k) => Math.max(m, k), 0) + 1)), trades: total, volume_usd: round2(vol) }]) }).catch(e => console.error('flow stats save:', e.message));
+    }
+  }
+}
+function observeTrade(market, price, qty, isBuyerMaker) {
+  const f = market.flow; if (!f) return;
+  const usd = price * qty; const side = isBuyerMaker ? 'sell' : 'buy';
+  const i = histIdx(usd);
+  f.hist.set(i, (f.hist.get(i) || 0) + 1); f.histSum.set(i, (f.histSum.get(i) || 0) + usd); f.studyTrades++;
+  const cls = usd >= f.pct.p95 ? 'whale' : usd >= f.pct.p75 ? 'pro' : 'retail';
+  f.cls[cls][side] += usd;
+  f.clips.push({ t: Date.now(), side, usd, price, cls });
+  if (f.clips.length > 500) f.clips.splice(0, f.clips.length - 500);
+  detectWhalePrint(market, usd, side, price);
+  detectSplit(market, side);
+  detectAbsorption(market, price, usd, side);
+  detectSweep(market, price);
+  detectHerd(market);
+}
+function detectWhalePrint(market, usd, side, price) {
+  const f = market.flow;
+  if (usd < Math.max(f.pct.p99, 500000)) return;
+  if (!flowCooldown(f, 'WP' + side, 20000)) return;
+  emitFlowEvent(market, 'WHALE_PRINT', side, usd, price, {});
+}
+function detectSplit(market, side) {
+  const f = market.flow; const now = Date.now();
+  const win = f.clips.filter(c => c.side === side && now - c.t <= 90000 && c.cls !== 'whale');
+  const sum = win.reduce((s, c) => s + c.usd, 0);
+  if (win.length >= 10 && sum >= 250000) {
+    if (!flowCooldown(f, 'SPLIT' + side, 180000)) return;
+    const prices = win.map(c => c.price);
+    const pMin = Math.min(...prices), pMax = Math.max(...prices);
+    emitFlowEvent(market, 'SPLIT_EXEC', side, sum, (pMin + pMax) / 2, { prints: win.length, pMin: round2(pMin), pMax: round2(pMax), action: side === 'buy' ? 'ACCUMULATION' : 'DISTRIBUTION' });
+    f.clips = f.clips.filter(c => !(c.side === side && now - c.t <= 90000 && c.cls !== 'whale'));
+  }
+}
+function detectAbsorption(market, price, usd, side) {
+  const f = market.flow; const key = bucketPrice(price); const now = Date.now();
+  let a = f.absorb.get(key);
+  if (!a) { a = { buy: 0, sell: 0, first: now, price }; f.absorb.set(key, a); }
+  if (side === 'buy') a.buy += usd; else a.sell += usd;
+  if (now - a.first > 60000) {
+    const dom = a.buy > a.sell ? 'buy' : 'sell';
+    const domUsd = Math.max(a.buy, a.sell);
+    if (domUsd >= 300000 && Math.abs(price - a.price) / a.price <= 0.0002) {
+      const passive = dom === 'buy' ? 'sell' : 'buy';
+      if (flowCooldown(f, 'ABS' + passive, 120000)) emitFlowEvent(market, 'ABSORPTION', passive, domUsd, price, { taker: dom });
+    }
+    f.absorb.delete(key);
+  }
+  if (f.absorb.size > 200) f.absorb.clear();
+}
+function detectSweep(market, price) {
+  const f = market.flow; const now = Date.now();
+  if (f.swingHigh == null || f.swingLow == null) return;
+  if (!f.armedUp && price > f.swingHigh) f.armedUp = now;
+  if (f.armedUp && price < f.swingHigh) {
+    if (now - f.armedUp <= 180000 && flowCooldown(f, 'SWEEPsell', 120000)) emitFlowEvent(market, 'SWEEP', 'sell', 0, f.swingHigh, { grab: 'above' });
+    f.armedUp = null;
+  }
+  if (!f.armedDn && price < f.swingLow) f.armedDn = now;
+  if (f.armedDn && price > f.swingLow) {
+    if (now - f.armedDn <= 180000 && flowCooldown(f, 'SWEEPbuy', 120000)) emitFlowEvent(market, 'SWEEP', 'buy', 0, f.swingLow, { grab: 'below' });
+    f.armedDn = null;
+  }
+}
+function detectHerd(market) {
+  const f = market.flow; const r = f.cls.retail; const tot = r.buy + r.sell;
+  if (tot < 100000) return;
+  const side = r.buy > r.sell ? 'buy' : 'sell';
+  const share = Math.max(r.buy, r.sell) / tot;
+  if (share >= 0.7) {
+    f.herd = { side, share, until: Date.now() + 300000 };
+    if (flowCooldown(f, 'HERD' + side, 300000)) emitFlowEvent(market, 'RETAIL_HERD', side, tot, market.pulse.lastPrice || 0, { share: round2(share) });
+    const sm = f.recentSmart;
+    if (sm && Date.now() - sm.ts < 300000 && sm.side !== side && flowCooldown(f, 'TRAP', 300000)) {
+      const action = sm.side === 'buy' ? 'ACCUMULATING (buying)' : 'DISTRIBUTING (selling)';
+      emitFlowEvent(market, 'TRAP', side, 0, market.pulse.lastPrice || 0, { smartSide: sm.side, action, text: `Big money trapping ${side.toUpperCase()} retailers (herd ${(share * 100).toFixed(0)}%) while ${action}. Avoid ${side} side.` });
+    }
+  }
+}
+function flowStatePayload(market) {
+  const f = market.flow;
+  return { cls: f.cls, pct: f.pct, herd: f.herd, trap: f.trap, studyTrades: f.studyTrades, recentSmart: f.recentSmart };
+}
 // ---------------------------------------------------------------------------
 // HTTP API
 // ---------------------------------------------------------------------------
@@ -599,6 +741,25 @@ app.get('/api/pulse-ai', async (req, res) => {
     distanceToPoc: livePrice > 0 ? round2(livePrice - poc) : null,
   });
 });
+function saveFlowClass5m(market, bucketStart) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !market.flow) return;
+  const f = market.flow; const c = f.cls;
+  fetch(`${SUPABASE_URL}/rest/v1/flow_class_5m`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: bucketStart, retail_cvd: round2(c.retail.buy - c.retail.sell), pro_cvd: round2(c.pro.buy - c.pro.sell), whale_cvd: round2(c.whale.buy - c.whale.sell), retail_share: round2((c.retail.buy + c.retail.sell) > 0 ? Math.max(c.retail.buy, c.retail.sell) / (c.retail.buy + c.retail.sell) : 0.5), herd_side: f.herd && f.herd.until > Date.now() ? f.herd.side : null, trap: !!(f.trap && Date.now() - f.trap.ts < 300000) }]) }).catch(e => console.error('flow 5m save:', e.message));
+}
+app.get('/api/flow-events', async (req, res) => {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return res.json([]);
+  const symbol = (req.query.symbol || 'BTCUSDT').toUpperCase();
+  const since = Number(req.query.since || Date.now() - 86400000);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/flow_events?symbol=eq.${symbol}&ts=gte.${since}&order=ts.asc&limit=1000`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    res.json(r.ok ? await r.json() : []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/flow-summary', (req, res) => {
+  const market = markets.get((req.query.symbol || 'btcusdt').toLowerCase());
+  if (!market || !market.flow) return res.json({ waiting: true });
+  res.json(flowStatePayload(market));
+});
 // ---------------------------------------------------------------------------
 // WS SERVERS
 // ---------------------------------------------------------------------------
@@ -780,12 +941,14 @@ setInterval(async () => {
         p.buckets.push({ time: p.bucketStart, close: p.lastPrice, volume: p.bucketVolume, cvd: p.bucketCvd, oi: p.oi });
         if (p.buckets.length > MAX_PULSE_BUCKETS) p.buckets.shift();
       }
+      if (market.flow) { saveFlowClass5m(market, p.bucketStart); recalibrateFlow(market); market.flow.cls = { retail: { buy: 0, sell: 0 }, pro: { buy: 0, sell: 0 }, whale: { buy: 0, sell: 0 } }; }
       p.bucketStart = curBucket; p.bucketVolume = 0; p.bucketCvd = 0;
     }
     broadcastToMarket(market, {
       type: 'pulse',
       data: { lastPrice: p.lastPrice, cvd: p.bucketCvd, oi: p.oi, verdict: p.verdict, verdictType: p.verdictType, bias: p.bias, oiUpdatedAt: p.oiUpdatedAt },
     });
+    if (market.flow) broadcastToMarket(market, { type: 'flow_state', data: flowStatePayload(market) });
   }
 }, 10000);
 // ----------------------------------------------------------

@@ -71,6 +71,9 @@ marketStore.onSymbolListsReady(() => renderCurrentMarketList());
 document.addEventListener('click', (e) => { if (!e.target.closest('.ctc-wrap')) closeAllDropdowns(); });
 window.addEventListener('scroll', repositionOpenDropdowns, { passive: true, capture: true });
 window.addEventListener('resize', repositionOpenDropdowns);
+const fiScript = document.createElement('script');
+fiScript.src = 'chart-terminal/flow-intel.js';
+document.head.appendChild(fiScript);
 clearInterval(healthTimer);
 healthTimer = setInterval(updateHealthDot, 10000);
 updateHealthDot();
@@ -133,6 +136,12 @@ mountEl.innerHTML = `
   <button class="ctc-pill" id="ctc-whales-btn" title="Whale Absorption">Whales</button>
   <button class="ctc-pill" id="ctc-pulse-btn" title="Market Pulse AI" style="color:var(--gold);border-color:var(--gold);">⚡ Pulse</button>
   <div class="ctc-divider"></div>
+  <button class="ctc-pill" id="ctc-fi-whale-btn" title="Whale flow: split execution + whale prints">🐋 Whale</button>
+  <button class="ctc-pill" id="ctc-fi-sweep-btn" title="Liquidity sweeps / grabs">⚡ Sweeps</button>
+  <button class="ctc-pill" id="ctc-fi-abs-btn" title="Absorption zones">🧊 Absorb</button>
+  <button class="ctc-pill" id="ctc-fi-herd-btn" title="Retail herd zones">👥 Retail</button>
+  <button class="ctc-pill" id="ctc-fi-panel-btn" title="Flow Intel panel + trap alerts">🧠 Flow Intel</button>
+  <div class="ctc-divider"></div>
   <button class="ctc-pill ctc-ai-btn" id="ctc-ai-btn" title="AI Assistant">✨ AI</button>
 </div>`;
 renderTabs();
@@ -171,6 +180,12 @@ document.getElementById('ctc-orderflow-btn').onclick = () => toggleFeatureModule
 document.getElementById('ctc-liquidity-btn').onclick = () => toggleFeatureModule('liquidity', 'ctc-liquidity-btn');
 document.getElementById('ctc-whales-btn').onclick = () => toggleFeatureModule('whaleTracker', 'ctc-whales-btn');
 document.getElementById('ctc-pulse-btn').onclick = () => toggleFeatureModule('pulse', 'ctc-pulse-btn');
+const fiLayer = (layer, btnId) => { const fi = window.flowIntel; const btn = document.getElementById(btnId); if (fi && fi.toggleLayer) btn.classList.toggle('on', fi.toggleLayer(layer)); };
+document.getElementById('ctc-fi-whale-btn').onclick = () => fiLayer('whale', 'ctc-fi-whale-btn');
+document.getElementById('ctc-fi-sweep-btn').onclick = () => fiLayer('sweep', 'ctc-fi-sweep-btn');
+document.getElementById('ctc-fi-abs-btn').onclick = () => fiLayer('absorb', 'ctc-fi-abs-btn');
+document.getElementById('ctc-fi-herd-btn').onclick = () => fiLayer('herd', 'ctc-fi-herd-btn');
+document.getElementById('ctc-fi-panel-btn').onclick = () => { const fi = window.flowIntel; const btn = document.getElementById('ctc-fi-panel-btn'); if (fi && fi.togglePanel) btn.classList.toggle('on', fi.togglePanel()); };
 document.getElementById('ctc-ai-btn').onclick = () => {
   if (window.aiAssistant && typeof window.aiAssistant.open === 'function') window.aiAssistant.open();
   else console.warn('[chart-cockpit] ai-assistant.js not loaded yet');
