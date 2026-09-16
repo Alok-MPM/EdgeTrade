@@ -438,7 +438,7 @@ function observeTrade(market, price, qty, isBuyerMaker) {
 }
 function detectWhalePrint(market, usd, side, price) {
   const f = market.flow;
-  if (usd < Math.max(f.pct.p99, 500000)) return;
+  if (usd < whaleMin(f)) return;
   if (!flowCooldown(f, 'WP' + side, 20000)) return;
   emitFlowEvent(market, 'WHALE_PRINT', side, usd, price, {});
 }
@@ -490,7 +490,7 @@ function detectHerd(market) {
   const side = r.buy > r.sell ? 'buy' : 'sell';
   const share = Math.max(r.buy, r.sell) / tot;
   if (share >= 0.7) {
-    f.herd = { side, share, until: Date.now() + 300000 };
+    f.herd = { side, share, until: Date.now() + 300000, ts: Date.now() };
     if (flowCooldown(f, 'HERD' + side, 300000)) emitFlowEvent(market, 'RETAIL_HERD', side, tot, market.pulse.lastPrice || 0, { share: round2(share) });
     const sm = f.recentSmart;
     if (sm && Date.now() - sm.ts < 300000 && sm.side !== side && flowCooldown(f, 'TRAP', 300000)) {
@@ -527,9 +527,17 @@ function computeOutlook(market) {
   const call = s >= 25 ? 'bull' : s <= -25 ? 'bear' : 'range';
   return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60 };
 }
+function flowContext(market) {
+  const f = market.flow; const c = f.cls;
+  return {
+    retail_cvd: round2(c.retail.buy - c.retail.sell), pro_cvd: round2(c.pro.buy - c.pro.sell), whale_cvd: round2(c.whale.buy - c.whale.sell),
+    herd: f.herd && f.herd.until > Date.now() ? { side: f.herd.side, share: round2(f.herd.share) } : null,
+    price: round2(market.pulse.lastPrice || 0),
+  };
+}
 function saveOutlook(market, o) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
-  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
+  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: flowContext(market), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
 }
 function maybeEmitOutlook(market) {
   const o = computeOutlook(market); if (!o) return;
@@ -830,7 +838,7 @@ app.get('/api/outlook', async (req, res) => {
       if (Array.isArray(rows)) {
         const total = rows.length, correct = rows.filter(r => r.correct).length;
         out.stats = { total, correct, accuracyPct: total ? Math.round(correct / total * 100) : 0 };
-        out.history = rows.slice(0, 8).map(r => ({ ts: r.ts, call: r.call, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct }));
+        out.history = rows.slice(0, 20).map(r => ({ ts: r.ts, call: r.call, score: r.score, reasons: r.reasons, price_at_call: r.price_at_call, resolved_at: r.resolved_at, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct, context: r.context || null }));
       }
     } catch (e) {}
   }
