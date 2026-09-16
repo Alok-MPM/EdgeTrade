@@ -541,8 +541,14 @@ function saveOutlook(market, o) {
 }
 function maybeEmitOutlook(market) {
   const o = computeOutlook(market); if (!o) return;
+  const hourStart = Math.floor(Date.now() / 3600000) * 3600000;
+  const hourEnd = hourStart + 3600000;
+  o.hourStart = hourStart;
+  o.horizonEnd = hourEnd;
+  o.horizonMin = Math.max(1, Math.ceil((hourEnd - Date.now()) / 60000));
   const last = market.outlook;
-  if (last && last.call === o.call && Date.now() - last.ts < 30 * 60000) return;
+  if (last && last.hourStart === hourStart && last.call === o.call) return; // ek 1H candle = ek call
+  if (last && last.hourStart === hourStart && Date.now() - last.ts < 10 * 60000) return;
   market.outlook = o;
   broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: o.ts, type: 'OUTLOOK', side: o.call, usd: 0, price: market.pulse.lastPrice || 0, meta: { score: o.score, horizonMin: o.horizonMin, reasons: o.reasons } } });
   saveOutlook(market, o);
