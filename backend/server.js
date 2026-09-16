@@ -1029,7 +1029,10 @@ setInterval(async () => {
       type: 'pulse',
       data: { lastPrice: p.lastPrice, cvd: p.bucketCvd, oi: p.oi, verdict: p.verdict, verdictType: p.verdictType, bias: p.bias, oiUpdatedAt: p.oiUpdatedAt },
     });
-    if (market.flow) broadcastToMarket(market, { type: 'flow_state', data: flowStatePayload(market) });
+    if (market.flow) {
+      if (now % 60000 < 10000) maybeEmitOutlook(market); // ~every 60s, independent of the 5m roll
+      broadcastToMarket(market, { type: 'flow_state', data: flowStatePayload(market) });
+    }
   }
 }, 10000);
 // ----------------------------------------------------------
