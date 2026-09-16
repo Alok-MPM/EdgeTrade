@@ -61,6 +61,7 @@ function createMarket(symbol) {
     clients: new Set(),
     pulse: makePulseState(),
     flow: makeFlowState(),
+    outlook: null,
     liquidity: { bids: [], asks: [], lastUpdateTime: null, awake: false, lastActivity: 0, socket: null, reconnectTimer: null, clients: new Set() },
   };
 }
@@ -357,6 +358,7 @@ function countAwakeMarkets() {
 setInterval(() => {
   const now = Date.now();
   for (const market of markets.values()) {
+    if (market.symbol === 'btcusdt') continue; // 24/7 collector — never sleeps
     if (market.awake && market.clients.size === 0 && now - market.lastActivity > IDLE_SLEEP_MS) sleep(market);
     if (market.liquidity.awake && market.liquidity.clients.size === 0 && now - market.liquidity.lastActivity > IDLE_SLEEP_MS) sleepLiquidity(market);
   }
@@ -424,7 +426,7 @@ function observeTrade(market, price, qty, isBuyerMaker) {
   const usd = price * qty; const side = isBuyerMaker ? 'sell' : 'buy';
   const i = histIdx(usd);
   f.hist.set(i, (f.hist.get(i) || 0) + 1); f.histSum.set(i, (f.histSum.get(i) || 0) + usd); f.studyTrades++;
-  const cls = usd >= f.pct.p95 ? 'whale' : usd >= f.pct.p75 ? 'pro' : 'retail';
+  const cls = usd >= whaleMin(f) ? 'whale' : usd >= retailMax(f) ? 'pro' : 'retail';
   f.cls[cls][side] += usd;
   f.clips.push({ t: Date.now(), side, usd, price, cls });
   if (f.clips.length > 500) f.clips.splice(0, f.clips.length - 500);
@@ -497,9 +499,72 @@ function detectHerd(market) {
     }
   }
 }
+function retailMax(f) { return Math.min(Math.max(f.pct.p75, 1000), 10000); }
+function whaleMin(f) { return Math.max(f.pct.p99, 100000); }
+function windowDeltas(market, ms) {
+  const p = market.pulse; const now = Date.now();
+  const bs = (p.buckets || []).filter(b => b.time >= now - ms);
+  const cvd = bs.reduce((s, b) => s + (b.cvd || 0), 0);
+  const oi = bs.length ? (bs[bs.length - 1].oi || 0) - (bs[0].oi || 0) : 0;
+  const px = bs.length ? bs[bs.length - 1].close - bs[0].close : 0;
+  return { cvd, oi, px };
+}
+function computeOutlook(market) {
+  const f = market.flow; if (!f) return null;
+  const c = f.cls;
+  const wc = c.whale.buy - c.whale.sell, pc = c.pro.buy - c.pro.sell, rc = c.retail.buy - c.retail.sell;
+  const d = windowDeltas(market, 3600000);
+  let s = 0; const reasons = [];
+  const w = Math.max(-1, Math.min(1, wc / 50000)); s += w * 30; if (Math.abs(w) > 0.3) reasons.push(`whale flow ${w > 0 ? 'buy' : 'sell'} heavy`);
+  s += Math.max(-1, Math.min(1, pc / 100000)) * 15;
+  const rt = Math.max(-1, Math.min(1, rc / 100000)); s -= rt * 10; if (Math.abs(rt) > 0.4) reasons.push(`retail crowded ${rt > 0 ? 'long' : 'short'} (fade)`);
+  s += Math.max(-1, Math.min(1, d.cvd / 200)) * 10;
+  if (d.oi !== 0 && d.px !== 0) { s += (Math.sign(d.oi) === Math.sign(d.px) ? 5 : -5) * Math.sign(d.px); reasons.push(d.oi > 0 ? 'new money with trend' : 'position unwind'); }
+  if (f.herd && f.herd.until > Date.now()) { s += f.herd.side === 'buy' ? -10 : 10; reasons.push(`retail herd ${f.herd.side} (fade)`); }
+  if (f.recentSmart && Date.now() - f.recentSmart.ts < 600000) { s += f.recentSmart.side === 'buy' ? 10 : -10; reasons.push(`smart money ${f.recentSmart.side} clips`); }
+  if (f.trap && Date.now() - f.trap.ts < 600000) { s += f.trap.side === 'buy' ? -15 : 15; reasons.push(`trap on ${f.trap.side}s`); }
+  s = Math.max(-100, Math.min(100, Math.round(s)));
+  const call = s >= 25 ? 'bull' : s <= -25 ? 'bear' : 'range';
+  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60 };
+}
+function saveOutlook(market, o) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
+}
+function maybeEmitOutlook(market) {
+  const o = computeOutlook(market); if (!o) return;
+  const last = market.outlook;
+  if (last && last.call === o.call && Date.now() - last.ts < 30 * 60000) return;
+  market.outlook = o;
+  broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: o.ts, type: 'OUTLOOK', side: o.call, usd: 0, price: market.pulse.lastPrice || 0, meta: { score: o.score, horizonMin: o.horizonMin, reasons: o.reasons } } });
+  saveOutlook(market, o);
+}
+async function resolveOutlooks() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    const now = Date.now();
+    const due = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?resolved=eq.false&ts=lt.${now - 60000}`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
+    if (!Array.isArray(due) || !due.length) return;
+    const prices = {};
+    for (const sym of [...new Set(due.map(d => d.symbol))]) {
+      const m = markets.get(sym.toLowerCase());
+      if (m && m.pulse && m.pulse.lastPrice > 0) { prices[sym] = m.pulse.lastPrice; continue; }
+      try { const t = await fetch(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${sym}`).then(r => r.json()); prices[sym] = parseFloat(t?.result?.list?.[0]?.lastPrice) || 0; } catch (e) {}
+    }
+    for (const row of due) {
+      const px = prices[row.symbol]; if (!px) continue;
+      if (now - row.ts < (row.horizon_min || 60) * 60000) continue;
+      const pct = ((px - row.price_at_call) / row.price_at_call) * 100;
+      const actual = pct > 0.15 ? 'up' : pct < -0.15 ? 'down' : 'flat';
+      const correct = (row.call === 'bull' && actual === 'up') || (row.call === 'bear' && actual === 'down') || (row.call === 'range' && actual === 'flat');
+      await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' }, body: JSON.stringify({ resolved: true, resolved_at: now, actual_dir: actual, actual_pct: round2(pct), correct }) });
+    }
+  } catch (e) { console.error('outlook resolve:', e.message); }
+}
+setInterval(resolveOutlooks, 60000);
 function flowStatePayload(market) {
   const f = market.flow;
-  return { cls: f.cls, pct: f.pct, herd: f.herd, trap: f.trap, studyTrades: f.studyTrades, recentSmart: f.recentSmart };
+  return { cls: f.cls, pct: f.pct, bounds: { retailMax: retailMax(f), whaleMin: whaleMin(f) }, herd: f.herd, trap: f.trap, studyTrades: f.studyTrades, recentSmart: f.recentSmart, outlook: market.outlook || null };
 }
 // ---------------------------------------------------------------------------
 // HTTP API
@@ -755,6 +820,22 @@ app.get('/api/flow-events', async (req, res) => {
     res.json(r.ok ? await r.json() : []);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+app.get('/api/outlook', async (req, res) => {
+  const symbol = (req.query.symbol || 'BTCUSDT').toUpperCase();
+  const market = markets.get(symbol.toLowerCase());
+  const out = { current: market && market.outlook ? market.outlook : null, stats: null, history: [] };
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${symbol}&resolved=eq.true&order=ts.desc&limit=50`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
+      if (Array.isArray(rows)) {
+        const total = rows.length, correct = rows.filter(r => r.correct).length;
+        out.stats = { total, correct, accuracyPct: total ? Math.round(correct / total * 100) : 0 };
+        out.history = rows.slice(0, 8).map(r => ({ ts: r.ts, call: r.call, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct }));
+      }
+    } catch (e) {}
+  }
+  res.json(out);
+});
 app.get('/api/flow-summary', (req, res) => {
   const market = markets.get((req.query.symbol || 'btcusdt').toLowerCase());
   if (!market || !market.flow) return res.json({ waiting: true });
@@ -941,7 +1022,7 @@ setInterval(async () => {
         p.buckets.push({ time: p.bucketStart, close: p.lastPrice, volume: p.bucketVolume, cvd: p.bucketCvd, oi: p.oi });
         if (p.buckets.length > MAX_PULSE_BUCKETS) p.buckets.shift();
       }
-      if (market.flow) { saveFlowClass5m(market, p.bucketStart); recalibrateFlow(market); market.flow.cls = { retail: { buy: 0, sell: 0 }, pro: { buy: 0, sell: 0 }, whale: { buy: 0, sell: 0 } }; }
+      if (market.flow) { saveFlowClass5m(market, p.bucketStart); recalibrateFlow(market); maybeEmitOutlook(market); market.flow.cls = { retail: { buy: 0, sell: 0 }, pro: { buy: 0, sell: 0 }, whale: { buy: 0, sell: 0 } }; }
       p.bucketStart = curBucket; p.bucketVolume = 0; p.bucketCvd = 0;
     }
     broadcastToMarket(market, {
@@ -965,3 +1046,4 @@ process.on('SIGTERM', shutdown);
 app.get('/', (req, res) => res.json({ ok: true, service: 'edgetrade-backend' }));
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 server.listen(PORT, '0.0.0.0', () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
+wakeUp('btcusdt').catch(() => {}); // boot the 24/7 collector
