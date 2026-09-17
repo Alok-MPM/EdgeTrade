@@ -34,6 +34,7 @@ let currentIntervalMs = INTERVAL_MS['1m'];
 const CHART_TYPE_STYLE_MAP = { candle_solid: 'candle_solid', candle_stroke: 'candle_stroke', ohlc: 'ohlc', area: 'area' };
 const UP_COLOR = '#4CAF7D';
 const DOWN_COLOR = '#E05252';
+const IST_SHIFT_SEC = 19800; // UTC+5:30 — axis IST wall-clock dikhayega
 // ── Whale wall price-lines lifecycle (single owner: yahan) ────────────
 let wallLines = [];
 let wallSeries = null;
@@ -56,6 +57,7 @@ chartInstance = LightweightCharts.createChart(container, {
   grid: { vertLines: { color: '#2a2a2a' }, horzLines: { color: '#2a2a2a' } },
   autoSize: true,
   timeScale: { timeVisible: true, secondsVisible: false },
+  localization: { timeFormatter: (ts) => new Date(ts * 1000).toLocaleString('en-IN', { timeZone: 'UTC', hour12: true, hour: 'numeric', minute: '2-digit', day: '2-digit', month: 'short' }) },
 });
 createSeries(currentChartType);
 if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
@@ -138,12 +140,12 @@ refreshWhaleWalls(); // har chart type pe walls (pehle sirf candle modes thi)
 if (candleBuffer.length) seriesInstance.setData(toSeriesData(candleBuffer, type));
 }
 function toSeriesData(candles, type) {
-if (type === 'area') return candles.map(c => ({ time: Math.floor(c.timestamp / 1000), value: c.close }));
-return candles.map(c => ({ time: Math.floor(c.timestamp / 1000), open: c.open, high: c.high, low: c.low, close: c.close }));
+if (type === 'area') return candles.map(c => ({ time: Math.floor(c.timestamp / 1000) + IST_SHIFT_SEC, value: c.close }));
+return candles.map(c => ({ time: Math.floor(c.timestamp / 1000) + IST_SHIFT_SEC, open: c.open, high: c.high, low: c.low, close: c.close }));
 }
 function toSeriesPoint(c, type) {
-if (type === 'area') return { time: Math.floor(c.timestamp / 1000), value: c.close };
-return { time: Math.floor(c.timestamp / 1000), open: c.open, high: c.high, low: c.low, close: c.close };
+if (type === 'area') return { time: Math.floor(c.timestamp / 1000) + IST_SHIFT_SEC, value: c.close };
+return { time: Math.floor(c.timestamp / 1000) + IST_SHIFT_SEC, open: c.open, high: c.high, low: c.low, close: c.close };
 }
 function applyHistory(candles) {
 if (!chartInstance || !seriesInstance) return;
@@ -170,10 +172,11 @@ updateCountdown();
 }
 function updateCountdown() {
 if (!countdownEl) return;
-if (!currentCandleTimestamp) { countdownEl.textContent = '--:--'; return; }
+if (!currentCandleTimestamp) { countdownEl.textContent = istClock() + ' IST · --:--'; return; }
 const remainingMs = (currentCandleTimestamp + currentIntervalMs) - Date.now();
-countdownEl.textContent = formatCountdown(remainingMs);
+countdownEl.textContent = istClock() + ' IST · ' + formatCountdown(remainingMs);
 }
+function istClock() { return new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); }
 function formatCountdown(ms) {
 const totalSec = Math.max(0, Math.floor(ms / 1000));
 const h = Math.floor(totalSec / 3600);

@@ -368,7 +368,7 @@
 
     allCandles.forEach((candle) => {
       if (!candle || candle.time == null) return;
-      const x = timeScale.timeToCoordinate(Math.floor(candle.time / 1000));
+      const x = timeScale.timeToCoordinate(Math.floor(candle.time / 1000) + 19800);
       if (window.chartOverlayUtils.isOffscreenX(x, canvas.clientWidth)) return;
 
       const levels = Object.keys(candle.levels || {}).map(Number).sort((a, b) => b - a);

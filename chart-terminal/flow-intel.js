@@ -76,7 +76,7 @@ function updateOutBox() {
   if (md && state.record && state.record.model) md.textContent = state.record.model.samples ? `learned · n=${state.record.model.samples}` : 'priors (seekh raha hai)';
   const hist = document.getElementById('fo-history');
   if (hist && state.record && state.record.history) {
-    hist.innerHTML = state.record.history.map((h, i) => { const t = new Date(h.ts); const hh = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${h.actual_pct > 0 ? '+' : ''}${h.actual_pct}%</div>`; }).join('') || 'koi resolved call nahi abhi';
+    hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${h.actual_pct > 0 ? '+' : ''}${h.actual_pct}%</div>`; }).join('') || 'koi resolved call nahi abhi';
     hist.querySelectorAll('.fo-hrow').forEach(el => { el.onclick = () => openDrill(state.record.history[parseInt(el.getAttribute('data-i'), 10)]); });
   }
 }
@@ -87,7 +87,7 @@ function openDrill(h) {
   const d = state.drillEl;
   d.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📋 Call Record</h4>
   <div style="margin:4px 0;"><button id="fd-back" style="background:#2a2a30;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">← Back</button></div>
-  <div class="fi-row fi-muted"><span>Time</span><span>${new Date(h.ts).toLocaleString()}</span></div>
+  <div class="fi-row fi-muted"><span>Time</span><span>${new Date(h.ts).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit', day: '2-digit', month: 'short' })} IST</span></div>
   <div class="fi-row"><span>Call</span><span style="color:${h.call === 'bull' ? '#4CAF7D' : h.call === 'bear' ? '#E05252' : '#f5cb42'}">${h.call.toUpperCase()} (conf ${Math.abs(h.score || 0)})</span></div>
   <div class="fi-row"><span>Result</span><span style="color:${h.correct ? '#4CAF7D' : '#E05252'}">${h.correct ? 'PASS ✓' : 'FAIL ✗'} · market ${h.actual_dir} ${h.actual_pct > 0 ? '+' : ''}${h.actual_pct}%</span></div>
   <div class="fi-row fi-muted"><span>Price at call</span><span>${h.price_at_call || '—'}</span></div>
@@ -157,8 +157,8 @@ function render() {
   const ts = chart.timeScale();
   const L = state.layers;
   if (L.herd && state.live && state.live.herd && state.live.herd.until > Date.now() && state.live.herd.ts) {
-    const hx = ts.timeToCoordinate(Math.floor(state.live.herd.ts / 1000));
-    const hx2 = ts.timeToCoordinate(Math.floor(Date.now() / 1000));
+    const hx = ts.timeToCoordinate(Math.floor(state.live.herd.ts / 1000) + 19800);
+    const hx2 = ts.timeToCoordinate(Math.floor(Date.now() / 1000) + 19800);
     if (hx !== null) {
       const w = Math.max(30, (hx2 == null ? hx + 30 : hx2) - hx);
       ctx.fillStyle = state.live.herd.side === 'buy' ? 'rgba(76,175,125,0.16)' : 'rgba(224,82,82,0.16)';
@@ -172,7 +172,7 @@ function render() {
   if (L.whale || L.sweep || L.absorb || L.herd) drawHUD(ctx, canvas);
 }
 function drawEvent(ev, ts, series, ctx, canvas) {
-  const sec = Math.floor(ev.ts / 1000);
+  const sec = Math.floor(ev.ts / 1000) + 19800;
   const x = ts.timeToCoordinate(sec);
   if (x === null || x < -80 || x > canvas.clientWidth + 80) return;
   const L = state.layers;
