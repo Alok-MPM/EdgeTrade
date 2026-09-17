@@ -579,8 +579,17 @@ function computeOutlook(market) {
     if (Math.abs(feat[k]) >= 0.5 && Math.abs(weightFor(k)) >= 0.08) reasons.push(`${k} ${feat[k] > 0 ? '+' : '-'}${Math.abs(feat[k]).toFixed(1)} (w${weightFor(k) >= 0 ? '+' : ''}${weightFor(k).toFixed(2)})`);
   }
   const s = Math.max(-100, Math.min(100, Math.round(raw * 70)));
-  const call = s >= 25 ? 'bull' : s <= -25 ? 'bear' : 'range';
-  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat };
+  let call = s >= 25 ? 'bull' : s <= -25 ? 'bear' : 'range';
+  const cs = market.candles || [];
+  let eff = 0;
+  if (cs.length >= 61) {
+    const l60 = cs.slice(-60);
+    const net = Math.abs(l60[l60.length - 1].close - l60[0].close);
+    const sum = l60.reduce((a, c) => a + (c.high - c.low), 0);
+    eff = sum > 0 ? net / sum : 0;
+  }
+  if (eff < 0.2 && call !== 'range') { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
+  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat, eff: Math.round(eff * 100) / 100 };
 }
 function flowContext(market) {
   const f = market.flow; const c = f.cls;
