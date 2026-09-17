@@ -5,7 +5,7 @@ const REST_BASE = 'https://m-edgetrade-api-server.onrender.com';
 const RECONNECT_MS = 3000;
 const state = { ws: null, wsReconnect: null, events: [], live: null, record: null, symbol: null, overlay: null, unsub: null, bannerEl: null, boxEl: null, outEl: null, drillEl: null, panelOn: false, outOn: false, layers: { whale: true, sweep: true, absorb: true, herd: true } };
 const style = document.createElement('style');
-style.textContent = `.fi-banner{position:absolute;top:44px;left:50%;transform:translateX(-50%);z-index:9;background:rgba(255,82,82,0.16);border:1px solid #E05252;color:#ff8a8a;font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:7px 12px;border-radius:8px;max-width:80%;text-align:center;pointer-events:none;} .fi-box{position:fixed;top:70px;left:20px;width:250px;background:#0f0f12;border:1px solid #2a2a30;border-radius:10px;z-index:999998;display:none;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#EAECEF;} .fi-box2{position:fixed;top:70px;left:290px;width:280px;max-height:calc(100vh - 100px);overflow-y:auto;background:#0f0f12;border:1px solid #2a2a30;border-radius:10px;z-index:999998;display:none;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#EAECEF;} .fi-row{display:flex;justify-content:space-between;margin:3px 0;} .fi-muted{color:#8b8b96;} .fo-hrow{padding:4px 2px;border-bottom:1px dashed #2a2a30;cursor:pointer;} .fo-hrow:hover{background:#1a1a20;}`;
+ style.textContent = `.fi-banner{position:absolute;top:44px;left:50%;transform:translateX(-50%);z-index:9;background:rgba(255,82,82,0.16);border:1px solid #E05252;color:#ff8a8a;font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:7px 12px;border-radius:8px;max-width:80%;text-align:center;pointer-events:none;} .fi-box{position:fixed;top:70px;left:20px;width:300px;background:#0f0f12;border:1px solid #2a2a30;border-radius:10px;z-index:999998;display:none;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#EAECEF;} .fi-box2{position:fixed;top:70px;left:340px;width:330px;max-height:calc(100vh - 100px);overflow-y:auto;background:#0f0f12;border:1px solid #2a2a30;border-radius:10px;z-index:999998;display:none;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#EAECEF;} .fi-row{display:flex;justify-content:space-between;margin:3px 0;} .fi-muted{color:#8b8b96;} .fo-hrow{padding:4px 2px;border-bottom:1px dashed #2a2a30;cursor:pointer;} .fo-hrow:hover{background:#1a1a20;} @media (max-width:560px){.fi-box,.fi-box2{width:calc(100vw - 24px) !important;left:12px !important;top:64px !important;max-height:calc(100vh - 80px);}}`;
 document.head.appendChild(style);
 function currentSymbol() { return (typeof marketStore !== 'undefined') ? marketStore.getState().symbol : 'BTCUSDT'; }
 function usd(n) { const a = Math.abs(n); if (a >= 1e6) return '$' + (a / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return '$' + (a / 1e3).toFixed(1) + 'K'; return '$' + a.toFixed(0); }
@@ -23,7 +23,7 @@ function ensureBanner() { if (!state.bannerEl) { state.bannerEl = document.creat
 function ensureBox() {
   if (!state.boxEl) {
     state.boxEl = document.createElement('div'); state.boxEl.className = 'fi-box';
-    state.boxEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">🧠 Flow Intel</h4><div class="fi-row fi-muted"><span>Thresholds</span><span id="fi-pct">—</span></div><div class="fi-row"><span>Retail CVD</span><span id="fi-retail">—</span></div><div class="fi-row"><span>Pro CVD</span><span id="fi-pro">—</span></div><div class="fi-row"><span>Whale CVD</span><span id="fi-whale">—</span></div><div class="fi-row fi-muted"><span>Retail herd</span><span id="fi-herd">none</span></div><div class="fi-row fi-muted"><span>Study trades</span><span id="fi-study">0</span></div>`;
+    state.boxEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">🧠 Flow Intel</h4><div class="fi-row fi-muted"><span>Thresholds</span><span id="fi-pct">—</span></div><div class="fi-row"><span>Retail CVD</span><span id="fi-retail">—</span></div><div class="fi-row"><span>Pro CVD</span><span id="fi-pro">—</span></div><div class="fi-row"><span>Whale CVD</span><span id="fi-whale">—</span></div><div class="fi-row fi-muted"><span>Retail herd</span><span id="fi-herd">none</span></div><div class="fi-row fi-muted"><span>Study trades</span><span id="fi-study">0</span></div><div style="margin-top:8px;color:#8b8b96;font-size:9.5px;line-height:1.5;border-top:1px dashed #2a2a30;padding-top:6px;">CVD = market orders ka net paisa (buy − sell). + matlab aggressive buyers tod rahe, − matlab sellers. Retail = &lt;$1K trades · Pro = $1K–$100K · Whale = $100K+. Herd = retail ek side crowd → aksar ulta hota hai.</div>`;
     document.body.appendChild(state.boxEl);
   }
   state.boxEl.style.display = state.panelOn ? 'block' : 'none';
@@ -31,7 +31,7 @@ function ensureBox() {
 function ensureOutBox() {
   if (!state.outEl) {
     state.outEl = document.createElement('div'); state.outEl.className = 'fi-box2';
-    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div id="fo-pattern" style="font-size:10.5px;color:#D4B886;margin-bottom:4px;">—</div><div id="fo-pyramid" style="font-size:10.5px;color:#8b8b96;margin-bottom:4px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div class="fi-row fi-muted"><span>Model</span><span id="fo-model">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
+    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div id="fo-pattern" style="font-size:10.5px;color:#D4B886;margin-bottom:4px;">—</div><div id="fo-pyramid" style="font-size:10.5px;color:#8b8b96;margin-bottom:4px;">—</div><div id="fo-tpsl" style="font-size:10.5px;color:#EAECEF;margin-bottom:4px;">—</div><div id="fo-desc" style="font-size:9.5px;color:#8b8b96;line-height:1.5;margin-bottom:4px;">—</div><div id="fo-regime" style="font-size:9.5px;color:#D4B886;margin-bottom:4px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div class="fi-row fi-muted"><span>Model</span><span id="fo-model">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
     document.body.appendChild(state.outEl);
   }
   state.outEl.style.display = state.outOn ? 'block' : 'none';
@@ -79,9 +79,21 @@ function updateOutBox() {
   if (pt) pt.textContent = o2 && o2.pattern ? `⏰ range-but-move pattern (sim ${o2.pattern.sim}) — past moves ~${o2.pattern.medianMin}m baad aaye; break watch karo` : '—';
   const py = document.getElementById('fo-pyramid');
   if (py) py.textContent = o2 && o2.pyramid ? `PYRAMID: ${o2.pyramid.level} pe add (guard ${o2.pyramid.guard}) · size ${o2.pyramid.size}` : '—';
+  const tpsl = document.getElementById('fo-tpsl');
+  if (tpsl) tpsl.textContent = o2 && o2.tp ? `TP ${o2.tp} · SL ${o2.sl} (vol-based, RR 1:2)` : 'TP/SL: range mode — koi trade nahi';
+  const dsc = document.getElementById('fo-desc');
+  if (dsc) dsc.textContent = o2 && o2.desc ? o2.desc : '—';
+  const rg = document.getElementById('fo-regime');
+  if (rg && state.record && state.record.model && state.record.model.regime) {
+    const R = state.record.model.regime;
+    rg.textContent = 'Regime record: ' + Object.keys(R).slice(0, 4).map(k => `${k} ${R[k].win}/${R[k].n}`).join(' · ');
+  } else if (rg) rg.textContent = '—';
   const hist = document.getElementById('fo-history');
   if (hist && state.record && state.record.history) {
-    hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); const mv = h.move_usd != null ? (h.move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.move_usd)) : ((h.actual_pct || 0) > 0 ? '+' : '') + h.actual_pct + '%'; const tm = h.countdown_at_move != null ? ` @${h.countdown_at_move}m` : ''; const du = h.move_dur_min != null ? ` · ${h.move_dur_min}m` : ''; return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${mv}${tm}${du}</div>`; }).join('') || 'koi resolved call nahi abhi';
+    hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); const mv = h.move_usd != null ? (h.move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.move_usd)) : ((h.actual_pct || 0) > 0 ? '+' : '') + h.actual_pct + '%';
+    const ob = h.outcome === 'SL_THEN_TP' ? 'SL→TP' : h.outcome === 'TP_THEN_SL' ? 'TP→SL' : (h.outcome || '—');
+    const du = h.move_dur_min != null ? ` · ${h.move_dur_min}m` : '';
+    return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${mv}${du} · ${ob}</div>`; }).join('') || 'koi resolved call nahi abhi';
     hist.querySelectorAll('.fo-hrow').forEach(el => { el.onclick = () => openDrill(state.record.history[parseInt(el.getAttribute('data-i'), 10)]); });
   }
 }
@@ -101,7 +113,13 @@ function openDrill(h) {
   <div class="fi-row fi-muted"><span>Max move</span><span>${h.max_move_usd != null ? (h.max_move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.max_move_usd)) : '—'}</span></div>
   <div class="fi-row fi-muted"><span>Move aaya</span><span>${h.move_start_min != null ? h.move_start_min + 'm baad · countdown ' + h.countdown_at_move + 'm' : 'move nahi aaya'}</span></div>
   <div class="fi-row fi-muted"><span>Move chala</span><span>${h.move_dur_min != null ? h.move_dur_min + ' min tak' : '—'}</span></div>
+  <div class="fi-row fi-muted"><span>SL / TP</span><span>${h.sl_price || '—'} / ${h.tp_price || '—'}</span></div>
+  <div class="fi-row"><span>Outcome</span><span style="color:${(h.outcome || '').startsWith('TP') ? '#4CAF7D' : (h.outcome || '').startsWith('SL') ? '#E05252' : '#f5cb42'}">${h.outcome || '—'}${h.first_touch_min != null ? ' · first touch ' + h.first_touch_min + 'm' : ''}</span></div>
+  ${h.outcome === 'SL_THEN_TP' ? '<div style="color:#E05252;font-size:10px;margin:2px 0;">⚠ SL pehle hit (stop-hunt), phir TP — real 200x trade SL mein out hota. Is setup mein SL chhota mat rakho.</div>' : ''}
+  <div class="fi-row fi-muted"><span>Against move</span><span>${h.against_usd != null ? (h.against_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.against_usd)) : '—'}</span></div>
+  <div class="fi-row fi-muted"><span>Regime</span><span>${h.regime || '—'}</span></div>
   <div class="fi-row fi-muted"><span>Aapke liye</span><span>${(h.user_call || 'range').toUpperCase()}${h.pattern_bucket ? ' · ' + h.pattern_bucket : ''}</span></div>
+  ${h.desc_text ? `<div style="color:#8b8b96;font-size:9.5px;line-height:1.5;margin-top:4px;">${h.desc_text}</div>` : ''}
   <div style="border-top:1px solid #2a2a30;margin:6px 0;"></div>
   <div style="color:#8b8b96;font-size:10px;margin-bottom:4px;">US WAQT KA MARKET CONTEXT:</div>
   <div class="fi-row"><span>Retail CVD</span><span>${c.retail_cvd != null ? usd(c.retail_cvd) : '—'}</span></div>
