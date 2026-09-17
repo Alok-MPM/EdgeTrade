@@ -31,7 +31,7 @@ function ensureBox() {
 function ensureOutBox() {
   if (!state.outEl) {
     state.outEl = document.createElement('div'); state.outEl.className = 'fi-box2';
-    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div class="fi-row fi-muted"><span>Model</span><span id="fo-model">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
+    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div id="fo-pattern" style="font-size:10.5px;color:#D4B886;margin-bottom:4px;">—</div><div id="fo-pyramid" style="font-size:10.5px;color:#8b8b96;margin-bottom:4px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div class="fi-row fi-muted"><span>Model</span><span id="fo-model">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
     document.body.appendChild(state.outEl);
   }
   state.outEl.style.display = state.outOn ? 'block' : 'none';
@@ -74,9 +74,14 @@ function updateOutBox() {
   if (rec && state.record && state.record.stats) { const s = state.record.stats; rec.textContent = `ALL ${s.correct}/${s.total} (${s.accuracyPct}%) · DIR ${s.dirCorrect}/${s.dirTotal} (${s.dirPct}%)`; }
   const md = document.getElementById('fo-model');
   if (md && state.record && state.record.model) md.textContent = state.record.model.samples ? `learned · n=${state.record.model.samples}` : 'priors (seekh raha hai)';
+  const o2 = state.live ? state.live.outlook : null;
+  const pt = document.getElementById('fo-pattern');
+  if (pt) pt.textContent = o2 && o2.pattern ? `⏰ range-but-move pattern (sim ${o2.pattern.sim}) — past moves ~${o2.pattern.medianMin}m baad aaye; break watch karo` : '—';
+  const py = document.getElementById('fo-pyramid');
+  if (py) py.textContent = o2 && o2.pyramid ? `PYRAMID: ${o2.pyramid.level} pe add (guard ${o2.pyramid.guard}) · size ${o2.pyramid.size}` : '—';
   const hist = document.getElementById('fo-history');
   if (hist && state.record && state.record.history) {
-    hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${h.actual_pct > 0 ? '+' : ''}${h.actual_pct}%</div>`; }).join('') || 'koi resolved call nahi abhi';
+    hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); const mv = h.move_usd != null ? (h.move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.move_usd)) : ((h.actual_pct || 0) > 0 ? '+' : '') + h.actual_pct + '%'; const tm = h.countdown_at_move != null ? ` @${h.countdown_at_move}m` : ''; const du = h.move_dur_min != null ? ` · ${h.move_dur_min}m` : ''; return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${mv}${tm}${du}</div>`; }).join('') || 'koi resolved call nahi abhi';
     hist.querySelectorAll('.fo-hrow').forEach(el => { el.onclick = () => openDrill(state.record.history[parseInt(el.getAttribute('data-i'), 10)]); });
   }
 }
@@ -90,7 +95,13 @@ function openDrill(h) {
   <div class="fi-row fi-muted"><span>Time</span><span>${new Date(h.ts).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit', day: '2-digit', month: 'short' })} IST</span></div>
   <div class="fi-row"><span>Call</span><span style="color:${h.call === 'bull' ? '#4CAF7D' : h.call === 'bear' ? '#E05252' : '#f5cb42'}">${h.call.toUpperCase()} (conf ${Math.abs(h.score || 0)})</span></div>
   <div class="fi-row"><span>Result</span><span style="color:${h.correct ? '#4CAF7D' : '#E05252'}">${h.correct ? 'PASS ✓' : 'FAIL ✗'} · market ${h.actual_dir} ${h.actual_pct > 0 ? '+' : ''}${h.actual_pct}%</span></div>
-  <div class="fi-row fi-muted"><span>Price at call</span><span>${h.price_at_call || '—'}</span></div>
+  <div class="fi-row fi-muted"><span>Start price</span><span>${h.price_at_call || '—'}</span></div>
+  <div class="fi-row fi-muted"><span>End price</span><span>${h.end_price || '—'}</span></div>
+  <div class="fi-row"><span>Move</span><span style="color:${(h.move_usd || 0) >= 0 ? '#4CAF7D' : '#E05252'}">${h.move_usd != null ? (h.move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.move_usd)) + ' (' + ((h.actual_pct || 0) > 0 ? '+' : '') + h.actual_pct + '%)' : '—'}</span></div>
+  <div class="fi-row fi-muted"><span>Max move</span><span>${h.max_move_usd != null ? (h.max_move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.max_move_usd)) : '—'}</span></div>
+  <div class="fi-row fi-muted"><span>Move aaya</span><span>${h.move_start_min != null ? h.move_start_min + 'm baad · countdown ' + h.countdown_at_move + 'm' : 'move nahi aaya'}</span></div>
+  <div class="fi-row fi-muted"><span>Move chala</span><span>${h.move_dur_min != null ? h.move_dur_min + ' min tak' : '—'}</span></div>
+  <div class="fi-row fi-muted"><span>Aapke liye</span><span>${(h.user_call || 'range').toUpperCase()}${h.pattern_bucket ? ' · ' + h.pattern_bucket : ''}</span></div>
   <div style="border-top:1px solid #2a2a30;margin:6px 0;"></div>
   <div style="color:#8b8b96;font-size:10px;margin-bottom:4px;">US WAQT KA MARKET CONTEXT:</div>
   <div class="fi-row"><span>Retail CVD</span><span>${c.retail_cvd != null ? usd(c.retail_cvd) : '—'}</span></div>
