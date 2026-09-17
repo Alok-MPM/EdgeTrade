@@ -545,7 +545,7 @@ async function recomputeWeights() {
   try {
     const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?resolved=eq.true&actual_pct=not.is.null&order=ts.desc&limit=300`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
     if (!Array.isArray(rows) || rows.length < 10) return;
-    const stats = {}; const reg = {};
+    const stats = {}; const reg = {}; const tuneAcc = {};
     for (const r of rows) {
       const feat = r.context && r.context.feat;
       if (feat && r.call !== 'range') {
@@ -560,6 +560,12 @@ async function recomputeWeights() {
       const rk = r.call + ':' + (r.regime || 'trend');
       reg[rk] = reg[rk] || { n: 0, win: 0 };
       reg[rk].n++; if (r.correct) reg[rk].win++;
+      if (r.call !== 'range') {
+        const rg2 = r.regime || 'trend';
+        tuneAcc[rg2] = tuneAcc[rg2] || { n: 0, hunt: 0 };
+        tuneAcc[rg2].n++;
+        if ((r.outcome || '').indexOf('SL') === 0) tuneAcc[rg2].hunt++;
+      }
     }
     const weights = {};
     for (const k of FEATURE_DEFS) {
@@ -567,7 +573,14 @@ async function recomputeWeights() {
       const wr = s.win / s.n;
       weights[k] = { weight: Math.max(-1, Math.min(1, (wr - 0.5) * 2)), n: s.n, winrate: Math.round(wr * 100) / 100, updated: Date.now() };
     }
-    MODEL = { weights, n: rows.length, updated: Date.now(), regime: reg };
+    const regimeTune = {};
+    for (const g of Object.keys(tuneAcc)) {
+      const t = tuneAcc[g];
+      if (t.n < 4) continue;
+      const hunt = t.hunt / t.n;
+      regimeTune[g] = { slMult: Math.round((1 + Math.min(1, hunt)) * 10) / 10, confBoost: Math.round(20 * hunt), slHunt: Math.round(hunt * 100) / 100 };
+    }
+    MODEL = { weights, n: rows.length, updated: Date.now(), regime: reg, regimeTune };
     for (const k of Object.keys(weights)) {
       fetch(`${SUPABASE_URL}/rest/v1/flow_weights?feature=eq.${k}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify(Object.assign({ feature: k }, weights[k])) }).catch(() => {});
     }
@@ -584,7 +597,6 @@ function computeOutlook(market) {
     if (Math.abs(feat[k]) >= 0.5 && Math.abs(weightFor(k)) >= 0.08) reasons.push(`${k} ${feat[k] > 0 ? '+' : '-'}${Math.abs(feat[k]).toFixed(1)} (w${weightFor(k) >= 0 ? '+' : ''}${weightFor(k).toFixed(2)})`);
   }
   const s = Math.max(-100, Math.min(100, Math.round(raw * 70)));
-  let call = s >= 25 ? 'bull' : s <= -25 ? 'bear' : 'range';
   const cs = market.candles || [];
   let eff = 0;
   if (cs.length >= 61) {
@@ -593,10 +605,15 @@ function computeOutlook(market) {
     const sum = l60.reduce((a, c) => a + (c.high - c.low), 0);
     eff = sum > 0 ? net / sum : 0;
   }
+  const regime0 = eff < 0.2 ? 'chop' : 'trend';
+  const tune = (MODEL.regimeTune && MODEL.regimeTune[regime0]) || { slMult: 1, confBoost: 0, slHunt: 0 };
+  const bar = 25 + (tune.confBoost || 0);
+  let call = s >= bar ? 'bull' : s <= -bar ? 'bear' : 'range';
   if (eff < 0.2 && call !== 'range') { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
+  if (tune.confBoost > 0 && call === 'range' && Math.abs(s) >= 25) reasons.unshift(`conf bar +${tune.confBoost} (${regime0} mein stop-hunt ${Math.round((tune.slHunt || 0) * 100)}%)`);
   let pattern = null;
   if (call === 'range' && MISSED.length >= 3) {
-    const sims = MISSED.map(x => ({ s: cosine(feat, x.feat), m: x.m })).filter(x => x.s >= 0.6 && x.m != null);
+    const sims = MISSED.map(x => ({ s: cosine(feat, x.feat), m: x.m })).filter(x => x.s >= 0.5 && x.m != null);
     if (sims.length >= 2) { const ms = sims.map(x => x.m).sort((a, b) => a - b); pattern = { sim: Math.round(sims[0].s * 100) / 100, medianMin: ms[Math.floor(ms.length / 2)] }; }
   }
   let pyramid = null;
@@ -616,11 +633,11 @@ function computeOutlook(market) {
   const regime = eff < 0.2 ? 'chop' : 'trend';
   let tp = null, sl = null, desc = '';
   if (call !== 'range' && lp2 > 0 && r60 > 0) {
-    const slDist = Math.max(lp2 * 0.0018, r60 * 0.9);
-    const tpDist = Math.max(lp2 * 0.0036, r60 * 1.8);
+    const slDist = Math.max(lp2 * 0.0018, r60 * 0.9) * (tune.slMult || 1);
+    const tpDist = slDist * 2;
     if (call === 'bull') { tp = round2(lp2 + tpDist); sl = round2(lp2 - slDist); }
     else { tp = round2(lp2 - tpDist); sl = round2(lp2 + slDist); }
-    desc = `${call.toUpperCase()} entry ~${round2(lp2)} · SL ${sl} · TP ${tp} (vol r60 $${Math.round(r60)}, RR 1:2) · ${regime} · eff ${eff.toFixed(2)}`;
+    desc = `${call.toUpperCase()} entry ~${round2(lp2)} · SL ${sl} · TP ${tp} (vol r60 $${Math.round(r60)}, RR 1:2${(tune.slMult || 1) > 1 ? ', SL widened ×' + tune.slMult.toFixed(1) : ''}) · ${regime} · eff ${eff.toFixed(2)}`;
   } else {
     desc = `RANGE: tradeable edge nahi (eff ${eff.toFixed(2)}, ${regime}) · $350+ break ka wait karo`;
   }
@@ -644,7 +661,10 @@ function maybeEmitOutlook(market) {
   o.horizonEnd = Date.now() + 60 * 60000; // decision-anchored window
   o.horizonMin = 60;
   const last = market.outlook;
-  if (last && last.call === o.call) { market.flow.pendingCall = null; return; }
+  if (last && last.call === o.call) {
+    market.flow.pendingCall = null;
+    if (Date.now() - last.ts < 60 * 60000) return; // window poora hone do, phir nayi row
+  }
   if (last && o.call !== last.call) {
     const pend = market.flow.pendingCall;
     if (!pend || pend.call !== o.call) { market.flow.pendingCall = { call: o.call, since: Date.now() }; return; }
@@ -1006,7 +1026,7 @@ app.get('/api/outlook', async (req, res) => {
       }
     } catch (e) {}
   }
-  out.model = { samples: MODEL.n, updated: MODEL.updated, weights: MODEL.weights, regime: MODEL.regime || null };
+  out.model = { samples: MODEL.n, updated: MODEL.updated, weights: MODEL.weights, regime: MODEL.regime || null, regimeTune: MODEL.regimeTune || null };
   res.json(out);
 });
 app.get('/api/flow-summary', (req, res) => {
