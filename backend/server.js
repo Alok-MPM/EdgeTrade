@@ -486,11 +486,14 @@ function detectSweep(market, price) {
 }
 function detectHerd(market) {
   const f = market.flow; const r = f.cls.retail; const tot = r.buy + r.sell;
-  if (tot < 100000) return;
+  const now = Date.now();
+  if (tot < 150000) return; // quiet minutes mein chhota retail flow herd whipsaw karta tha
   const side = r.buy > r.sell ? 'buy' : 'sell';
   const share = Math.max(r.buy, r.sell) / tot;
-  if (share >= 0.7) {
-    f.herd = { side, share, until: Date.now() + 300000, ts: Date.now() };
+  if (share >= 0.72) {
+    if (!f.herdCand || f.herdCand.side !== side) f.herdCand = { side, firstTs: now };
+    if (now - f.herdCand.firstTs < 60000) return; // 60s tikka tabhi herd maano
+    f.herd = { side, share, until: now + 300000, ts: now };
     if (flowCooldown(f, 'HERD' + side, 300000)) emitFlowEvent(market, 'RETAIL_HERD', side, tot, market.pulse.lastPrice || 0, { share: round2(share) });
     const sm = f.recentSmart;
     if (sm && Date.now() - sm.ts < 300000 && sm.side !== side && flowCooldown(f, 'TRAP', 300000)) {
@@ -850,7 +853,9 @@ app.get('/api/outlook', async (req, res) => {
       const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${symbol}&resolved=eq.true&order=ts.desc&limit=50`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
       if (Array.isArray(rows)) {
         const total = rows.length, correct = rows.filter(r => r.correct).length;
-        out.stats = { total, correct, accuracyPct: total ? Math.round(correct / total * 100) : 0 };
+        const dir = rows.filter(r => r.call !== 'range');
+        const dirOk = dir.filter(r => r.correct).length;
+        out.stats = { total, correct, accuracyPct: total ? Math.round(correct / total * 100) : 0, dirTotal: dir.length, dirCorrect: dirOk, dirPct: dir.length ? Math.round(dirOk / dir.length * 100) : 0 };
         out.history = rows.slice(0, 20).map(r => ({ ts: r.ts, call: r.call, score: r.score, reasons: r.reasons, price_at_call: r.price_at_call, resolved_at: r.resolved_at, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct, context: r.context || null }));
       }
     } catch (e) {}

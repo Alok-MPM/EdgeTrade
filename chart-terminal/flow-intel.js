@@ -71,7 +71,7 @@ function updateOutBox() {
   state.horizonEnd = o && o.horizonEnd ? o.horizonEnd : null;
   const rs = document.getElementById('fo-reasons'); if (rs) rs.innerHTML = o && o.reasons && o.reasons.length ? o.reasons.map(r => '• ' + r).join('<br>') : 'abhi koi strong signal nahi';
   const rec = document.getElementById('fo-record');
-  if (rec && state.record && state.record.stats) rec.textContent = `${state.record.stats.correct}/${state.record.stats.total} (${state.record.stats.accuracyPct}%)`;
+  if (rec && state.record && state.record.stats) { const s = state.record.stats; rec.textContent = `ALL ${s.correct}/${s.total} (${s.accuracyPct}%) · DIR ${s.dirCorrect}/${s.dirTotal} (${s.dirPct}%)`; }
   const hist = document.getElementById('fo-history');
   if (hist && state.record && state.record.history) {
     hist.innerHTML = state.record.history.map((h, i) => { const t = new Date(h.ts); const hh = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${h.actual_pct > 0 ? '+' : ''}${h.actual_pct}%</div>`; }).join('') || 'koi resolved call nahi abhi';
