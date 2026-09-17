@@ -545,16 +545,21 @@ async function recomputeWeights() {
   try {
     const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?resolved=eq.true&actual_pct=not.is.null&order=ts.desc&limit=300`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
     if (!Array.isArray(rows) || rows.length < 10) return;
-    const stats = {};
+    const stats = {}; const reg = {};
     for (const r of rows) {
-      const feat = r.context && r.context.feat; if (!feat) continue;
-      if (Math.abs(r.actual_pct) < 0.03) continue; // noise hour — skip
-      for (const k of FEATURE_DEFS) {
-        const v = feat[k]; if (v == null || Math.abs(v) < 0.3) continue;
-        stats[k] = stats[k] || { n: 0, win: 0 };
-        stats[k].n++;
-        if (Math.sign(v) === Math.sign(r.actual_pct)) stats[k].win++;
+      const feat = r.context && r.context.feat;
+      if (feat && r.call !== 'range') {
+        const target = r.correct ? (r.call === 'bull' ? 1 : -1) : (r.call === 'bull' ? -1 : 1);
+        for (const k of FEATURE_DEFS) {
+          const v = feat[k]; if (v == null || Math.abs(v) < 0.3) continue;
+          stats[k] = stats[k] || { n: 0, win: 0 };
+          stats[k].n++;
+          if (Math.sign(v) === target) stats[k].win++;
+        }
       }
+      const rk = r.call + ':' + (r.regime || 'trend');
+      reg[rk] = reg[rk] || { n: 0, win: 0 };
+      reg[rk].n++; if (r.correct) reg[rk].win++;
     }
     const weights = {};
     for (const k of FEATURE_DEFS) {
@@ -562,7 +567,7 @@ async function recomputeWeights() {
       const wr = s.win / s.n;
       weights[k] = { weight: Math.max(-1, Math.min(1, (wr - 0.5) * 2)), n: s.n, winrate: Math.round(wr * 100) / 100, updated: Date.now() };
     }
-    MODEL = { weights, n: rows.length, updated: Date.now() };
+    MODEL = { weights, n: rows.length, updated: Date.now(), regime: reg };
     for (const k of Object.keys(weights)) {
       fetch(`${SUPABASE_URL}/rest/v1/flow_weights?feature=eq.${k}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify(Object.assign({ feature: k }, weights[k])) }).catch(() => {});
     }
@@ -605,7 +610,21 @@ function computeOutlook(market) {
         : { level: round2(lp + 0.5 * r60), guard: round2(lp + 1.5 * r60), size: '1x max' };
     }
   }
-  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat, eff: Math.round(eff * 100) / 100, pattern, pyramid };
+  const cc2 = market.candles || [];
+  const r60 = cc2.length >= 60 ? cc2.slice(-60).reduce((a, c) => a + (c.high - c.low), 0) / 60 : 0;
+  const lp2 = market.pulse.lastPrice || 0;
+  const regime = eff < 0.2 ? 'chop' : 'trend';
+  let tp = null, sl = null, desc = '';
+  if (call !== 'range' && lp2 > 0 && r60 > 0) {
+    const slDist = Math.max(lp2 * 0.0018, r60 * 0.9);
+    const tpDist = Math.max(lp2 * 0.0036, r60 * 1.8);
+    if (call === 'bull') { tp = round2(lp2 + tpDist); sl = round2(lp2 - slDist); }
+    else { tp = round2(lp2 - tpDist); sl = round2(lp2 + slDist); }
+    desc = `${call.toUpperCase()} entry ~${round2(lp2)} · SL ${sl} · TP ${tp} (vol r60 $${Math.round(r60)}, RR 1:2) · ${regime} · eff ${eff.toFixed(2)}`;
+  } else {
+    desc = `RANGE: tradeable edge nahi (eff ${eff.toFixed(2)}, ${regime}) · $350+ break ka wait karo`;
+  }
+  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat, eff: Math.round(eff * 100) / 100, pattern, pyramid, tp, sl, desc, regime, r60: round2(r60) };
 }
 function flowContext(market) {
   const f = market.flow; const c = f.cls;
@@ -617,7 +636,7 @@ function flowContext(market) {
 }
 function saveOutlook(market, o) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
-  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: Object.assign(flowContext(market), { feat: o.feat || null }), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
+  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: Object.assign(flowContext(market), { feat: o.feat || null }), tp_price: o.tp, sl_price: o.sl, regime: o.regime, desc_text: o.desc, resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
 }
 function maybeEmitOutlook(market) {
   const o = computeOutlook(market); if (!o) return;
@@ -668,26 +687,47 @@ async function resolveOutlooks() {
       }
       const key = row.symbol + ':' + row.ts;
       let tr = MOVE_TRACK.get(key);
-      if (!tr) { tr = { maxDev: 0, moveStartMin: null, peakMin: null }; MOVE_TRACK.set(key, tr); }
+      if (!tr) { tr = { maxDev: 0, moveStartMin: null, peakMin: null, mfe: null, mae: null, firstTouch: null, firstTouchMin: null, tpHit: null, slHit: null }; MOVE_TRACK.set(key, tr); }
       const m = Math.floor((now - row.ts) / 60000);
       const dev = px - row.price_at_call;
       if (Math.abs(dev) > Math.abs(tr.maxDev)) { tr.maxDev = dev; tr.peakMin = m; }
       const thr = tradeMinUsd(row.symbol, row.price_at_call);
       if (tr.moveStartMin == null && Math.abs(dev) >= thr) tr.moveStartMin = m;
-      if (m < (row.horizon_min || 60)) continue; // window abhi chalu hai
-      const moveUsd = round2(dev);
-      const maxMove = round2(tr.maxDev);
+      if (row.tp_price && row.sl_price && row.call !== 'range') {
+        if (row.call === 'bull') {
+          if (!tr.tpHit && px >= row.tp_price) { tr.tpHit = m; if (!tr.firstTouch) { tr.firstTouch = 'tp'; tr.firstTouchMin = m; } }
+          if (!tr.slHit && px <= row.sl_price) { tr.slHit = m; if (!tr.firstTouch) { tr.firstTouch = 'sl'; tr.firstTouchMin = m; } }
+          tr.mfe = tr.mfe == null ? dev : Math.max(tr.mfe, dev);
+          tr.mae = tr.mae == null ? dev : Math.min(tr.mae, dev);
+        } else {
+          if (!tr.tpHit && px <= row.tp_price) { tr.tpHit = m; if (!tr.firstTouch) { tr.firstTouch = 'tp'; tr.firstTouchMin = m; } }
+          if (!tr.slHit && px >= row.sl_price) { tr.slHit = m; if (!tr.firstTouch) { tr.firstTouch = 'sl'; tr.firstTouchMin = m; } }
+          tr.mfe = tr.mfe == null ? dev : Math.min(tr.mfe, dev);
+          tr.mae = tr.mae == null ? dev : Math.max(tr.mae, dev);
+        }
+      } else { tr.mfe = tr.maxDev; tr.mae = 0; }
+      if (m < (row.horizon_min || 60)) continue;
+      const moveUsd = round2(tr.mfe != null ? tr.mfe : dev);
+      const againstUsd = round2(tr.mae != null && isFinite(tr.mae) ? tr.mae : 0);
+      let outcome = 'EXPIRED';
+      if (row.tp_price && row.sl_price && row.call !== 'range') {
+        if (tr.firstTouch === 'sl') outcome = tr.tpHit != null ? 'SL_THEN_TP' : 'SL';
+        else if (tr.firstTouch === 'tp') outcome = tr.slHit != null ? 'TP_THEN_SL' : 'TP';
+      }
+      const dirSign = row.call === 'bull' ? 1 : -1;
+      const correct = row.call === 'range'
+        ? Math.abs(tr.maxDev) < thr
+        : (outcome === 'TP' || outcome === 'TP_THEN_SL' || (outcome === 'EXPIRED' && Math.sign(moveUsd) === dirSign && Math.abs(moveUsd) >= thr));
       const dur = (tr.moveStartMin != null && tr.peakMin != null) ? Math.max(0, tr.peakMin - tr.moveStartMin) : null;
       const cdm = tr.moveStartMin != null ? Math.max(0, (row.horizon_min || 60) - tr.moveStartMin) : null;
       const bucket = tr.moveStartMin == null ? null : (tr.moveStartMin < 15 ? 'early' : tr.moveStartMin < 40 ? 'mid' : 'late');
-      const userCall = Math.abs(moveUsd) >= thr ? (moveUsd > 0 ? 'bull' : 'bear') : 'range';
-      const correct = (row.call === 'bull' && moveUsd >= thr) || (row.call === 'bear' && moveUsd <= -thr) || (row.call === 'range' && Math.abs(moveUsd) < thr);
+      const userCall = Math.abs(tr.maxDev) >= thr ? (tr.maxDev > 0 ? 'bull' : 'bear') : 'range';
       MOVE_TRACK.delete(key);
       if (row.call === 'range' && Math.abs(moveUsd) >= thr) {
         MISSED.push({ feat: (row.context && row.context.feat) || null, m: tr.moveStartMin });
         if (MISSED.length > 30) MISSED.shift();
       }
-      await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' }, body: JSON.stringify({ resolved: true, resolved_at: now, end_price: round2(px), actual_pct: round2((dev / row.price_at_call) * 100), actual_dir: dev > 0 ? 'up' : dev < 0 ? 'down' : 'flat', move_usd: moveUsd, max_move_usd: maxMove, move_start_min: tr.moveStartMin, move_dur_min: dur, countdown_at_move: cdm, user_call: userCall, pattern_bucket: bucket, correct }) });
+      await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' }, body: JSON.stringify({ resolved: true, resolved_at: now, end_price: round2(px), actual_pct: round2((dev / row.price_at_call) * 100), actual_dir: dev > 0 ? 'up' : dev < 0 ? 'down' : 'flat', move_usd: moveUsd, max_move_usd: round2(tr.maxDev), against_usd: againstUsd, outcome, first_touch_min: tr.firstTouchMin, move_start_min: tr.moveStartMin, move_dur_min: dur, countdown_at_move: cdm, user_call: userCall, pattern_bucket: bucket, correct }) });
     }
   } catch (e) { console.error('outlook resolve:', e.message); }
 }
@@ -962,11 +1002,11 @@ app.get('/api/outlook', async (req, res) => {
         const dir = rows.filter(r => r.call !== 'range');
         const dirOk = dir.filter(r => r.correct).length;
         out.stats = { total, correct, accuracyPct: total ? Math.round(correct / total * 100) : 0, dirTotal: dir.length, dirCorrect: dirOk, dirPct: dir.length ? Math.round(dirOk / dir.length * 100) : 0 };
-        out.history = rows.slice(0, 20).map(r => ({ ts: r.ts, call: r.call, score: r.score, reasons: r.reasons, price_at_call: r.price_at_call, resolved_at: r.resolved_at, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct, context: r.context || null, end_price: r.end_price, move_usd: r.move_usd, max_move_usd: r.max_move_usd, move_start_min: r.move_start_min, move_dur_min: r.move_dur_min, countdown_at_move: r.countdown_at_move, user_call: r.user_call, pattern_bucket: r.pattern_bucket }));
+        out.history = rows.slice(0, 20).map(r => ({ ts: r.ts, call: r.call, score: r.score, reasons: r.reasons, price_at_call: r.price_at_call, resolved_at: r.resolved_at, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct, context: r.context || null, end_price: r.end_price, move_usd: r.move_usd, max_move_usd: r.max_move_usd, against_usd: r.against_usd, move_start_min: r.move_start_min, move_dur_min: r.move_dur_min, countdown_at_move: r.countdown_at_move, user_call: r.user_call, pattern_bucket: r.pattern_bucket, tp_price: r.tp_price, sl_price: r.sl_price, outcome: r.outcome, first_touch_min: r.first_touch_min, regime: r.regime, desc_text: r.desc_text }));
       }
     } catch (e) {}
   }
-  out.model = { samples: MODEL.n, updated: MODEL.updated, weights: MODEL.weights };
+  out.model = { samples: MODEL.n, updated: MODEL.updated, weights: MODEL.weights, regime: MODEL.regime || null };
   res.json(out);
 });
 app.get('/api/flow-summary', (req, res) => {
