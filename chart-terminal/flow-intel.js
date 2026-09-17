@@ -31,7 +31,7 @@ function ensureBox() {
 function ensureOutBox() {
   if (!state.outEl) {
     state.outEl = document.createElement('div'); state.outEl.className = 'fi-box2';
-    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div id="fo-pattern" style="font-size:10.5px;color:#D4B886;margin-bottom:4px;">—</div><div id="fo-pyramid" style="font-size:10.5px;color:#8b8b96;margin-bottom:4px;">—</div><div id="fo-tpsl" style="font-size:10.5px;color:#EAECEF;margin-bottom:4px;">—</div><div id="fo-desc" style="font-size:9.5px;color:#8b8b96;line-height:1.5;margin-bottom:4px;">—</div><div id="fo-regime" style="font-size:9.5px;color:#D4B886;margin-bottom:4px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div class="fi-row fi-muted"><span>Model</span><span id="fo-model">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
+    state.outEl.innerHTML = `<h4 style="margin:0 0 8px;font-size:12px;color:#D4B886;">📈 Market Outlook</h4><div id="fo-call" style="font-size:16px;font-weight:bold;margin-bottom:4px;">—</div><div id="fo-action" style="font-size:12px;font-weight:bold;margin-bottom:6px;">—</div><div id="fo-pattern" style="font-size:10.5px;color:#D4B886;margin-bottom:4px;">—</div><div id="fo-pyramid" style="font-size:10.5px;color:#8b8b96;margin-bottom:4px;">—</div><div id="fo-tpsl" style="font-size:10.5px;color:#EAECEF;margin-bottom:4px;">—</div><div id="fo-desc" style="font-size:9.5px;color:#8b8b96;line-height:1.5;margin-bottom:4px;">—</div><div id="fo-regime" style="font-size:9.5px;color:#D4B886;margin-bottom:4px;">—</div><div id="fo-tune" style="font-size:9.5px;color:#8b8b96;margin-bottom:4px;">—</div><div class="fi-row fi-muted"><span>Confidence</span><span id="fo-conf">—</span></div><div class="fi-row fi-muted"><span>Horizon</span><span id="fo-horizon">—</span></div><div class="fi-row fi-muted"><span>Time left</span><span id="fo-left">—</span></div><div id="fo-reasons" style="margin:6px 0;color:#8b8b96;font-size:10px;line-height:1.6;"></div><div style="border-top:1px solid #2a2a30;margin:6px 0;"></div><div class="fi-row"><span>Record</span><span id="fo-record">—</span></div><div class="fi-row fi-muted"><span>Model</span><span id="fo-model">—</span></div><div style="color:#8b8b96;font-size:10px;margin:4px 0 2px;">History (click for full record):</div><div id="fo-history"></div>`;
     document.body.appendChild(state.outEl);
   }
   state.outEl.style.display = state.outOn ? 'block' : 'none';
@@ -88,6 +88,11 @@ function updateOutBox() {
     const R = state.record.model.regime;
     rg.textContent = 'Regime record: ' + Object.keys(R).slice(0, 4).map(k => `${k} ${R[k].win}/${R[k].n}`).join(' · ');
   } else if (rg) rg.textContent = '—';
+  const tn = document.getElementById('fo-tune');
+  if (tn && state.record && state.record.model && state.record.model.regimeTune) {
+    const T = state.record.model.regimeTune;
+    tn.textContent = 'Self-tuning: ' + Object.keys(T).map(k => `${k}: SL ×${T[k].slMult}, conf +${T[k].confBoost} (stop-hunt ${Math.round(T[k].slHunt * 100)}%)`).join(' · ');
+  } else if (tn) tn.textContent = '—';
   const hist = document.getElementById('fo-history');
   if (hist && state.record && state.record.history) {
     hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); const mv = h.move_usd != null ? (h.move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.move_usd)) : ((h.actual_pct || 0) > 0 ? '+' : '') + h.actual_pct + '%';
@@ -278,7 +283,7 @@ setInterval(() => {
   if (!el) return;
   if (!state.outOn || !state.horizonEnd) { el.textContent = '—'; return; }
   const ms = state.horizonEnd - Date.now();
-  if (ms <= 0) { el.textContent = 'candle closed → new call'; return; }
+  if (ms <= 0) { el.textContent = 'window khatam → re-decide...'; return; }
   const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
   el.textContent = m + 'm ' + String(s).padStart(2, '0') + 's';
 }, 1000);
