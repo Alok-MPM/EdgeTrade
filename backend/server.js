@@ -589,7 +589,23 @@ function computeOutlook(market) {
     eff = sum > 0 ? net / sum : 0;
   }
   if (eff < 0.2 && call !== 'range') { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
-  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat, eff: Math.round(eff * 100) / 100 };
+  let pattern = null;
+  if (call === 'range' && MISSED.length >= 3) {
+    const sims = MISSED.map(x => ({ s: cosine(feat, x.feat), m: x.m })).filter(x => x.s >= 0.6 && x.m != null);
+    if (sims.length >= 2) { const ms = sims.map(x => x.m).sort((a, b) => a - b); pattern = { sim: Math.round(sims[0].s * 100) / 100, medianMin: ms[Math.floor(ms.length / 2)] }; }
+  }
+  let pyramid = null;
+  if (call !== 'range' && Math.abs(s) >= 40) {
+    const cc = market.candles || [];
+    const lp = market.pulse.lastPrice || 0;
+    if (cc.length >= 60 && lp > 0) {
+      const r60 = cc.slice(-60).reduce((a, c) => a + (c.high - c.low), 0) / 60;
+      pyramid = call === 'bull'
+        ? { level: round2(lp - 0.5 * r60), guard: round2(lp - 1.5 * r60), size: '1x max' }
+        : { level: round2(lp + 0.5 * r60), guard: round2(lp + 1.5 * r60), size: '1x max' };
+    }
+  }
+  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat, eff: Math.round(eff * 100) / 100, pattern, pyramid };
 }
 function flowContext(market) {
   const f = market.flow; const c = f.cls;
@@ -606,49 +622,72 @@ function saveOutlook(market, o) {
 function maybeEmitOutlook(market) {
   const o = computeOutlook(market); if (!o) return;
   if (!(market.pulse.lastPrice > 0)) return; // no price = no prediction
-  const hourStart = Math.floor(Date.now() / 3600000) * 3600000;
-  const hourEnd = hourStart + 3600000;
-  o.hourStart = hourStart;
-  o.horizonEnd = hourEnd;
-  o.horizonMin = Math.max(1, Math.ceil((hourEnd - Date.now()) / 60000));
+  o.horizonEnd = Date.now() + 60 * 60000; // decision-anchored window
+  o.horizonMin = 60;
   const last = market.outlook;
-  if (last && last.hourStart === hourStart && last.call === o.call) { market.flow.pendingCall = null; return; }
+  if (last && last.call === o.call) { market.flow.pendingCall = null; return; }
   if (last && o.call !== last.call) {
     const pend = market.flow.pendingCall;
     if (!pend || pend.call !== o.call) { market.flow.pendingCall = { call: o.call, since: Date.now() }; return; }
     if (Date.now() - pend.since < 120000) return; // 2 min tika tabhi flip
     market.flow.pendingCall = null;
   }
-  if (last && last.hourStart === hourStart && Date.now() - last.ts < 10 * 60000) return;
-  o.ts = hourStart; // PK (symbol, ts) => same candle par UPSERT, nayi row nahi
+  if (last && Date.now() - last.ts < 10 * 60000) return;
+  o.ts = Date.now();
   o.horizonMin = 60;
   market.outlook = o;
   broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: o.ts, type: 'OUTLOOK', side: o.call, usd: 0, price: market.pulse.lastPrice || 0, meta: { score: o.score, horizonMin: o.horizonMin, reasons: o.reasons } } });
   saveOutlook(market, o);
 }
+const MOVE_TRACK = new Map();
+const MISSED = [];
+function tradeMinUsd(symbol, price) { return symbol === 'BTCUSDT' ? 350 : Math.max(50, price * 0.0046); }
+function cosine(a, b) {
+  if (!a || !b) return 0;
+  let dot = 0, na = 0, nb = 0;
+  for (const k of FEATURE_DEFS) { const x = a[k] || 0, y = b[k] || 0; dot += x * y; na += x * x; nb += y * y; }
+  return (na > 0 && nb > 0) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+}
 async function resolveOutlooks() {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
   try {
     const now = Date.now();
-    const due = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?resolved=eq.false&ts=lt.${now - 60000}`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
-    if (!Array.isArray(due) || !due.length) return;
+    const open = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?resolved=eq.false&order=ts.asc&limit=50`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
+    if (!Array.isArray(open) || !open.length) return;
     const prices = {};
-    for (const sym of [...new Set(due.map(d => d.symbol))]) {
+    for (const sym of [...new Set(open.map(d => d.symbol))]) {
       const m = markets.get(sym.toLowerCase());
       if (m && m.pulse && m.pulse.lastPrice > 0) { prices[sym] = m.pulse.lastPrice; continue; }
       try { const t = await fetch(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${sym}`).then(r => r.json()); prices[sym] = parseFloat(t?.result?.list?.[0]?.lastPrice) || 0; } catch (e) {}
     }
-    for (const row of due) {
+    for (const row of open) {
       const px = prices[row.symbol]; if (!px) continue;
       if (!row.price_at_call || row.price_at_call <= 0) {
         fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => {});
         continue;
       }
-      if (now - row.ts < (row.horizon_min || 60) * 60000) continue;
-      const pct = ((px - row.price_at_call) / row.price_at_call) * 100;
-      const actual = pct > 0.15 ? 'up' : pct < -0.15 ? 'down' : 'flat';
-      const correct = (row.call === 'bull' && actual === 'up') || (row.call === 'bear' && actual === 'down') || (row.call === 'range' && actual === 'flat');
-      await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' }, body: JSON.stringify({ resolved: true, resolved_at: now, actual_dir: actual, actual_pct: round2(pct), correct }) });
+      const key = row.symbol + ':' + row.ts;
+      let tr = MOVE_TRACK.get(key);
+      if (!tr) { tr = { maxDev: 0, moveStartMin: null, peakMin: null }; MOVE_TRACK.set(key, tr); }
+      const m = Math.floor((now - row.ts) / 60000);
+      const dev = px - row.price_at_call;
+      if (Math.abs(dev) > Math.abs(tr.maxDev)) { tr.maxDev = dev; tr.peakMin = m; }
+      const thr = tradeMinUsd(row.symbol, row.price_at_call);
+      if (tr.moveStartMin == null && Math.abs(dev) >= thr) tr.moveStartMin = m;
+      if (m < (row.horizon_min || 60)) continue; // window abhi chalu hai
+      const moveUsd = round2(dev);
+      const maxMove = round2(tr.maxDev);
+      const dur = (tr.moveStartMin != null && tr.peakMin != null) ? Math.max(0, tr.peakMin - tr.moveStartMin) : null;
+      const cdm = tr.moveStartMin != null ? Math.max(0, (row.horizon_min || 60) - tr.moveStartMin) : null;
+      const bucket = tr.moveStartMin == null ? null : (tr.moveStartMin < 15 ? 'early' : tr.moveStartMin < 40 ? 'mid' : 'late');
+      const userCall = Math.abs(moveUsd) >= thr ? (moveUsd > 0 ? 'bull' : 'bear') : 'range';
+      const correct = (row.call === 'bull' && moveUsd >= thr) || (row.call === 'bear' && moveUsd <= -thr) || (row.call === 'range' && Math.abs(moveUsd) < thr);
+      MOVE_TRACK.delete(key);
+      if (row.call === 'range' && Math.abs(moveUsd) >= thr) {
+        MISSED.push({ feat: (row.context && row.context.feat) || null, m: tr.moveStartMin });
+        if (MISSED.length > 30) MISSED.shift();
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${row.symbol}&ts=eq.${row.ts}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' }, body: JSON.stringify({ resolved: true, resolved_at: now, end_price: round2(px), actual_pct: round2((dev / row.price_at_call) * 100), actual_dir: dev > 0 ? 'up' : dev < 0 ? 'down' : 'flat', move_usd: moveUsd, max_move_usd: maxMove, move_start_min: tr.moveStartMin, move_dur_min: dur, countdown_at_move: cdm, user_call: userCall, pattern_bucket: bucket, correct }) });
     }
   } catch (e) { console.error('outlook resolve:', e.message); }
 }
@@ -923,7 +962,7 @@ app.get('/api/outlook', async (req, res) => {
         const dir = rows.filter(r => r.call !== 'range');
         const dirOk = dir.filter(r => r.correct).length;
         out.stats = { total, correct, accuracyPct: total ? Math.round(correct / total * 100) : 0, dirTotal: dir.length, dirCorrect: dirOk, dirPct: dir.length ? Math.round(dirOk / dir.length * 100) : 0 };
-        out.history = rows.slice(0, 20).map(r => ({ ts: r.ts, call: r.call, score: r.score, reasons: r.reasons, price_at_call: r.price_at_call, resolved_at: r.resolved_at, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct, context: r.context || null }));
+        out.history = rows.slice(0, 20).map(r => ({ ts: r.ts, call: r.call, score: r.score, reasons: r.reasons, price_at_call: r.price_at_call, resolved_at: r.resolved_at, actual_dir: r.actual_dir, actual_pct: r.actual_pct, correct: r.correct, context: r.context || null, end_price: r.end_price, move_usd: r.move_usd, max_move_usd: r.max_move_usd, move_start_min: r.move_start_min, move_dur_min: r.move_dur_min, countdown_at_move: r.countdown_at_move, user_call: r.user_call, pattern_bucket: r.pattern_bucket }));
       }
     } catch (e) {}
   }
