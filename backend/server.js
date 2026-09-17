@@ -512,23 +512,75 @@ function windowDeltas(market, ms) {
   const px = bs.length ? bs[bs.length - 1].close - bs[0].close : 0;
   return { cvd, oi, px };
 }
-function computeOutlook(market) {
-  const f = market.flow; if (!f) return null;
-  const c = f.cls;
+const FEATURE_DEFS = ['whale','pro','retailFade','cvd1h','oi','herd','smart','trap','align','div'];
+const PRIOR = { whale: 0.30, pro: 0.15, retailFade: 0.10, cvd1h: 0.10, oi: 0.05, herd: 0.10, smart: 0.10, trap: 0.15, align: 0.10, div: 0.15 };
+let MODEL = { weights: null, n: 0, updated: 0 };
+function featureVector(market) {
+  const f = market.flow; const c = f.cls;
   const wc = c.whale.buy - c.whale.sell, pc = c.pro.buy - c.pro.sell, rc = c.retail.buy - c.retail.sell;
   const d = windowDeltas(market, 3600000);
-  let s = 0; const reasons = [];
-  const w = Math.max(-1, Math.min(1, wc / 50000)); s += w * 30; if (Math.abs(w) > 0.3) reasons.push(`whale flow ${w > 0 ? 'buy' : 'sell'} heavy`);
-  s += Math.max(-1, Math.min(1, pc / 100000)) * 15;
-  const rt = Math.max(-1, Math.min(1, rc / 100000)); s -= rt * 10; if (Math.abs(rt) > 0.4) reasons.push(`retail crowded ${rt > 0 ? 'long' : 'short'} (fade)`);
-  s += Math.max(-1, Math.min(1, d.cvd / 200)) * 10;
-  if (d.oi !== 0 && d.px !== 0) { s += (Math.sign(d.oi) === Math.sign(d.px) ? 5 : -5) * Math.sign(d.px); reasons.push(d.oi > 0 ? 'new money with trend' : 'position unwind'); }
-  if (f.herd && f.herd.until > Date.now()) { s += f.herd.side === 'buy' ? -10 : 10; reasons.push(`retail herd ${f.herd.side} (fade)`); }
-  if (f.recentSmart && Date.now() - f.recentSmart.ts < 600000) { s += f.recentSmart.side === 'buy' ? 10 : -10; reasons.push(`smart money ${f.recentSmart.side} clips`); }
-  if (f.trap && Date.now() - f.trap.ts < 600000) { s += f.trap.side === 'buy' ? -15 : 15; reasons.push(`trap on ${f.trap.side}s`); }
-  s = Math.max(-100, Math.min(100, Math.round(s)));
+  const d5 = windowDeltas(market, 300000);
+  const cl = (x) => Math.max(-1, Math.min(1, x));
+  const feat = {};
+  feat.whale = cl(wc / 50000);
+  feat.pro = cl(pc / 100000);
+  feat.retailFade = -cl(rc / 100000);
+  feat.cvd1h = cl(d.cvd / 200);
+  feat.oi = (d.oi !== 0 && d.px !== 0) ? (Math.sign(d.oi) === Math.sign(d.px) ? Math.sign(d.px) : -Math.sign(d.px)) : 0;
+  feat.herd = (f.herd && f.herd.until > Date.now()) ? (f.herd.side === 'buy' ? -1 : 1) : 0;
+  feat.smart = (f.recentSmart && Date.now() - f.recentSmart.ts < 600000) ? (f.recentSmart.side === 'buy' ? 1 : -1) : 0;
+  feat.trap = (f.trap && Date.now() - f.trap.ts < 600000) ? (f.trap.side === 'buy' ? -1 : 1) : 0;
+  feat.align = (Math.sign(d5.cvd) !== 0 && Math.sign(d5.cvd) === Math.sign(d.cvd)) ? Math.sign(d.cvd) : 0;
+  feat.div = (Math.abs(d.cvd) > 100 && Math.abs(d.px) / Math.max(1, market.pulse.lastPrice) < 0.0005) ? -Math.sign(d.cvd) : 0;
+  return feat;
+}
+function weightFor(name) {
+  const w = MODEL.weights && MODEL.weights[name];
+  if (!w || w.n < 15) return PRIOR[name] || 0;
+  const shrink = w.n / (w.n + 30);
+  return (PRIOR[name] || 0) * (1 - shrink) + w.weight * shrink;
+}
+async function recomputeWeights() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?resolved=eq.true&actual_pct=not.is.null&order=ts.desc&limit=300`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
+    if (!Array.isArray(rows) || rows.length < 10) return;
+    const stats = {};
+    for (const r of rows) {
+      const feat = r.context && r.context.feat; if (!feat) continue;
+      if (Math.abs(r.actual_pct) < 0.03) continue; // noise hour — skip
+      for (const k of FEATURE_DEFS) {
+        const v = feat[k]; if (v == null || Math.abs(v) < 0.3) continue;
+        stats[k] = stats[k] || { n: 0, win: 0 };
+        stats[k].n++;
+        if (Math.sign(v) === Math.sign(r.actual_pct)) stats[k].win++;
+      }
+    }
+    const weights = {};
+    for (const k of FEATURE_DEFS) {
+      const s = stats[k]; if (!s || s.n < 5) continue;
+      const wr = s.win / s.n;
+      weights[k] = { weight: Math.max(-1, Math.min(1, (wr - 0.5) * 2)), n: s.n, winrate: Math.round(wr * 100) / 100, updated: Date.now() };
+    }
+    MODEL = { weights, n: rows.length, updated: Date.now() };
+    for (const k of Object.keys(weights)) {
+      fetch(`${SUPABASE_URL}/rest/v1/flow_weights?feature=eq.${k}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify(Object.assign({ feature: k }, weights[k])) }).catch(() => {});
+    }
+  } catch (e) { console.error('model recompute:', e.message); }
+}
+setInterval(recomputeWeights, 3600000);
+setTimeout(recomputeWeights, 30000);
+function computeOutlook(market) {
+  const f = market.flow; if (!f) return null;
+  const feat = featureVector(market);
+  let raw = 0; const reasons = [];
+  for (const k of FEATURE_DEFS) {
+    raw += weightFor(k) * feat[k];
+    if (Math.abs(feat[k]) >= 0.5 && Math.abs(weightFor(k)) >= 0.08) reasons.push(`${k} ${feat[k] > 0 ? '+' : '-'}${Math.abs(feat[k]).toFixed(1)} (w${weightFor(k) >= 0 ? '+' : ''}${weightFor(k).toFixed(2)})`);
+  }
+  const s = Math.max(-100, Math.min(100, Math.round(raw * 70)));
   const call = s >= 25 ? 'bull' : s <= -25 ? 'bear' : 'range';
-  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60 };
+  return { call, score: s, reasons: reasons.slice(0, 4), ts: Date.now(), horizonMin: 60, feat };
 }
 function flowContext(market) {
   const f = market.flow; const c = f.cls;
@@ -540,7 +592,7 @@ function flowContext(market) {
 }
 function saveOutlook(market, o) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
-  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: flowContext(market), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
+  fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: Object.assign(flowContext(market), { feat: o.feat || null }), resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
 }
 function maybeEmitOutlook(market) {
   const o = computeOutlook(market); if (!o) return;
@@ -551,7 +603,13 @@ function maybeEmitOutlook(market) {
   o.horizonEnd = hourEnd;
   o.horizonMin = Math.max(1, Math.ceil((hourEnd - Date.now()) / 60000));
   const last = market.outlook;
-  if (last && last.hourStart === hourStart && last.call === o.call) return; // ek 1H candle = ek call
+  if (last && last.hourStart === hourStart && last.call === o.call) { market.flow.pendingCall = null; return; }
+  if (last && o.call !== last.call) {
+    const pend = market.flow.pendingCall;
+    if (!pend || pend.call !== o.call) { market.flow.pendingCall = { call: o.call, since: Date.now() }; return; }
+    if (Date.now() - pend.since < 120000) return; // 2 min tika tabhi flip
+    market.flow.pendingCall = null;
+  }
   if (last && last.hourStart === hourStart && Date.now() - last.ts < 10 * 60000) return;
   o.ts = hourStart; // PK (symbol, ts) => same candle par UPSERT, nayi row nahi
   o.horizonMin = 60;
@@ -860,6 +918,7 @@ app.get('/api/outlook', async (req, res) => {
       }
     } catch (e) {}
   }
+  out.model = { samples: MODEL.n, updated: MODEL.updated, weights: MODEL.weights };
   res.json(out);
 });
 app.get('/api/flow-summary', (req, res) => {
