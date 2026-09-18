@@ -96,7 +96,7 @@ function updateOutBox() {
   const hist = document.getElementById('fo-history');
   if (hist && state.record && state.record.history) {
     hist.innerHTML = state.record.history.map((h, i) => { const hh = new Date(h.ts).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' }); const mv = h.move_usd != null ? (h.move_usd >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(h.move_usd)) : ((h.actual_pct || 0) > 0 ? '+' : '') + h.actual_pct + '%';
-    const ob = h.outcome === 'SL_THEN_TP' ? 'SL→TP' : h.outcome === 'TP_THEN_SL' ? 'TP→SL' : (h.outcome || '—');
+    const ob = h.outcome === 'SL_THEN_TP' ? 'SL→TP' : h.outcome === 'TP_THEN_SL' ? 'TP→SL' : (h.call === 'range' ? 'NO-TRADE' : (h.outcome || '—'));
     const du = h.move_dur_min != null ? ` · ${h.move_dur_min}m` : '';
     return `<div class="fo-hrow" data-i="${i}">${hh} ${h.call.toUpperCase()} ${h.correct ? '✓' : '✗'} ${mv}${du} · ${ob}</div>`; }).join('') || 'koi resolved call nahi abhi';
     hist.querySelectorAll('.fo-hrow').forEach(el => { el.onclick = () => openDrill(state.record.history[parseInt(el.getAttribute('data-i'), 10)]); });
