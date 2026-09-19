@@ -512,8 +512,8 @@ function windowDeltas(market, ms) {
   const px = bs.length ? bs[bs.length - 1].close - bs[0].close : 0;
   return { cvd, oi, px };
 }
-const FEATURE_DEFS = ['whale','pro','retailFade','cvd1h','oi','herd','smart','trap','align','div'];
-const PRIOR = { whale: 0.30, pro: 0.15, retailFade: 0.10, cvd1h: 0.10, oi: 0.05, herd: 0.10, smart: 0.10, trap: 0.15, align: 0.10, div: 0.15 };
+const FEATURE_DEFS = ['whale','pro','retailFade','cvd1h','oi','herd','smart','trap','align','div','mom'];
+const PRIOR = { whale: 0.30, pro: 0.15, retailFade: 0.10, cvd1h: 0.10, oi: 0.05, herd: 0.10, smart: 0.10, trap: 0.15, align: 0.10, div: 0.15, mom: 0.20 };
 let MODEL = { weights: null, n: 0, updated: 0 };
 function featureVector(market) {
   const f = market.flow; const c = f.cls;
@@ -532,12 +532,19 @@ function featureVector(market) {
   feat.trap = (f.trap && Date.now() - f.trap.ts < 600000) ? (f.trap.side === 'buy' ? -1 : 1) : 0;
   feat.align = (Math.sign(d5.cvd) !== 0 && Math.sign(d5.cvd) === Math.sign(d.cvd)) ? Math.sign(d.cvd) : 0;
   feat.div = (Math.abs(d.cvd) > 100 && Math.abs(d.px) / Math.max(1, market.pulse.lastPrice) < 0.0005) ? -Math.sign(d.cvd) : 0;
+  const c3 = (market.candles || []).slice(-180);
+  if (c3.length >= 120) {
+    const net3 = c3[c3.length - 1].close - c3[0].close;
+    const sum3 = c3.reduce((a, c) => a + (c.high - c.low), 0);
+    const eff3 = sum3 > 0 ? Math.abs(net3) / sum3 : 0;
+    feat.mom = Math.max(-1, Math.min(1, (eff3 / 0.35) * Math.sign(net3)));
+  } else feat.mom = 0;
   return feat;
 }
 function weightFor(name) {
   const w = MODEL.weights && MODEL.weights[name];
-  if (!w || w.n < 15) return PRIOR[name] || 0;
-  const shrink = w.n / (w.n + 30);
+  if (!w || w.n < 8) return PRIOR[name] || 0;
+  const shrink = w.n / (w.n + 12);
   return (PRIOR[name] || 0) * (1 - shrink) + w.weight * shrink;
 }
 async function recomputeWeights() {
@@ -556,6 +563,10 @@ async function recomputeWeights() {
           stats[k].n++;
           if (Math.sign(v) === target) stats[k].win++;
         }
+      }
+      if (feat && r.call === 'range' && Math.abs(r.max_move_usd || 0) >= 350) {
+        const t2 = r.max_move_usd > 0 ? 1 : -1;
+        for (const k of FEATURE_DEFS) { const v = feat[k]; if (v == null || Math.abs(v) < 0.3) continue; stats[k] = stats[k] || { n: 0, win: 0 }; stats[k].n++; if (Math.sign(v) === t2) stats[k].win++; }
       }
       const rk = r.call + ':' + (r.regime || 'trend');
       reg[rk] = reg[rk] || { n: 0, win: 0 };
@@ -605,11 +616,18 @@ function computeOutlook(market) {
     const sum = l60.reduce((a, c) => a + (c.high - c.low), 0);
     eff = sum > 0 ? net / sum : 0;
   }
+  const r60x = ((market.candles || []).slice(-60).reduce((a, c) => a + (c.high - c.low), 0) / 60);
   const regime0 = eff < 0.2 ? 'chop' : 'trend';
   const tune = (MODEL.regimeTune && MODEL.regimeTune[regime0]) || { slMult: 1, confBoost: 0, slHunt: 0 };
   const bar = 25 + (tune.confBoost || 0);
   let call = s >= bar ? 'bull' : s <= -bar ? 'bear' : 'range';
-  if (eff < 0.2 && call !== 'range') { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
+  const momV = feat.mom || 0;
+  if (call === 'range' && Math.abs(momV) >= 0.5 && eff >= 0.15 && r60x >= 25) {
+    call = momV > 0 ? 'bull' : 'bear';
+    reasons.unshift(`trend momentum: 3h eff ${momV.toFixed(2)} — established trend join`);
+  }
+  if (r60x < 20 && call !== 'range') { call = 'range'; reasons.unshift(`vol too low: r60 $${Math.round(r60x)} < $20`); }
+  if (eff < 0.2 && call !== 'range' && Math.abs(momV) < 0.5) { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
   if (tune.confBoost > 0 && call === 'range' && Math.abs(s) >= 25) reasons.unshift(`conf bar +${tune.confBoost} (${regime0} mein stop-hunt ${Math.round((tune.slHunt || 0) * 100)}%)`);
   let pattern = null;
   if (call === 'range' && MISSED.length >= 3) {
@@ -656,6 +674,37 @@ function saveOutlook(market, o) {
   fetch(`${SUPABASE_URL}/rest/v1/flow_outlook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify([{ symbol: market.symbol.toUpperCase(), ts: o.ts, horizon_min: o.horizonMin, call: o.call, score: o.score, reasons: o.reasons, price_at_call: round2(market.pulse.lastPrice || 0), context: Object.assign(flowContext(market), { feat: o.feat || null }), tp_price: o.tp, sl_price: o.sl, regime: o.regime, desc_text: o.desc, resolved: false }]) }).catch(e => console.error('outlook save:', e.message));
 }
 function maybeEmitOutlook(market) {
+  const f = market.flow;
+  const lp = market.pulse.lastPrice || 0;
+  if (f && lp > 0) {
+    if (!f.winOpen) f.winOpen = lp;
+    const dev = lp - f.winOpen;
+    const thr = tradeMinUsd(market.symbol, lp);
+    const cSince = (market.candles || []).slice(-10);
+    let effSince = 0;
+    if (cSince.length >= 5) { const n2 = cSince[cSince.length - 1].close - cSince[0].close; const sm = cSince.reduce((a, c) => a + (c.high - c.low), 0); effSince = sm > 0 ? Math.abs(n2) / sm : 0; }
+    const lastO = market.outlook;
+    const bSide = dev > 0 ? 'bull' : 'bear';
+    if (Math.abs(dev) >= thr && effSince >= 0.25 && lastO && lastO.call !== bSide) {
+      if (!f.breakPend || f.breakPend.side !== bSide) f.breakPend = { side: bSide, since: Date.now() };
+      else if (Date.now() - f.breakPend.since >= 120000) {
+        const bo = computeOutlook(market);
+        if (bo) {
+          bo.call = bSide;
+          bo.reasons.unshift(`BREAKOUT: ${dev > 0 ? '+' : '-'}$${Math.abs(Math.round(dev))} since call, eff ${effSince.toFixed(2)} — trend join`);
+          bo.score = Math.max(Math.abs(bo.score), 45) * (dev > 0 ? 1 : -1);
+          const slD = Math.max(lp * 0.0018, 30) * 1.2;
+          bo.sl = round2(dev > 0 ? lp - slD : lp + slD);
+          bo.tp = round2(dev > 0 ? lp + slD * 2 : lp - slD * 2);
+          bo.desc = `${bSide.toUpperCase()} breakout entry ~${round2(lp)} · SL ${bo.sl} · TP ${bo.tp} · confirmed move $${Math.abs(Math.round(dev))}`;
+          market.outlook = bo; market.flow.winOpen = lp; market.flow.breakPend = null;
+          broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: bo.ts, type: 'OUTLOOK', side: bSide, usd: 0, price: lp, meta: { score: bo.score, reasons: bo.reasons.slice(0, 3) } } });
+          saveOutlook(market, bo);
+          return;
+        }
+      }
+    } else if (Math.abs(dev) < thr * 0.5) { f.breakPend = null; }
+  }
   const o = computeOutlook(market); if (!o) return;
   if (!(market.pulse.lastPrice > 0)) return; // no price = no prediction
   o.horizonEnd = Date.now() + 60 * 60000; // decision-anchored window
@@ -675,6 +724,8 @@ function maybeEmitOutlook(market) {
   o.ts = Date.now();
   o.horizonMin = 60;
   market.outlook = o;
+  market.flow.winOpen = market.pulse.lastPrice || market.flow.winOpen;
+  market.flow.breakPend = null;
   broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: o.ts, type: 'OUTLOOK', side: o.call, usd: 0, price: market.pulse.lastPrice || 0, meta: { score: o.score, horizonMin: o.horizonMin, reasons: o.reasons } } });
   saveOutlook(market, o);
 }
