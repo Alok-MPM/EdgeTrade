@@ -139,6 +139,7 @@ mountEl.innerHTML = `
   <button class="ctc-pill" id="ctc-orderflow-btn" title="Order Flow">Order Flow</button>
   <button class="ctc-pill" id="ctc-liquidity-btn" title="Liquidity">Liquidity</button>
   <button class="ctc-pill" id="ctc-whales-btn" title="Whale Absorption">Whales</button>
+  <button class="ctc-pill" id="ctc-context-btn" title="Macro Context (sentiment + news + global)">🌐 Context</button>
   <button class="ctc-pill" id="ctc-pulse-btn" title="Market Pulse AI" style="color:var(--gold);border-color:var(--gold);">⚡ Pulse</button>
   <div class="ctc-divider"></div>
   <button class="ctc-pill" id="ctc-fi-whale-btn" title="Whale flow: split execution + whale prints">🐋 Whale</button>
@@ -185,6 +186,7 @@ document.getElementById('ctc-footprint-btn').onclick = () => toggleFeatureModule
 document.getElementById('ctc-orderflow-btn').onclick = () => toggleFeatureModule('orderflow', 'ctc-orderflow-btn');
 document.getElementById('ctc-liquidity-btn').onclick = () => toggleFeatureModule('liquidity', 'ctc-liquidity-btn');
 document.getElementById('ctc-whales-btn').onclick = () => toggleFeatureModule('whaleTracker', 'ctc-whales-btn');
+document.getElementById('ctc-context-btn').onclick = () => toggleFeatureModule('marketContext', 'ctc-context-btn');
 document.getElementById('ctc-pulse-btn').onclick = () => toggleFeatureModule('pulse', 'ctc-pulse-btn');
 const fiLayer = (layer, btnId) => { const fi = window.flowIntel; const btn = document.getElementById(btnId); if (fi && fi.toggleLayer) { btn.classList.toggle('on', fi.toggleLayer(layer)); } else { btn.setAttribute('data-pending-layer', layer); btn.classList.add('on'); } };
 document.getElementById('ctc-fi-whale-btn').onclick = () => fiLayer('whale', 'ctc-fi-whale-btn');
