@@ -622,12 +622,27 @@ function computeOutlook(market) {
   const bar = 25 + (tune.confBoost || 0);
   let call = s >= bar ? 'bull' : s <= -bar ? 'bear' : 'range';
   const momV = feat.mom || 0;
-  if (call === 'range' && Math.abs(momV) >= 0.5 && eff >= 0.15 && r60x >= 25) {
+  let trendAllow = false;
+  if (call === 'range' && Math.abs(momV) >= 0.35 && eff >= 0.12 && r60x >= 25) {
     call = momV > 0 ? 'bull' : 'bear';
+    trendAllow = true;
     reasons.unshift(`trend momentum: 3h eff ${momV.toFixed(2)} — established trend join`);
   }
+  const hrs = {};
+  (market.candles || []).forEach(c => { const h = Math.floor(c.time / 3600000); if (!hrs[h]) hrs[h] = { o: c.open, c: c.close }; else hrs[h].c = c.close; });
+  const hkeys = Object.keys(hrs).map(Number).sort((a, b) => a - b).slice(-6);
+  let streak = 0, hdir = 0;
+  for (let i = hkeys.length - 1; i >= 0; i--) { const d = Math.sign(hrs[hkeys[i]].c - hrs[hkeys[i]].o); if (d === 0) break; if (hdir === 0) { hdir = d; streak = 1; } else if (d === hdir) streak++; else break; }
+  const lpNow = market.pulse.lastPrice || 0;
+  const curHr = hrs[Math.floor(Date.now() / 3600000)];
+  const curDir = (curHr && lpNow > 0) ? Math.sign(lpNow - curHr.o) : 0;
+  if (call === 'range' && streak >= 2 && curDir !== 0 && curDir === hdir && r60x >= 25) {
+    call = curDir > 0 ? 'bull' : 'bear';
+    trendAllow = true;
+    reasons.unshift(`grind trend: ${streak} consecutive hourly closes ${curDir > 0 ? 'up' : 'down'} + current hour same`);
+  }
   if (r60x < 20 && call !== 'range') { call = 'range'; reasons.unshift(`vol too low: r60 $${Math.round(r60x)} < $20`); }
-  if (eff < 0.2 && call !== 'range' && Math.abs(momV) < 0.5) { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
+  if (eff < 0.2 && call !== 'range' && !trendAllow) { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
   if (tune.confBoost > 0 && call === 'range' && Math.abs(s) >= 25) reasons.unshift(`conf bar +${tune.confBoost} (${regime0} mein stop-hunt ${Math.round((tune.slHunt || 0) * 100)}%)`);
   let pattern = null;
   if (call === 'range' && MISSED.length >= 3) {
@@ -651,7 +666,7 @@ function computeOutlook(market) {
   const regime = eff < 0.2 ? 'chop' : 'trend';
   let tp = null, sl = null, desc = '';
   if (call !== 'range' && lp2 > 0 && r60 > 0) {
-    const slDist = Math.max(lp2 * 0.0018, r60 * 0.9) * (tune.slMult || 1);
+    const slDist = Math.max(lp2 * 0.0022, r60 * 1.2) * (tune.slMult || 1);
     const tpDist = slDist * 2;
     if (call === 'bull') { tp = round2(lp2 + tpDist); sl = round2(lp2 - slDist); }
     else { tp = round2(lp2 - tpDist); sl = round2(lp2 + slDist); }
@@ -679,13 +694,14 @@ function maybeEmitOutlook(market) {
   if (f && lp > 0) {
     if (!f.winOpen) f.winOpen = lp;
     const dev = lp - f.winOpen;
-    const thr = tradeMinUsd(market.symbol, lp);
+    const r60q = ((market.candles || []).slice(-60).reduce((a, c) => a + (c.high - c.low), 0) / 60) || 30;
+    const thr = Math.max(tradeMinUsd(market.symbol, lp), r60q * 1.5);
     const cSince = (market.candles || []).slice(-10);
     let effSince = 0;
     if (cSince.length >= 5) { const n2 = cSince[cSince.length - 1].close - cSince[0].close; const sm = cSince.reduce((a, c) => a + (c.high - c.low), 0); effSince = sm > 0 ? Math.abs(n2) / sm : 0; }
     const lastO = market.outlook;
     const bSide = dev > 0 ? 'bull' : 'bear';
-    if (Math.abs(dev) >= thr && effSince >= 0.25 && lastO && lastO.call !== bSide) {
+    if (Math.abs(dev) >= thr && effSince >= 0.30 && lastO && lastO.call !== bSide) {
       if (!f.breakPend || f.breakPend.side !== bSide) f.breakPend = { side: bSide, since: Date.now() };
       else if (Date.now() - f.breakPend.since >= 120000) {
         const bo = computeOutlook(market);
@@ -693,10 +709,10 @@ function maybeEmitOutlook(market) {
           bo.call = bSide;
           bo.reasons.unshift(`BREAKOUT: ${dev > 0 ? '+' : '-'}$${Math.abs(Math.round(dev))} since call, eff ${effSince.toFixed(2)} — trend join`);
           bo.score = Math.max(Math.abs(bo.score), 45) * (dev > 0 ? 1 : -1);
-          const slD = Math.max(lp * 0.0018, 30) * 1.2;
+          const slD = Math.max(lp * 0.0025, r60q * 1.5);
           bo.sl = round2(dev > 0 ? lp - slD : lp + slD);
-          bo.tp = round2(dev > 0 ? lp + slD * 2 : lp - slD * 2);
-          bo.desc = `${bSide.toUpperCase()} breakout entry ~${round2(lp)} · SL ${bo.sl} · TP ${bo.tp} · confirmed move $${Math.abs(Math.round(dev))}`;
+          bo.tp = round2(dev > 0 ? lp + slD * 2.5 : lp - slD * 2.5);
+          bo.desc = `${bSide.toUpperCase()} breakout entry ~${round2(lp)} · SL ${bo.sl} · TP ${bo.tp} · confirmed move $${Math.abs(Math.round(dev))}${r60q > 120 ? ' · HIGH VOL: size 0.5x' : ''}`;
           market.outlook = bo; market.flow.winOpen = lp; market.flow.breakPend = null;
           broadcastToMarket(market, { type: 'flow_event', data: { symbol: market.symbol.toUpperCase(), ts: bo.ts, type: 'OUTLOOK', side: bSide, usd: 0, price: lp, meta: { score: bo.score, reasons: bo.reasons.slice(0, 3) } } });
           saveOutlook(market, bo);
@@ -1067,7 +1083,7 @@ app.get('/api/outlook', async (req, res) => {
   const out = { current: market && market.outlook ? market.outlook : null, stats: null, history: [] };
   if (SUPABASE_URL && SUPABASE_KEY) {
     try {
-      const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${symbol}&resolved=eq.true&order=ts.desc&limit=50`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
+      const rows = await fetch(`${SUPABASE_URL}/rest/v1/flow_outlook?symbol=eq.${symbol}&resolved=eq.true&order=ts.desc&limit=300`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json());
       if (Array.isArray(rows)) {
         const total = rows.length, correct = rows.filter(r => r.correct).length;
         const dir = rows.filter(r => r.call !== 'range');
