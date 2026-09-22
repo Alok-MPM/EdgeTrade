@@ -617,10 +617,12 @@ function computeOutlook(market) {
     eff = sum > 0 ? net / sum : 0;
   }
   const r60x = ((market.candles || []).slice(-60).reduce((a, c) => a + (c.high - c.low), 0) / 60);
+  const macroHint = market._macroHint || null;
   const regime0 = eff < 0.2 ? 'chop' : 'trend';
   const tune = (MODEL.regimeTune && MODEL.regimeTune[regime0]) || { slMult: 1, confBoost: 0, slHunt: 0 };
-  const bar = 25 + (tune.confBoost || 0);
+  const bar = 25 + (tune.confBoost || 0) - (macroHint && macroHint.biasShift ? macroHint.biasShift : 0);
   let call = s >= bar ? 'bull' : s <= -bar ? 'bear' : 'range';
+  if (macroHint && macroHint.tag !== 'neutral') reasons.unshift(`macro: ${macroHint.tag} (${macroHint.note})`);
   const momV = feat.mom || 0;
   let trendAllow = false;
   if (call === 'range' && Math.abs(momV) >= 0.35 && eff >= 0.12 && r60x >= 25) {
@@ -666,7 +668,7 @@ function computeOutlook(market) {
   const regime = eff < 0.2 ? 'chop' : 'trend';
   let tp = null, sl = null, desc = '';
   if (call !== 'range' && lp2 > 0 && r60 > 0) {
-    const slDist = Math.max(lp2 * 0.0022, r60 * 1.2) * (tune.slMult || 1);
+    const slDist = Math.max(lp2 * 0.0022, r60 * 1.2) * (tune.slMult || 1) * (macroHint && macroHint.slWiden ? macroHint.slWiden : 1);
     const tpDist = slDist * 2;
     if (call === 'bull') { tp = round2(lp2 + tpDist); sl = round2(lp2 - slDist); }
     else { tp = round2(lp2 - tpDist); sl = round2(lp2 + slDist); }
@@ -819,6 +821,13 @@ async function resolveOutlooks() {
   } catch (e) { console.error('outlook resolve:', e.message); }
 }
 setInterval(resolveOutlooks, 60000);
+setInterval(async () => {
+  try {
+    const mod = require('./macro-context');
+    const hint = await fetch('http://localhost:' + PORT + '/api/macro-hint').then(r => r.json()).catch(() => null);
+    for (const m of markets.values()) { if (m.awake) m._macroHint = hint; }
+  } catch (e) {}
+}, 60000);
 function flowStatePayload(market) {
   const f = market.flow;
   return { cls: f.cls, pct: f.pct, bounds: { retailMax: retailMax(f), whaleMin: whaleMin(f) }, herd: f.herd, trap: f.trap, studyTrades: f.studyTrades, recentSmart: f.recentSmart, outlook: market.outlook || null };
@@ -1308,5 +1317,10 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 app.get('/', (req, res) => res.json({ ok: true, service: 'edgetrade-backend' }));
 app.get('/healthz', (req, res) => res.json({ ok: true }));
+try {
+  const macroCtx = require('./macro-context');
+  macroCtx.mount(app);
+  console.log('[system] macro-context mounted (/api/macro-context, /api/macro-hint)');
+} catch (e) { console.error('[system] macro-context load failed:', e.message); }
 server.listen(PORT, '0.0.0.0', () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
 wakeUp('btcusdt').catch(() => {}); // boot the 24/7 collector
