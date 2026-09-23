@@ -625,7 +625,7 @@ function computeOutlook(market) {
   if (macroHint && macroHint.tag !== 'neutral') reasons.unshift(`macro: ${macroHint.tag} (${macroHint.note})`);
   const momV = feat.mom || 0;
   let trendAllow = false;
-  if (call === 'range' && Math.abs(momV) >= 0.35 && eff >= 0.12 && r60x >= 25) {
+  if (call === 'range' && Math.abs(momV) >= 0.35 && eff >= 0.2 && r60x >= 25) {
     call = momV > 0 ? 'bull' : 'bear';
     trendAllow = true;
     reasons.unshift(`trend momentum: 3h eff ${momV.toFixed(2)} — established trend join`);
@@ -638,13 +638,13 @@ function computeOutlook(market) {
   const lpNow = market.pulse.lastPrice || 0;
   const curHr = hrs[Math.floor(Date.now() / 3600000)];
   const curDir = (curHr && lpNow > 0) ? Math.sign(lpNow - curHr.o) : 0;
-  if (call === 'range' && streak >= 2 && curDir !== 0 && curDir === hdir && r60x >= 25) {
+  if (call === 'range' && streak >= 2 && curDir !== 0 && curDir === hdir && r60x >= 25 && eff >= 0.2) {
     call = curDir > 0 ? 'bull' : 'bear';
     trendAllow = true;
     reasons.unshift(`grind trend: ${streak} consecutive hourly closes ${curDir > 0 ? 'up' : 'down'} + current hour same`);
   }
   if (r60x < 20 && call !== 'range') { call = 'range'; reasons.unshift(`vol too low: r60 $${Math.round(r60x)} < $20`); }
-  if (eff < 0.2 && call !== 'range' && !trendAllow) { call = 'range'; reasons.unshift(`chop guard: efficiency ${eff.toFixed(2)} < 0.20`); }
+  if (eff < 0.2 && call !== 'range') { call = 'range'; reasons.unshift(`chop guard: eff ${eff.toFixed(2)} < 0.20 — chop mein directional 8/40 jeete hain, isliye NO-TRADE`); }
   if (tune.confBoost > 0 && call === 'range' && Math.abs(s) >= 25) reasons.unshift(`conf bar +${tune.confBoost} (${regime0} mein stop-hunt ${Math.round((tune.slHunt || 0) * 100)}%)`);
   let pattern = null;
   if (call === 'range' && MISSED.length >= 3) {
