@@ -148,6 +148,7 @@ mountEl.innerHTML = `
   <button class="ctc-pill" id="ctc-fi-herd-btn" title="Retail herd zones">👥 Retail</button>
   <button class="ctc-pill" id="ctc-fi-panel-btn" title="Flow Intel panel + trap alerts">🧠 Flow Intel</button>
   <button class="ctc-pill" id="ctc-fi-outlook-btn" title="Market Outlook + accuracy record">📈 Outlook</button>
+  <button class="ctc-pill" id="ctc-burst-btn" title="Burst-Catcher signal strip">🎯 Burst</button>
   <div class="ctc-divider"></div>
   <button class="ctc-pill ctc-ai-btn" id="ctc-ai-btn" title="AI Assistant">✨ AI</button>
 </div>`;
@@ -195,6 +196,14 @@ document.getElementById('ctc-fi-abs-btn').onclick = () => fiLayer('absorb', 'ctc
 document.getElementById('ctc-fi-herd-btn').onclick = () => fiLayer('herd', 'ctc-fi-herd-btn');
 document.getElementById('ctc-fi-panel-btn').onclick = () => { const fi = window.flowIntel; const btn = document.getElementById('ctc-fi-panel-btn'); if (fi && fi.togglePanel) { btn.classList.toggle('on', fi.togglePanel()); } else { btn.setAttribute('data-pending-panel', '1'); btn.classList.add('on'); } };
 document.getElementById('ctc-fi-outlook-btn').onclick = () => { const fi = window.flowIntel; const btn = document.getElementById('ctc-fi-outlook-btn'); if (fi && fi.toggleOutlook) { btn.classList.toggle('on', fi.toggleOutlook()); } else { btn.setAttribute('data-pending-outlook', '1'); btn.classList.add('on'); } };
+const bcScript = document.createElement('script');
+bcScript.src = 'chart-terminal/burst-catcher.js';
+bcScript.onload = () => {
+  const b = document.getElementById('ctc-burst-btn');
+  if (b) { if (window.burstCatcher && window.burstCatcher.isActive()) b.classList.add('on'); if (b.hasAttribute('data-pending-burst')) { b.removeAttribute('data-pending-burst'); b.classList.toggle('on', window.burstCatcher.toggle()); } }
+};
+document.head.appendChild(bcScript);
+document.getElementById('ctc-burst-btn').onclick = () => { const bc = window.burstCatcher; const btn = document.getElementById('ctc-burst-btn'); if (bc && bc.toggle) { btn.classList.toggle('on', bc.toggle()); } else { btn.setAttribute('data-pending-burst', '1'); btn.classList.add('on'); } };
 document.getElementById('ctc-ai-btn').onclick = () => {
   if (window.aiAssistant && typeof window.aiAssistant.open === 'function') window.aiAssistant.open();
   else console.warn('[chart-cockpit] ai-assistant.js not loaded yet');
