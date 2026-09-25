@@ -1322,5 +1322,10 @@ try {
   macroCtx.mount(app);
   console.log('[system] macro-context mounted (/api/macro-context, /api/macro-hint)');
 } catch (e) { console.error('[system] macro-context load failed:', e.message); }
+try {
+  const burst = require('./burst-engine');
+  burst.mount(app, markets, broadcastToMarket);
+  console.log('[system] burst-engine mounted');
+} catch (e) { console.error('[system] burst-engine load failed:', e.message); }
 server.listen(PORT, '0.0.0.0', () => { console.log(`[system] EdgeTrade backend listening on port ${PORT}`); });
 wakeUp('btcusdt').catch(() => {}); // boot the 24/7 collector
