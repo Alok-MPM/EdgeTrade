@@ -1,9 +1,9 @@
 (function () {
-if (typeof chartEngine === 'undefined' || typeof window.chartOverlayUtils === 'undefined' || typeof marketStore === 'undefined') return;
+if (typeof chartEngine === 'undefined' || typeof marketStore === 'undefined') return;
 const WS_BASE = 'wss://m-edgetrade-api-server.onrender.com/ws/footprint';
 const REST_BASE = 'https://m-edgetrade-api-server.onrender.com';
 const IST = 19800;
-const state = { active: false, ws: null, wsT: null, st: null, events: [], rows: [], overlay: null, overlayOk: false, unsub: null, strip: null, list: null, listOpen: false, symbol: null };
+const state = { active: false, ws: null, wsT: null, st: null, events: [], rows: [], canvas: null, ctx: null, cw: 0, ch: 0, unsub: null, strip: null, list: null, listOpen: false, symbol: null };
 const style = document.createElement('style');
 style.textContent = `.bc-strip{position:fixed;top:118px;left:16px;z-index:60;max-width:min(72vw,760px);background:rgba(15,15,18,0.95);border:1px solid #2a2a30;border-radius:8px;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#EAECEF;cursor:pointer;line-height:1.55;display:none;} .bc-list{position:fixed;top:164px;left:16px;z-index:60;width:330px;max-height:40vh;overflow-y:auto;background:#0f0f12;border:1px solid #2a2a30;border-radius:8px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:10px;display:none;line-height:1.6;} .bc-row{padding:3px 0;border-bottom:1px dashed #2a2a30;}`;
 document.head.appendChild(style);
@@ -15,7 +15,7 @@ function ensureUI() {
     state.list = document.createElement('div'); state.list.className = 'bc-list';
     document.body.appendChild(state.strip); document.body.appendChild(state.list);
     state.strip.onclick = () => { state.listOpen = !state.listOpen; state.list.style.display = state.listOpen ? 'block' : 'none'; renderList(); };
-  } catch (e) { console.error('[burst] ui:', e); }
+  } catch (e) {}
 }
 function renderList() {
   if (!state.list) return;
@@ -50,18 +50,56 @@ function updateStrip() {
       const lastTxt = last ? ` · last: ${last.outcome} ${last.move_usd != null ? (last.move_usd >= 0 ? '+$' + Math.round(last.move_usd) : '-$' + Math.abs(Math.round(last.move_usd))) : ''}` : '';
       state.strip.innerHTML = `${evw}🎯 FLAT — burst scan on${pri}${lastTxt}`;
     }
-  } catch (e) { console.error('[burst] strip:', e); }
+  } catch (e) {}
 }
-function safeRender() { try { render(); } catch (e) { console.error('[burst] render:', e); } }
+function sizeCanvas() {
+  const cont = document.getElementById('klineMainChart');
+  if (!cont || !state.canvas) return;
+  const r = cont.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  state.cw = Math.max(1, Math.round(r.width));
+  state.ch = Math.max(1, Math.round(r.height));
+  state.canvas.width = Math.round(state.cw * dpr);
+  state.canvas.height = Math.round(state.ch * dpr);
+  state.canvas.style.width = state.cw + 'px';
+  state.canvas.style.height = state.ch + 'px';
+  state.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function ensureCanvas() {
+  if (state.canvas) { state.canvas.style.display = 'block'; sizeCanvas(); return true; }
+  try {
+    const cont = document.getElementById('klineMainChart');
+    if (!cont) return false;
+    if (getComputedStyle(cont).position === 'static') cont.style.position = 'relative';
+    const c = document.createElement('canvas');
+    c.id = 'bc-overlay';
+    c.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:3;background:transparent;';
+    cont.appendChild(c);
+    state.canvas = c; state.ctx = c.getContext('2d');
+    const chart = chartEngine.getInstance();
+    if (chart && typeof chart.subscribeVisibleLogicalRangeChange === 'function') {
+      chart.subscribeVisibleLogicalRangeChange(safeRender);
+    }
+    window.addEventListener('resize', safeRender);
+    sizeCanvas();
+    return true;
+  } catch (e) { state.canvas = null; state.ctx = null; return false; }
+}
+function killCanvas() {
+  if (state.canvas) { try { state.canvas.remove(); } catch (e) {} }
+  state.canvas = null; state.ctx = null; state.cw = 0; state.ch = 0;
+}
+function safeRender() { try { render(); } catch (e) {} }
 function render() {
-  if (!state.active || !state.overlayOk || !state.overlay) return;
+  if (!state.active || !state.canvas || !state.ctx) return;
   const series = chartEngine.getSeries(); const chart = chartEngine.getInstance();
   if (!series || !chart) return;
-  const ctx = state.overlay.ctx, canvas = state.overlay.canvas;
-  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  sizeCanvas();
+  const ctx = state.ctx;
+  ctx.clearRect(0, 0, state.cw, state.ch);
   const ts = chart.timeScale();
   const drawMark = (sec, price, color, label, dy) => {
-    const x = ts.timeToCoordinate(sec + IST); if (x === null || x < -60 || x > canvas.clientWidth + 60) return;
+    const x = ts.timeToCoordinate(sec + IST); if (x === null || x < -60 || x > state.cw + 60) return;
     const y = series.priceToCoordinate(price); if (y === null) return;
     ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
     if (label) { ctx.font = '10px JetBrains Mono, monospace'; const w = ctx.measureText(label).width + 8; ctx.fillStyle = color; ctx.fillRect(x + 6, y - 8 + (dy || 0), w, 14); ctx.fillStyle = '#111317'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, x + 10, y - 1 + (dy || 0)); }
@@ -73,7 +111,7 @@ function render() {
   (state.events || []).forEach(ev => { if (ev.kind === 'TRAP-SKIP') drawMark(Math.floor(ev.ts / 1000), ev.price, '#f5cb42', 'TRAP-SKIP', -18); });
   if (state.st && state.st.phase === 'IN' && state.st.pos) {
     const y = series.priceToCoordinate(state.st.pos.sl);
-    if (y !== null) { ctx.strokeStyle = '#E05252'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.clientWidth, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#E05252'; ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'left'; ctx.fillText('TRAIL SL ' + state.st.pos.sl, 6, y - 5); }
+    if (y !== null) { ctx.strokeStyle = '#E05252'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(state.cw, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#E05252'; ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'left'; ctx.fillText('TRAIL SL ' + state.st.pos.sl, 6, y - 5); }
   }
 }
 function connect(symbol) {
@@ -103,27 +141,15 @@ async function loadRows() {
     updateStrip(); renderList(); safeRender();
   } catch (e) { state.rows = []; }
 }
-function ensureOverlay() {
-  if (state.overlayOk) { state.overlay.canvas.style.display = 'block'; return true; }
-  try {
-    state.overlay = window.chartOverlayUtils.createOverlayCanvas('klineMainChart', 'bc-overlay');
-    const chart = chartEngine.getInstance();
-    if (chart && !state.unsub) state.unsub = window.chartOverlayUtils.subscribeVisibleRangeRedraw(chart, safeRender);
-    state.overlayOk = true;
-    state.overlay.canvas.style.display = 'block';
-    state.overlay.resize();
-    return true;
-  } catch (e) { console.error('[burst] overlay failed, strip-only mode:', e); state.overlayOk = false; return false; }
-}
 function toggle() {
   state.active = !state.active;
   if (state.active) {
-    ensureUI(); ensureOverlay();
+    ensureUI(); ensureCanvas();
     if (state.strip) state.strip.style.display = 'block';
     connect(marketStore.getState().symbol); loadRows();
   } else {
     if (state.ws) { state.ws.onclose = null; try { state.ws.close(); } catch (e) {} state.ws = null; }
-    if (state.overlayOk && state.overlay) { try { state.overlay.clear(); state.overlay.canvas.style.display = 'none'; } catch (e) {} }
+    killCanvas();
     if (state.strip) state.strip.style.display = 'none';
     if (state.list) state.list.style.display = 'none';
   }
